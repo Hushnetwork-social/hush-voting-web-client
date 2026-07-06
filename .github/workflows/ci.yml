@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  repository-metadata:
+    name: Repository metadata
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate required metadata files
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s README.md
+          test -s LICENSE
+          test -s .gitignore
+          grep -q "MIT License" LICENSE
+
+  frontend:
+    name: Build, unit tests, and happy-path E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CI: "true"
+      HUSH_CI_E2E_DOTNET_FILTER: "Category=E2E&Category=HappyPath&Category!=LONG_RUNNING"
+      HUSH_CI_GHERKIN_TAG_EXPRESSION: "@HappyPath and not @LONG_RUNNING"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Enable Corepack
+        shell: bash
+        run: corepack enable
+
+      - name: Run frontend CI contract
+        shell: bash
+        run: bash scripts/ci/run-frontend-ci.sh

@@ -53,6 +53,23 @@ GRPC_SERVER_URL=http://localhost:4666
 
 This repository has been initialized with project metadata only. The frontend scaffold and runtime commands will be added when implementation starts.
 
+## CI contract
+
+GitHub Actions validates repository metadata on every push and pull request.
+
+After the frontend scaffold is added, `package.json` must define:
+
+- `build`: production build.
+- `test:unit` or `test`: unit test suite.
+- `test:e2e:happy-path`: HappyPath Gherkin E2E integration tests, excluding `LONG_RUNNING` scenarios.
+
+The CI workflow exposes these filter hints for the E2E script:
+
+```env
+HUSH_CI_E2E_DOTNET_FILTER=Category=E2E&Category=HappyPath&Category!=LONG_RUNNING
+HUSH_CI_GHERKIN_TAG_EXPRESSION=@HappyPath and not @LONG_RUNNING
+```
+
 ## License
 
 MIT
