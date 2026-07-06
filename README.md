@@ -89,6 +89,31 @@ repository, export the values in a local shell and run:
 bash scripts/github/set-aws-cd-secrets.sh Hushnetwork-social/hush-voting-web-client
 ```
 
+## CD contract
+
+Deployment is handled by GitHub Actions in `.github/workflows/cd.yml`.
+
+Trigger tag:
+
+```text
+HushVotingWebClient-vMAJOR.MINOR.PATCH
+```
+
+Published image:
+
+```text
+ghcr.io/hushnetwork-social/hush-voting-web-client:<version>
+```
+
+AWS runtime:
+
+- Container name: `HushVotingWebClient`
+- Local port: `127.0.0.1:3006`
+- Public domain: `https://app.hushvoting.com`
+- Backend: existing HushServerNode at `https://api.hushnetwork.social`
+
+The web client container is expected to expose HTTP on container port `3000`.
+
 ## License
 
 MIT

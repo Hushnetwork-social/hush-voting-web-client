@@ -1,0 +1,226 @@
+name: CD - HushVoting Web Client
+
+on:
+  push:
+    tags:
+      - "HushVotingWebClient-v[0-9]+.[0-9]+.[0-9]+"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to deploy, for example v1.0.1 or 1.0.1. Leave empty to use a timestamp."
+        required: false
+        type: string
+      grpc_url:
+        description: "HushServerNode gRPC URL."
+        required: false
+        type: string
+        default: "https://api.hushnetwork.social"
+      debug_logging:
+        description: "Enable debug logging."
+        required: false
+        type: boolean
+        default: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: hushnetwork-social/hush-voting-web-client
+  NODE_VERSION: "22"
+  APP_SITE_URL: https://app.hushvoting.com
+  MARKETING_SITE_URL: https://www.hushvoting.com
+  DEFAULT_HUSHSERVERNODE_GRPC_URL: https://api.hushnetwork.social
+
+jobs:
+  ci:
+    name: CI gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Enable Corepack
+        shell: bash
+        run: corepack enable
+
+      - name: Run frontend CI contract
+        shell: bash
+        run: bash scripts/ci/run-frontend-ci.sh
+
+  build-and-deploy:
+    name: Build, publish, and deploy
+    needs: [ci]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: HushServerNode AWS CD
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Extract deployment version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            RAW_VERSION="${{ inputs.version }}"
+
+            if [[ -z "${RAW_VERSION}" ]]; then
+              VERSION="manual-$(date +%Y%m%d-%H%M%S)"
+            elif [[ "${RAW_VERSION}" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              VERSION="v${RAW_VERSION#v}"
+            else
+              echo "::error::Invalid version '${RAW_VERSION}'. Use vMAJOR.MINOR.PATCH, for example v1.0.1."
+              exit 1
+            fi
+          else
+            TAG_NAME="${GITHUB_REF_NAME}"
+
+            if [[ ! "${TAG_NAME}" =~ ^HushVotingWebClient-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "::error::Invalid deployment tag '${TAG_NAME}'. Expected HushVotingWebClient-vMAJOR.MINOR.PATCH."
+              exit 1
+            fi
+
+            VERSION="${TAG_NAME#HushVotingWebClient-}"
+          fi
+
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "Deploying HushVoting Web Client ${VERSION}"
+
+      - name: Resolve HushServerNode URL
+        id: backend
+        shell: bash
+        run: |
+          set -euo pipefail
+          GRPC_URL="${{ inputs.grpc_url || env.DEFAULT_HUSHSERVERNODE_GRPC_URL }}"
+          if [[ "${GRPC_URL}" != "https://api.hushnetwork.social" ]]; then
+            echo "::warning::Deploying with non-default HushServerNode URL: ${GRPC_URL}"
+          fi
+          echo "grpc_url=${GRPC_URL}" >> "${GITHUB_OUTPUT}"
+
+      - name: Validate deployable scaffold
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f package.json || { echo "::error::package.json is required before CD can deploy."; exit 1; }
+          test -f Dockerfile || { echo "::error::Dockerfile is required before CD can deploy."; exit 1; }
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.GHCR_USERNAME || vars.GHCR_USERNAME || github.actor }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
+          build-args: |
+            APP_VERSION=${{ steps.version.outputs.version }}
+            NEXT_PUBLIC_APP_VERSION=${{ steps.version.outputs.version }}
+            NEXT_PUBLIC_API_URL=${{ env.APP_SITE_URL }}
+            NEXT_PUBLIC_APP_BASE_URL=${{ env.APP_SITE_URL }}
+            NEXT_PUBLIC_MARKETING_BASE_URL=${{ env.MARKETING_SITE_URL }}
+            NEXT_PUBLIC_GRPC_URL=${{ steps.backend.outputs.grpc_url }}
+            NEXT_PUBLIC_DEBUG_LOGGING=${{ inputs.debug_logging || 'false' }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Set up SSH key
+        shell: bash
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.AWS_SSH_PRIVATE_KEY }}" > ~/.ssh/lightsail.pem
+          chmod 600 ~/.ssh/lightsail.pem
+          ssh-keyscan -H "${{ secrets.AWS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Deploy to AWS Lightsail
+        shell: bash
+        env:
+          SSH_HOST: ${{ secrets.AWS_HOST }}
+          SSH_USER: ${{ secrets.AWS_SSH_USER }}
+          IMAGE_TAG: ${{ steps.version.outputs.version }}
+          GRPC_SERVER_URL: ${{ steps.backend.outputs.grpc_url }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME || vars.GHCR_USERNAME || github.actor }}
+          GHCR_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          APP_SITE_URL: ${{ env.APP_SITE_URL }}
+          MARKETING_SITE_URL: ${{ env.MARKETING_SITE_URL }}
+        run: |
+          ssh -i ~/.ssh/lightsail.pem -o ServerAliveInterval=30 -o ServerAliveCountMax=10 "${SSH_USER}@${SSH_HOST}" "IMAGE_TAG=${IMAGE_TAG}" "GRPC_SERVER_URL=${GRPC_SERVER_URL}" "GHCR_TOKEN=${GHCR_TOKEN}" "GHCR_USERNAME=${GHCR_USERNAME}" "GHCR_IMAGE=${GHCR_IMAGE}" "APP_SITE_URL=${APP_SITE_URL}" "MARKETING_SITE_URL=${MARKETING_SITE_URL}" 'bash -s' << 'DEPLOY_SCRIPT'
+            set -euo pipefail
+
+            CONTAINER_NAME="HushVotingWebClient"
+
+            echo "Starting HushVoting Web Client deployment of version ${IMAGE_TAG}..."
+            echo "Using HushServerNode backend: ${GRPC_SERVER_URL}"
+            echo "${GHCR_TOKEN}" | sudo docker login ghcr.io -u "${GHCR_USERNAME}" --password-stdin
+
+            echo "Pulling ${GHCR_IMAGE}:${IMAGE_TAG}..."
+            sudo docker pull "${GHCR_IMAGE}:${IMAGE_TAG}"
+
+            echo "Stopping old HushVoting Web Client container..."
+            sudo docker stop "${CONTAINER_NAME}" || true
+            sudo docker rm "${CONTAINER_NAME}" || true
+
+            echo "Starting ${CONTAINER_NAME}..."
+            sudo docker run -d \
+              --name "${CONTAINER_NAME}" \
+              --restart always \
+              -e GRPC_SERVER_URL="${GRPC_SERVER_URL}" \
+              -e NEXT_PUBLIC_GRPC_URL="${GRPC_SERVER_URL}" \
+              -e NEXT_PUBLIC_API_URL="${APP_SITE_URL}" \
+              -e NEXT_PUBLIC_APP_BASE_URL="${APP_SITE_URL}" \
+              -e NEXT_PUBLIC_MARKETING_BASE_URL="${MARKETING_SITE_URL}" \
+              -p 127.0.0.1:3006:3000 \
+              "${GHCR_IMAGE}:${IMAGE_TAG}"
+
+            echo "Verifying deployment..."
+            sleep 5
+            if sudo docker ps --filter "name=^/${CONTAINER_NAME}$" --format "{{.Names}}" | grep -qx "${CONTAINER_NAME}"; then
+              sudo docker ps --filter "name=${CONTAINER_NAME}" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+            else
+              sudo docker logs "${CONTAINER_NAME}" --tail 50 || true
+              exit 1
+            fi
+
+            curl -fsS -I http://127.0.0.1:3006 >/dev/null
+            echo "HushVoting Web Client deployment complete."
+          DEPLOY_SCRIPT
+
+      - name: Clean up SSH key
+        if: always()
+        shell: bash
+        run: rm -f ~/.ssh/lightsail.pem
+
+      - name: Deployment summary
+        shell: bash
+        run: |
+          echo "### HushVoting Web Client Deployment Complete" >> "${GITHUB_STEP_SUMMARY}"
+          echo "" >> "${GITHUB_STEP_SUMMARY}"
+          echo "**Version:** \`${{ steps.version.outputs.version }}\`" >> "${GITHUB_STEP_SUMMARY}"
+          echo "**Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}\`" >> "${GITHUB_STEP_SUMMARY}"
+          echo "**Container:** \`HushVotingWebClient\`" >> "${GITHUB_STEP_SUMMARY}"
+          echo "**Target:** AWS Lightsail" >> "${GITHUB_STEP_SUMMARY}"
+          echo "**URL:** \`${{ env.APP_SITE_URL }}\`" >> "${GITHUB_STEP_SUMMARY}"
+          echo "**Backend:** \`${{ steps.backend.outputs.grpc_url }}\`" >> "${GITHUB_STEP_SUMMARY}"
