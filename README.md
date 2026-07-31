@@ -17,6 +17,62 @@ Related repositories:
 - `hush-web-client`: broader HushNetwork app client.
 - `hush-website`: broader HushNetwork public website.
 
+## Architecture decisions
+
+### Product boundaries
+
+- `hush-voting-website` is the separate public marketing and information site at
+  `www.hushvoting.com`; it uses TanStack Start.
+- This repository is the authenticated voting application at
+  `app.hushvoting.com`. It does not contain a copy of the public website.
+
+### Voting application framework: Next.js
+
+**Decision:** Use Next.js and TypeScript for the HushVoting voting application.
+
+The voting client needs one carefully tested implementation of election
+creation, ballot casting, trustee actions, auditor review, verification, and
+identity integration. Next.js is the established HushNetwork application
+framework and is already compatible with the static-client build required by a
+native WebView shell. Replacing it with TanStack Start would not reduce the
+native mobile build cost, but would add a high-risk framework migration to the
+voting workflow.
+
+TanStack Start remains the deliberate choice for the separate public website;
+it is not the framework for this authenticated voting client.
+
+### Native application shell: Tauri 2
+
+**Decision:** Use Tauri 2 as the single native shell family for this client.
+
+One Next.js application will produce these delivery targets:
+
+- web application at `app.hushvoting.com`;
+- signed Android application for Google Play;
+- signed iPhone application for the Apple App Store; and
+- Windows, macOS, and Linux desktop applications only when a confirmed product
+  requirement justifies them.
+
+The Android and iPhone applications are store-delivered native packages, not
+PWAs. Tauri is retained because it permits one TypeScript/React voting UI and
+one native-shell contract across the required mobile platforms, without a
+second React Native or platform-specific UI implementation.
+
+The Tauri shell must host a deterministic static frontend bundle. All backend
+and election authority remains in HushServerNode. Native-only capabilities
+(such as push-notification registration, notification-tap routing, deep links,
+secure device storage, biometrics, and permissions) must be exposed through a
+small, capability-scoped, tested bridge rather than scattered platform checks
+in the voting UI.
+
+### Release and build policy
+
+Native builds are intentionally more expensive than web builds. They must run
+only for explicit release candidates, approved version tags, or manual release
+dispatches—not for ordinary web deployments or every pull request. Release
+workflows must cache safe build dependencies, preserve signing isolation, and
+publish hashes and release evidence for each signed native artifact.
+
 ## Planned scope
 
 - Authentication entry using the shared HushNetwork identity model.
