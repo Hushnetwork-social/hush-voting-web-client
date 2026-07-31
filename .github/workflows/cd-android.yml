@@ -1,0 +1,240 @@
+name: CD - Android Internal
+
+on:
+  push:
+    tags:
+      - "HushVotingAndroid-v[0-9]+.[0-9]+.[0-9]+"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "SemVer version to build, for example 0.1.0"
+        required: true
+        default: "0.1.0"
+        type: string
+      publish_to_play:
+        description: "Publish the signed AAB to the Google Play internal track"
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hush-voting-android-internal-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CI: "true"
+  NEXT_TELEMETRY_DISABLED: "1"
+  ANDROID_NDK_VERSION: "27.0.11902837"
+
+jobs:
+  build-android:
+    name: Build and optionally publish signed AAB
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    environment: HushVoting Google Play Internal
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Resolve release version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
+            VERSION="${GITHUB_REF_NAME#HushVotingAndroid-v}"
+          else
+            VERSION="${{ inputs.version }}"
+          fi
+          [[ "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+            echo "::error::Version must be MAJOR.MINOR.PATCH; received '${VERSION}'."
+            exit 1
+          }
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+
+      - name: Validate protected release secrets
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          PLAY_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          PUBLISH_TO_PLAY: ${{ github.event_name == 'push' || inputs.publish_to_play == true }}
+        run: |
+          set -euo pipefail
+          test -n "${KEYSTORE}" || { echo "::error::ANDROID_KEYSTORE_BASE64 is required."; exit 1; }
+          test -n "${STORE_PASSWORD}" || { echo "::error::ANDROID_KEYSTORE_PASSWORD is required."; exit 1; }
+          test -n "${KEY_ALIAS}" || { echo "::error::ANDROID_KEY_ALIAS is required."; exit 1; }
+          test -n "${KEY_PASSWORD}" || { echo "::error::ANDROID_KEY_PASSWORD is required."; exit 1; }
+          if [[ "${PUBLISH_TO_PLAY}" == "true" ]]; then
+            test -n "${PLAY_JSON}" || { echo "::error::GOOGLE_PLAY_SERVICE_ACCOUNT_JSON is required for publishing."; exit 1; }
+          fi
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install pinned Android SDK components
+        shell: bash
+        run: |
+          sdkmanager --install \
+            "platform-tools" \
+            "platforms;android-36" \
+            "build-tools;35.0.0" \
+            "build-tools;36.0.0" \
+            "ndk;${ANDROID_NDK_VERSION}"
+          echo "NDK_HOME=${ANDROID_HOME}/ndk/${ANDROID_NDK_VERSION}" >> "${GITHUB_ENV}"
+          echo "ANDROID_NDK_HOME=${ANDROID_HOME}/ndk/${ANDROID_NDK_VERSION}" >> "${GITHUB_ENV}"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install Rust Android targets
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android,i686-linux-android
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          cache-on-failure: true
+
+      - name: Configure Gradle caching
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.ref_type != 'tag' && github.ref_name != 'main' }}
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Run release gates
+        run: |
+          npm run lint
+          npm run typecheck
+          npm run test:unit
+          npm run build:static
+
+      - name: Set application version
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFile, writeFile } from 'node:fs/promises';
+          const path = 'src-tauri/tauri.conf.json';
+          const config = JSON.parse(await readFile(path, 'utf8'));
+          config.version = process.env.VERSION;
+          await writeFile(path, `${JSON.stringify(config, null, 2)}\n`);
+          NODE
+
+      - name: Initialize Android project
+        run: npm run tauri:android:init
+
+      - name: Configure release signing
+        run: node scripts/mobile/configure-android-signing.mjs
+
+      - name: Decode and verify Android keystore
+        id: signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          printf '%s' "${ANDROID_KEYSTORE_BASE64}" | base64 --decode > /tmp/hush-voting-release.keystore
+          keytool -list \
+            -keystore /tmp/hush-voting-release.keystore \
+            -storepass "${ANDROID_KEYSTORE_PASSWORD}" \
+            -alias "${ANDROID_KEY_ALIAS}" >/dev/null
+          FINGERPRINT="$(keytool -list -v \
+            -keystore /tmp/hush-voting-release.keystore \
+            -storepass "${ANDROID_KEYSTORE_PASSWORD}" \
+            -alias "${ANDROID_KEY_ALIAS}" \
+            | awk -F'SHA256: ' '/SHA256:/ { print $2; exit }')"
+          test -n "${FINGERPRINT}"
+          echo "fingerprint=${FINGERPRINT}" >> "${GITHUB_OUTPUT}"
+
+      - name: Build signed Android App Bundle
+        env:
+          ANDROID_KEYSTORE_PATH: /tmp/hush-voting-release.keystore
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          NEXT_PUBLIC_APP_VERSION: v${{ steps.version.outputs.version }}
+          NEXT_PUBLIC_APP_BASE_URL: https://app.hushvoting.com
+          NEXT_PUBLIC_API_URL: https://app.hushvoting.com
+          NEXT_PUBLIC_GRPC_URL: https://api.hushnetwork.social
+          NEXT_PUBLIC_DEBUG_LOGGING: "false"
+        run: npx tauri android build --aab --ci --target aarch64
+
+      - name: Collect signed AAB and release evidence
+        id: artifact
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          SIGNING_FINGERPRINT: ${{ steps.signing.outputs.fingerprint }}
+        run: |
+          set -euo pipefail
+          SOURCE_AAB="$(find src-tauri/gen/android/app/build/outputs/bundle -type f -name '*.aab' | head -1)"
+          test -n "${SOURCE_AAB}" || { echo "::error::No Android App Bundle was produced."; exit 1; }
+          mkdir -p release-artifacts
+          AAB="release-artifacts/HushVoting-v${VERSION}-internal.aab"
+          cp "${SOURCE_AAB}" "${AAB}"
+          DIGEST="sha256:$(sha256sum "${AAB}" | cut -d' ' -f1)"
+          jq -n \
+            --arg version "${VERSION}" \
+            --arg packageId "com.hushvoting.client" \
+            --arg artifact "$(basename "${AAB}")" \
+            --arg digest "${DIGEST}" \
+            --arg signingFingerprint "${SIGNING_FINGERPRINT}" \
+            --arg sourceCommit "${GITHUB_SHA}" \
+            --arg workflowRunId "${GITHUB_RUN_ID}" \
+            '{version: $version, packageId: $packageId, artifact: $artifact, digest: $digest, signingFingerprint: $signingFingerprint, sourceCommit: $sourceCommit, workflowRunId: $workflowRunId}' \
+            > release-artifacts/android-release-evidence.json
+          echo "aab=${AAB}" >> "${GITHUB_OUTPUT}"
+          echo "digest=${DIGEST}" >> "${GITHUB_OUTPUT}"
+
+      - name: Upload signed Android release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: HushVoting-Android-v${{ steps.version.outputs.version }}
+          path: release-artifacts/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish to Google Play internal track
+        if: github.event_name == 'push' || inputs.publish_to_play == true
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.hushvoting.client
+          releaseFiles: ${{ steps.artifact.outputs.aab }}
+          track: internal
+          status: completed
+
+      - name: Release summary
+        run: |
+          {
+            echo "### HushVoting Android internal release"
+            echo ""
+            echo "- Version: \`${{ steps.version.outputs.version }}\`"
+            echo "- Package: \`com.hushvoting.client\`"
+            echo "- AAB digest: \`${{ steps.artifact.outputs.digest }}\`"
+            echo "- Play upload requested: \`${{ github.event_name == 'push' || inputs.publish_to_play == true }}\`"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Remove protected signing material
+        if: always()
+        run: rm -f /tmp/hush-voting-release.keystore

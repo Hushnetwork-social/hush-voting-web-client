@@ -5,6 +5,8 @@ node_modules/
 
 # Build output
 .next/
+.next-web/
+.next-static/
 out/
 dist/
 build/

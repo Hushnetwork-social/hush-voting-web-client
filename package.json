@@ -1,0 +1,66 @@
+{
+  "name": "hush-voting-web-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "npm@10.9.4",
+  "engines": {
+    "node": ">=22 <23"
+  },
+  "scripts": {
+    "clean": "rimraf .next .next-web .next-tauri .next-static out coverage",
+    "clean:native": "rimraf src-tauri/target",
+    "dev": "next dev --port 3201",
+    "dev:tauri": "cross-env TAURI_DEV=true next dev --port 3202",
+    "build": "npm run build:web",
+    "build:web": "cross-env STANDALONE_BUILD=true next build",
+    "build:static": "cross-env STATIC_EXPORT=true next build",
+    "brand:sync": "node scripts/brand/sync-from-website.mjs",
+    "desktop:identity:install": "node scripts/dev/install-linux-desktop-entry.mjs",
+    "start": "next start --port 3201",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest",
+    "test:unit": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "tauri": "tauri",
+    "pretauri:dev": "npm run desktop:identity:install",
+    "tauri:dev": "tauri dev",
+    "tauri:build:linux": "tauri build --bundles deb,appimage",
+    "tauri:android:init": "tauri android init",
+    "tauri:android:dev": "tauri android dev",
+    "tauri:android:build:debug": "tauri android build --debug --apk --aab"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.11.1",
+    "next": "^16.2.12",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "sharp": "^0.35.3"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.11.4",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.1",
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.0.1",
+    "@types/react-dom": "^19.0.2",
+    "@vitejs/plugin-react": "^5.1.4",
+    "autoprefixer": "^10.4.20",
+    "cross-env": "^10.1.0",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.2.12",
+    "jsdom": "^27.3.0",
+    "postcss": "^8.5.15",
+    "rimraf": "^6.1.2",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.2",
+    "vite": "^8.2.0",
+    "vitest": "^4.1.10"
+  },
+  "overrides": {
+    "minimatch": "10.2.6",
+    "postcss": "$postcss",
+    "sharp": "$sharp"
+  }
+}

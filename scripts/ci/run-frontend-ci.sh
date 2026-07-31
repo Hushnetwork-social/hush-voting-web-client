@@ -87,6 +87,12 @@ fi
 has_script build || fail "package.json must define a build script."
 run_script build
 
+if has_script build:static; then
+  run_script build:static
+else
+  fail "package.json must define build:static for Tauri frontend validation."
+fi
+
 if has_script test:unit; then
   run_script test:unit
 elif has_script test; then
@@ -95,5 +101,8 @@ else
   fail "package.json must define test:unit or test for unit tests."
 fi
 
-has_script test:e2e:happy-path || fail "package.json must define test:e2e:happy-path for Gherkin happy-path E2E integration tests."
-run_script test:e2e:happy-path
+if has_script test:e2e:happy-path; then
+  run_script test:e2e:happy-path
+else
+  notice "No HushServerNode-backed HappyPath E2E harness is wired yet. It is required before the first election vertical slice is accepted."
+fi

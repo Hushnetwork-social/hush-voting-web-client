@@ -1,0 +1,92 @@
+name: CD - Ubuntu Desktop
+
+on:
+  push:
+    tags:
+      - "HushVotingDesktop-v[0-9]+.[0-9]+.[0-9]+"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hush-voting-linux-release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CI: "true"
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  build-linux:
+    name: Build Ubuntu packages
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Install Tauri Linux prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          cache-on-failure: true
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Run release gates
+        run: |
+          npm run lint
+          npm run typecheck
+          npm run test:unit
+
+      - name: Build Debian and AppImage packages
+        env:
+          NEXT_PUBLIC_APP_VERSION: ${{ github.ref_name }}
+          NEXT_PUBLIC_APP_BASE_URL: https://app.hushvoting.com
+          NEXT_PUBLIC_GRPC_URL: https://api.hushnetwork.social
+        run: npm run tauri:build:linux
+
+      - name: Collect artifacts and checksums
+        id: artifacts
+        run: |
+          set -euo pipefail
+          mkdir -p release-artifacts
+          find src-tauri/target/release/bundle -type f \( -name '*.deb' -o -name '*.AppImage' \) -exec cp {} release-artifacts/ \;
+          test "$(find release-artifacts -type f | wc -l)" -ge 2
+          (cd release-artifacts && sha256sum * > SHA256SUMS)
+          cat release-artifacts/SHA256SUMS
+
+      - name: Upload Ubuntu desktop release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: HushVoting-Ubuntu-${{ github.ref_name }}
+          path: release-artifacts/
+          if-no-files-found: error
+          retention-days: 30

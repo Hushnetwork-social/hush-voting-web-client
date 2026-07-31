@@ -45,13 +45,15 @@ it is not the framework for this authenticated voting client.
 
 **Decision:** Use Tauri 2 as the single native shell family for this client.
 
-One Next.js application will produce these delivery targets:
+One Next.js application now targets:
 
 - web application at `app.hushvoting.com`;
-- signed Android application for Google Play;
-- signed iPhone application for the Apple App Store; and
-- Windows, macOS, and Linux desktop applications only when a confirmed product
-  requirement justifies them.
+- signed Android application for the Google Play internal track and later production tracks;
+- Ubuntu desktop application as Debian and AppImage packages.
+
+The same Tauri structure should permit an iPhone application later. iOS initialization, signing,
+and App Store/TestFlight workflows are deferred until the macOS runner strategy and GitHub Actions
+minutes budget are approved. Windows and macOS desktop packages are not current delivery targets.
 
 The Android and iPhone applications are store-delivered native packages, not
 PWAs. Tauri is retained because it permits one TypeScript/React voting UI and
@@ -107,17 +109,76 @@ GRPC_SERVER_URL=http://localhost:4666
 
 ## Development status
 
-This repository has been initialized with project metadata only. The frontend scaffold and runtime commands will be added when implementation starts.
+The cross-platform foundation is implemented:
+
+- Next.js/React/TypeScript web application;
+- deterministic Next.js static export for Tauri;
+- minimal Tauri 2 Rust shell;
+- Ubuntu `.deb` and AppImage release workflow;
+- signed Android AAB workflow with optional Google Play internal-track publication;
+- npm, Next.js, Cargo, Gradle, and Docker build caching boundaries.
+
+Election features have not yet been migrated. The foundation screen deliberately does not expose
+live election actions.
+
+## Local development
+
+Ubuntu instructions: [`docs/development/UBUNTU.md`](docs/development/UBUNTU.md)
+
+```bash
+npm ci
+npm run dev
+```
+
+Quality and build commands:
+
+```bash
+npm run lint
+npm run typecheck
+npm run test:unit
+npm run build:web
+npm run build:static
+npm run tauri:dev # starts its own Next.js server on port 3202
+npm run tauri:build:linux
+```
+
+Build-target and cache policy: [`docs/architecture/BUILD_TARGETS_AND_CACHING.md`](docs/architecture/BUILD_TARGETS_AND_CACHING.md)
+
+## Brand and visual language
+
+The canonical HushVoting logo and Sovereign Shield visual language currently live in the sibling
+`hush-voting-website` repository:
+
+- `public/assets/hushvoting-logo.png`;
+- `STYLEGUIDE.md`;
+- `styles/app.css`.
+
+The application uses the same surface, primary, typography, spacing, and radius language while
+retaining the operational HushVoting rules from EPIC-013. To synchronize a newly approved website
+logo and regenerate the Next.js, Linux, Android, iOS, Windows, and macOS icon assets from the
+workspace root layout, run:
+
+```bash
+npm run brand:sync
+```
 
 ## CI contract
 
 GitHub Actions validates repository metadata on every push and pull request.
 
-After the frontend scaffold is added, `package.json` must define:
+The frontend CI validates:
 
-- `build`: production build.
-- `test:unit` or `test`: unit test suite.
-- `test:e2e:happy-path`: HappyPath Gherkin E2E integration tests, excluding `LONG_RUNNING` scenarios.
+- lint;
+- TypeScript;
+- unit tests;
+- Next.js standalone web build;
+- Next.js static/Tauri frontend build;
+- locked Cargo metadata.
+
+The HushServerNode-backed `test:e2e:happy-path` script becomes mandatory before the first election
+vertical slice is accepted. It is intentionally not represented by a fake scaffold test. Focused
+Playwright E2E remains in `hush-server-node/Node/HushNode.IntegrationTests` with matching server
+TwinTests.
 
 The CI workflow exposes these filter hints for the E2E script:
 
@@ -169,6 +230,19 @@ AWS runtime:
 - Backend: existing HushServerNode at `https://api.hushnetwork.social`
 
 The web client container is expected to expose HTTP on container port `3000`.
+
+## Native releases
+
+Ubuntu desktop packages are built only by an explicit
+`HushVotingDesktop-vMAJOR.MINOR.PATCH` tag or manual workflow dispatch.
+
+Android internal deployment is documented in
+[`docs/release/ANDROID_INTERNAL.md`](docs/release/ANDROID_INTERNAL.md). The scaffold proposes the
+permanent Android application ID `com.hushvoting.client`; product ownership must confirm it before the
+first Google Play upload.
+
+Native release jobs do not run for ordinary pull requests. iOS remains deferred because it requires
+a macOS runner, Apple signing assets, and an approved Actions-minutes budget.
 
 ## License
 
