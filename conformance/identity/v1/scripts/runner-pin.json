@@ -1,0 +1,6 @@
+{
+  "repository": "hush-server-node",
+  "revision": "9e9c130c542a701f9f4b31739b48cdc53cc4b056",
+  "note": "Pinned HushServerNode conformance runner revision for HushVoting pull-request compatibility CI. Update only via dual-owner (HushVoting + HushNetwork platform) review when the runner contract changes.",
+  "updated": "2026-08-02"
+}

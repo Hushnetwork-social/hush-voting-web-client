@@ -1,0 +1,155 @@
+name: Identity Compatibility - HushVoting to Server
+
+# FEAT-001 Phase 6 (Task 6.1): HushVoting-pull-request compatibility CI.
+# When the corpus or the TypeScript compatibility API changes, this workflow:
+#   1. runs the full TypeScript conformance and corpus suites; and
+#   2. checks out the APPROVED HushServerNode conformance runner at a PINNED
+#      revision (conformance/identity/v1/scripts/runner-pin.json) and runs it
+#      against the pull-request corpus, recording both revisions and the
+#      manifest digest in the job summary.
+# Normal HushVoting production builds remain independent of the server repo;
+# this workflow runs only when compatibility artifacts change.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "conformance/identity/**"
+      - "src/lib/identity-compatibility/**"
+  push:
+    branches: [main]
+    paths:
+      - "conformance/identity/**"
+      - "src/lib/identity-compatibility/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: identity-compat-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: "true"
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  typescript-conformance:
+    name: TypeScript conformance and corpus suites
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint and typecheck
+        run: |
+          npm run lint
+          npm run typecheck
+
+      - name: Unit tests
+        run: npm run test:unit
+
+      - name: TypeScript identity conformance (exit 0)
+        run: npm run identity:conformance
+
+      - name: Corpus suites (schema, integrity, docs, archive)
+        run: node --test "conformance/identity/v1/tests/*.test.mjs"
+
+      - name: Corpus integrity validation
+        run: |
+          node conformance/identity/v1/scripts/generate-manifest.mjs --check
+          node conformance/identity/v1/scripts/validate.mjs
+
+      - name: Upload TypeScript report
+        uses: actions/upload-artifact@v4
+        with:
+          name: typescript-identity-report
+          path: conformance/reports/typescript-identity-report.json
+          if-no-files-found: error
+
+  dotnet-cross-check:
+    name: .NET runner cross-check on PR corpus
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out HushVoting (PR corpus)
+        uses: actions/checkout@v5
+
+      - name: Read pinned server runner revision
+        id: pin
+        shell: bash
+        run: |
+          set -euo pipefail
+          PIN="conformance/identity/v1/scripts/runner-pin.json"
+          REV="$(node -e "console.log(JSON.parse(require('fs').readFileSync('${PIN}','utf8')).revision)")"
+          if ! [[ "${REV}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::runner-pin.json revision is not a 40-hex commit: ${REV}"
+            exit 1
+          fi
+          echo "revision=${REV}" >> "${GITHUB_OUTPUT}"
+
+      - name: Check out pinned HushServerNode runner
+        uses: actions/checkout@v5
+        with:
+          repository: Hushnetwork-social/hush-server-node
+          ref: ${{ steps.pin.outputs.revision }}
+          path: hush-server-node
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Build .NET conformance runner
+        working-directory: hush-server-node
+        run: dotnet build Tools/HushIdentityCompatibilityConformance/HushIdentityCompatibilityConformance.csproj --nologo
+
+      - name: Run pinned runner against PR corpus (exit 0)
+        id: conformance
+        shell: bash
+        run: |
+          set -euo pipefail
+          DIGEST="$(sha256sum hush-voting-web-client/conformance/identity/v1/manifest.json | cut -d' ' -f1)"
+          dotnet run --project hush-server-node/Tools/HushIdentityCompatibilityConformance \
+            -- --corpus hush-voting-web-client/conformance/identity/v1 \
+            --manifest-digest "${DIGEST}" \
+            --report conformance/reports/dotnet-identity-report.json
+          echo "manifest-digest=${DIGEST}" >> "${GITHUB_OUTPUT}"
+
+      - name: Record revisions and digest
+        shell: bash
+        run: |
+          {
+            echo "## Identity Compatibility Cross-Check"
+            echo ""
+            echo "| Item | Value |"
+            echo "|---|---|"
+            echo "| HushVoting revision | \`${GITHUB_SHA}\` |"
+            echo "| Pinned HushServerNode runner revision | \`${{ steps.pin.outputs.revision }}\` |"
+            echo "| Manifest digest | \`${{ steps.conformance.outputs.manifest-digest }}\` |"
+            echo "| .NET result | ${{ steps.conformance.outcome }} (exit 0) |"
+            echo ""
+            echo "No credential values are emitted in logs or reports."
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload .NET report
+        uses: actions/upload-artifact@v4
+        with:
+          name: dotnet-identity-report
+          path: conformance/reports/dotnet-identity-report.json
+          if-no-files-found: error

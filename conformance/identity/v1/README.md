@@ -110,6 +110,8 @@ newline.
   Phase 4): non-production adapter wrapping `Olimpo.KeyDerivation`,
   `Olimpo.CredentialsManager`, transaction serialization, and
   `Olimpo.DigitalSignature`. Pinned CI checkout; never an editable copy.
+  Automation exit codes: 0 all pass, 1 conformance mismatch, 2 invalid
+  corpus/schema/integrity input, 3 runner failure.
 - **Controlled identity lookup** (Phase 6): one focused HushServerNode TwinTest
   using `lookup/outcomes.json` with controlled identities only.
 - **Downstream features**: FEAT-002/003/007/008/009 and future Rust adapters
