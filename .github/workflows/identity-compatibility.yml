@@ -124,9 +124,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          DIGEST="$(sha256sum hush-voting-web-client/conformance/identity/v1/manifest.json | cut -d' ' -f1)"
+          DIGEST="$(sha256sum conformance/identity/v1/manifest.json | cut -d' ' -f1)"
           dotnet run --project hush-server-node/Tools/HushIdentityCompatibilityConformance \
-            -- --corpus hush-voting-web-client/conformance/identity/v1 \
+            -- --corpus conformance/identity/v1 \
             --manifest-digest "${DIGEST}" \
             --report conformance/reports/dotnet-identity-report.json
           echo "manifest-digest=${DIGEST}" >> "${GITHUB_OUTPUT}"
