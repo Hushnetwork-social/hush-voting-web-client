@@ -194,7 +194,8 @@ function compactToDer(rBytes, sBytes) {
   };
   const r = encInt(BigInt('0x' + bytesToHex(rBytes)));
   const s = encInt(BigInt('0x' + bytesToHex(sBytes)));
-  return new Uint8Array([0x30, r.length + s.length, ...r, ...s]);
+  const body = new Uint8Array([0x02, r.length, ...r, 0x02, s.length, ...s]);
+  return new Uint8Array([0x30, body.length, ...body]);
 }
 const derP01 = compactToDer(sigP01.slice(0, 32), sigP01.slice(32, 64));
 const derP02 = compactToDer(sigP02.slice(0, 32), sigP02.slice(32, 64));

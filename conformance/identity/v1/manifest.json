@@ -132,9 +132,9 @@
       "sha256": "417a502838a771ab9d7727a164c41e0e13cc428d39d2685e837c51bc95b2f77a"
     },
     {
-      "bytes": 14227,
+      "bytes": 14251,
       "path": "vectors/signature-vectors.json",
-      "sha256": "bf9a900f52e1f5694d9290ed92d4126123b2ec9c278cb87438917678a3464d78"
+      "sha256": "b084ee6dd48585732e0c1a1f6bf43c3622ae70d0513231108a56279781972017"
     }
   ],
   "schemaVersion": "1.0.0"

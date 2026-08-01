@@ -143,6 +143,22 @@ test('lookup outcomes cover zero, one, multiple, and dedup scenarios', () => {
   assert.ok(multi, 'no ambiguous multi-match scenario');
 });
 
+test('valid signature DER encodings are structurally correct DER (INTEGER tags, exact lengths)', () => {
+  for (const v of signature.vectors) {
+    if (v.expected !== 'VALID' || !v.signatureDerHex) continue;
+    const d = Buffer.from(v.signatureDerHex, 'hex');
+    assert.equal(d[0], 0x30, `${v.id}: missing SEQUENCE tag`);
+    assert.equal(d[1], d.length - 2, `${v.id}: SEQUENCE length mismatch`);
+    assert.equal(d[2], 0x02, `${v.id}: missing INTEGER tag for r`);
+    const rlen = d[3];
+    const sTag = 4 + rlen;
+    assert.equal(d[sTag], 0x02, `${v.id}: missing INTEGER tag for s`);
+    const slen = d[sTag + 1];
+    assert.equal(sTag + 2 + slen, d.length, `${v.id}: trailing or truncated bytes`);
+    assert.ok(rlen >= 32 && rlen <= 33 && slen >= 32 && slen <= 33, `${v.id}: invalid r/s lengths`);
+  }
+});
+
 test('corpus contains no private-key markers or placeholder secrets', () => {
   const joined = [
     raw('vectors/negative-vectors.json'),
