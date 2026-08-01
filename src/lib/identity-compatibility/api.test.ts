@@ -254,6 +254,20 @@ describe('pure .dat v1 operations (3.5/3.6)', () => {
     }
   });
 
+  it('does not false-positive on escaped-quote values (duplicate-key heuristic)', () => {
+    // A value containing an escaped quote followed by a colon must not be
+    // mistaken for a duplicate property.
+    const payload =
+      '{"ProfileName":"say \\"hi\\": now","PublicSigningAddress":"0237fdd4364c0b898908be2f1a98a6b4a7890c623ae92a283640e44d87e048daa5",' +
+      '"PrivateSigningKey":"6e3f74236c3d4a20553be05963f624696990c22245599b3d1b30262af793d885",' +
+      '"PublicEncryptAddress":"032ebaf076203f15ac8119cfdbc9394d1c7b9929b0647e4f607e27da95701f8556",' +
+      '"PrivateEncryptKey":"1a68f2d543282dd612502a1b3688e85eeca280057129d512011645a51cf6d552",' +
+      '"IsPublic":true,"Mnemonic":null}';
+    const result = parsePortableCredentialsStrict(payload);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.ProfileName).toBe('say "hi": now');
+  });
+
   it('detects mnemonic/key and private/public mismatches (D-014/D-015)', () => {
     const d014 = dtVectors.find((x) => x.id === 'D-014')!;
     const d015 = dtVectors.find((x) => x.id === 'D-015')!;
