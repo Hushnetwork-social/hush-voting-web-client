@@ -1,0 +1,135 @@
+{
+  "contractVersion": "1.0.0",
+  "kind": "dat-vectors",
+  "maxEnvelopeBytes": 1048576,
+  "schemaVersion": "1.0.0",
+  "vectors": [
+    {
+      "envelopeHex": "4855534801000000000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c6682e70cbad5cac305d922562fec1e473f54ae23fda0e7b812202a8792b7bf875e8cd0270ceb51991ea0d1da1a6014f0bd6d9a868fe9a9fda49782fdf4b67c7ce7c33f50780ee97b606f8d1811f5619187d8a0e6eedc05f7e309901052540fd8f7c60486884e391f62f8e74eff819b5ef84c6a0afdf752f22263cd8b2f0011178b361207e9c9022f916f1aaf708b36c68a5703caee2cee33c12191d1e4b2d9f2a6b58c7daece2982e1ef8032bc702353e6554e8a95786ec86f9ec4028a6e59991223cdd32a0615f87999b4c11471936b38a1878dae76da828f74f58e98e4e4b2aa061ffca4eef09680385f2f010f188612336670dec6247022e3d4a260eb88fa9fcb98909a3a1b260734227b1c783b8d211248a550f078c211d9d68bcd9e1bda8f38f09e9cc05a8230e4cd8a8248138cc96d786d3b751fb6d7d7076e38cabc274cbd30cc978b2e2ea6061965f5cb3266676076592a7fb8b63c53ef0540dd6990be07a814a8a73ea10c29ddde9526cdb27555c294176cf63b67f51708c8a601647bd348b3803c712dfa243eeaf5dee48319f2a5dbab74df9afa0a6449ad8c981d375bb0f92302c0e246c60a4943de650685ade4212285919e8a9d30f511da7ec9f2006322eefa1eb9532e3c3eaaebe6171668213586cf68d3e8ab9d0bc451045bdf63abba9af326997d9cc1c4a3159b657e58a501d096566c6815dd4ea34d4ed211db5a0210caec8f1fc7e549ca1e55780e78787e990bc8af52c5f8f772f421c681be4ca2b4ec58686a5cf6293b99eef135632000ad5e307af75c2a74bb6e2a15993cbb4fb05264a693abf0f2c58d6cefcb",
+      "expected": "OK",
+      "expectedPayloadJson": "{\"ProfileName\":\"public-test-profile-001\",\"PublicSigningAddress\":\"0237fdd4364c0b898908be2f1a98a6b4a7890c623ae92a283640e44d87e048daa5\",\"PrivateSigningKey\":\"6e3f74236c3d4a20553be05963f624696990c22245599b3d1b30262af793d885\",\"PublicEncryptAddress\":\"032ebaf076203f15ac8119cfdbc9394d1c7b9929b0647e4f607e27da95701f8556\",\"PrivateEncryptKey\":\"1a68f2d543282dd612502a1b3688e85eeca280057129d512011645a51cf6d552\",\"IsPublic\":true,\"Mnemonic\":\"abandon amount liar amount expire adjust cage candy arch gather drum bullet absurd math era live bid rhythm alien crouch range attend journey unaware\"}",
+      "id": "D-001",
+      "operation": "DECRYPT",
+      "password": "hush-public-test-password-2026-01",
+      "producerId": "P-04"
+    },
+    {
+      "envelopeHex": "4855534801000000000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c6682e70cbad5cac305d922562fec1e473f54ae23fda0e7b812202a8792b7bf875e8cd0270ceb51991ea0d1da1a6014f0bd6d9a868fe9a9fda49782fdf4b67c7ce7c33f50780ee97b606f8d1811f5619187d8a0e6eedc05f7e309901052540fd8f7c60486884e391f62f8e74eff819b5ef84c6a0afdf752f22263cd8b2f0011178b361207e9c9022f916f1aaf708b36c68a5703caee2cee33c12191d1e4b2d9f2a6b58c7daece2982e1ef8032bc702353e6554e8a95786ec86f9ec4028a6e59991223cdd32a0615f87999b4c11471936b38a1878dae76da828f74f58e98e4e4b2aa061ffca4eef09680385f2f010f188612336670dec6247022e3d4a260eb88fa9fcb98909a3a1b260734227b1c783b8d211248a550f078c211d9d68bcd9e1bda8f38f09e9cc05a8230e4cd8a8248138cc96d786d3b751fb6d7d7076e38cabc274cbd30cc978b2e2ea6061965f5cb3266676076592a7fb8b63c53ef0540dd6990be07a814a8a73ea10c29ddde9526cdb27555c294176cf63b67f51708c8a601647bd348b3803c712dfa243eeaf5dee48319f2a5dbab74df9afa0a6449ad8c981d375bb0f92302c0e246c60a4943de650685ade4212285919e8a9d30f511da7ec9f2006322eefa1eb9532e3c3eaaebe6171668213586cf68d3e8ab9d0bc451045bdf63abba9af326997d9cc1c4a3159b657e58a501d096566c6815dd4ea34d4ed211db5a0210caec8f1fc7e549ca1e55780e78787e990bc8af52c5f8f772f421c681be4ca2b4ec58686a5cf6293b99eef135632000ad5e307af75c2a74bb6e2a15993cbb4fb05264a693abf0f2c58d6cefcb",
+      "errorCode": "DAT_WRONG_PASSWORD",
+      "expected": "ERROR",
+      "id": "D-002",
+      "notes": "AES-GCM authentication failure.",
+      "operation": "DECRYPT",
+      "password": "wrong-public-test-password"
+    },
+    {
+      "envelopeHex": "4855534a01000000000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c6682e70cbad5cac305d922562fec1e473f54ae23fda0e7b812202a8792b7bf875e8cd0270ceb51991ea0d1da1a6014f0bd6d9a868fe9a9fda49782fdf4b67c7ce7c33f50780ee97b606f8d1811f5619187d8a0e6eedc05f7e309901052540fd8f7c60486884e391f62f8e74eff819b5ef84c6a0afdf752f22263cd8b2f0011178b361207e9c9022f916f1aaf708b36c68a5703caee2cee33c12191d1e4b2d9f2a6b58c7daece2982e1ef8032bc702353e6554e8a95786ec86f9ec4028a6e59991223cdd32a0615f87999b4c11471936b38a1878dae76da828f74f58e98e4e4b2aa061ffca4eef09680385f2f010f188612336670dec6247022e3d4a260eb88fa9fcb98909a3a1b260734227b1c783b8d211248a550f078c211d9d68bcd9e1bda8f38f09e9cc05a8230e4cd8a8248138cc96d786d3b751fb6d7d7076e38cabc274cbd30cc978b2e2ea6061965f5cb3266676076592a7fb8b63c53ef0540dd6990be07a814a8a73ea10c29ddde9526cdb27555c294176cf63b67f51708c8a601647bd348b3803c712dfa243eeaf5dee48319f2a5dbab74df9afa0a6449ad8c981d375bb0f92302c0e246c60a4943de650685ade4212285919e8a9d30f511da7ec9f2006322eefa1eb9532e3c3eaaebe6171668213586cf68d3e8ab9d0bc451045bdf63abba9af326997d9cc1c4a3159b657e58a501d096566c6815dd4ea34d4ed211db5a0210caec8f1fc7e549ca1e55780e78787e990bc8af52c5f8f772f421c681be4ca2b4ec58686a5cf6293b99eef135632000ad5e307af75c2a74bb6e2a15993cbb4fb05264a693abf0f2c58d6cefcb",
+      "errorCode": "DAT_INVALID_MAGIC",
+      "expected": "ERROR",
+      "id": "D-003",
+      "notes": "Magic \"HUSH\" mutated to \"HUSJ\".",
+      "operation": "DECRYPT",
+      "password": "hush-public-test-password-2026-01"
+    },
+    {
+      "envelopeHex": "4855534802000000000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c6682e70cbad5cac305d922562fec1e473f54ae23fda0e7b812202a8792b7bf875e8cd0270ceb51991ea0d1da1a6014f0bd6d9a868fe9a9fda49782fdf4b67c7ce7c33f50780ee97b606f8d1811f5619187d8a0e6eedc05f7e309901052540fd8f7c60486884e391f62f8e74eff819b5ef84c6a0afdf752f22263cd8b2f0011178b361207e9c9022f916f1aaf708b36c68a5703caee2cee33c12191d1e4b2d9f2a6b58c7daece2982e1ef8032bc702353e6554e8a95786ec86f9ec4028a6e59991223cdd32a0615f87999b4c11471936b38a1878dae76da828f74f58e98e4e4b2aa061ffca4eef09680385f2f010f188612336670dec6247022e3d4a260eb88fa9fcb98909a3a1b260734227b1c783b8d211248a550f078c211d9d68bcd9e1bda8f38f09e9cc05a8230e4cd8a8248138cc96d786d3b751fb6d7d7076e38cabc274cbd30cc978b2e2ea6061965f5cb3266676076592a7fb8b63c53ef0540dd6990be07a814a8a73ea10c29ddde9526cdb27555c294176cf63b67f51708c8a601647bd348b3803c712dfa243eeaf5dee48319f2a5dbab74df9afa0a6449ad8c981d375bb0f92302c0e246c60a4943de650685ade4212285919e8a9d30f511da7ec9f2006322eefa1eb9532e3c3eaaebe6171668213586cf68d3e8ab9d0bc451045bdf63abba9af326997d9cc1c4a3159b657e58a501d096566c6815dd4ea34d4ed211db5a0210caec8f1fc7e549ca1e55780e78787e990bc8af52c5f8f772f421c681be4ca2b4ec58686a5cf6293b99eef135632000ad5e307af75c2a74bb6e2a15993cbb4fb05264a693abf0f2c58d6cefcb",
+      "errorCode": "DAT_UNSUPPORTED_VERSION",
+      "expected": "ERROR",
+      "id": "D-004",
+      "notes": "Version int32 LE set to 2.",
+      "operation": "DECRYPT",
+      "password": "hush-public-test-password-2026-01"
+    },
+    {
+      "envelopeHex": "4855534801000000000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c6682e70cbad5cac305d922562fec1e473f54ae23fda0e7b812202a8792b7bf875e8cd0270ceb51991ea0d1da1a6014f0bd6d9a868fe9a9fda49782fdf4b67c7ce7c33f50780ee97b606f8d1811f5619187d8a0e6eedc05f7e309901052540fd8f7c60486884e391f62f8e74eff819b5ef84c6a0afdf752f22263cd8b2f0011178b361207e9c9022f916f1aaf708b36c68a5703caee2cee33c12191d1e4b2d9f2a6b58c7daece2982e1ef8032bc702353e6554e8a95786ec86f9ec4028a6e59991223cdd32a0615f87999b4c11471936b38a1878dae76da828f74f58e98e4e4b2aa061ffca4eef09680385f2f010f188612336670dec6247022e3d4a260eb88fa9fcb98909a3a1b260734227b1c783b8d211248a550f078c211d9d68bcd9e1bda8f38f09e9cc05a8230e4cd8a8248138cc96d786d3b751fb6d7d7076e38cabc274cbd30cc978b2e2ea6061965f5cb3266676076592a7fb8b63c53ef0540dd6990be07a814a8a73ea10c29ddde9526cdb27555c294176cf63b67f51708c8a601647bd348b3803c712dfa243eeaf5dee48319f2a5dbab74df9afa0a6449ad8c981d375bb0f92302c0e246c60a4943de650685ade4212285919e8a9d30f511da7ec9f2006322eefa1eb9532e3c3eaaebe6171668213586cf68d3e8ab9d0bc451045bdf63abba9af326997d9cc1c4a3159b657e58a501d096566c6815dd4ea34d4ed211db5a0210caec8f1fc7e549ca1e55780e78787e990bc8af52c5f8f772f421c681be4ca2b4ec58686a",
+      "errorCode": "DAT_WRONG_PASSWORD",
+      "expected": "ERROR",
+      "id": "D-005",
+      "notes": "Truncated ciphertext (last 40 bytes removed) -> GCM auth failure.",
+      "operation": "DECRYPT",
+      "password": "hush-public-test-password-2026-01"
+    },
+    {
+      "baseEnvelopeRef": "D-001",
+      "errorCode": "DAT_MALFORMED",
+      "expected": "ERROR",
+      "id": "D-006",
+      "notes": "Runner constructs base envelope + 1 MiB padding beyond maxEnvelopeBytes; rejected before PBKDF2.",
+      "operation": "OVERSIZED"
+    },
+    {
+      "envelopeHex": "4855534801000000",
+      "errorCode": "DAT_MALFORMED",
+      "expected": "ERROR",
+      "id": "D-007",
+      "notes": "Envelope shorter than structural minimum (36 bytes).",
+      "operation": "DECRYPT",
+      "password": "hush-public-test-password-2026-01"
+    },
+    {
+      "envelopeHex": "4855534801000000000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c6682e70cbad5cac305d922562fec1e473f54ae23fda0e7b812202a8792b7bf875e8cd0270ceb51991ea0d1da1a6014f0bd6d9a868fe9a9fda49782fdf4b67c7ce7c33f50780ee97b606f8d1811f5619187d8a0e6eedc05f7e309901052540fd8f7c60486884e391f62f8e74eff819b5ef84c6a0afdf752f22263cd8b2f0011178b361207e9c9022f916f1aaf708b36c68a5703caee2cee33c12191d1e4b2d9f2a6b58c7daece2982e1ef8032bc702353e6554e8a95786ec86f9ec4028a6e59991223cdd32a0615f87999b4c11471936b38a1878dae76da828f74f58e98e4e4b2aa061ffca4eef09680385f2f010f188612336670dec6247022e3d4a260eb88fa9fcb98909a3a1b260734227b1c783b8d211248a550f078c211d9d68bcd9e1bda8f38f09e9cc05a8230e4cd8a8248138cc96d786d3b751fb6d7d7076e38cabc274cbd30cc978b2e2ea6061965f5cb3266676076592a7fb8b63c53ef0540dd6990be07a814a8a73ea10c29ddde9526cdb27555c294176cf63b67f51708c8a601647bd348b3803c712dfa243eeaf5dee48319f2a5dbab74df9afa0a6449ad8c981d375bb0f92302c0e246c60a4943de650685ade4212285919e8a9d30f511da7ec9f2006322eefa1eb9532e3c3eaaebe6171668213586cf68d3e8ab9d0bc451045bdf63abba9af326997d9cc1c4a3159b657e58a501d096566c6815dd4ea34d4ed211db5a0210caec8f1fc7e549ca1e55780e78787e990bc8af52c5f8f772f421c681be4ca2b4ec58686a5cf6293b99eef135632000ad5e307af75c2a74bb6e2a15993cbb4fb05264a693abf0f2c58d6cef00",
+      "errorCode": "DAT_WRONG_PASSWORD",
+      "expected": "ERROR",
+      "id": "D-008",
+      "notes": "Last ciphertext byte flipped -> GCM auth failure.",
+      "operation": "DECRYPT",
+      "password": "hush-public-test-password-2026-01"
+    },
+    {
+      "errorCode": "DAT_MISSING_FIELD",
+      "expected": "ERROR",
+      "id": "D-009",
+      "notes": "IsPublic removed.",
+      "operation": "PARSE",
+      "payloadJson": "{\"ProfileName\":\"public-test-profile-001\",\"PublicSigningAddress\":\"0237fdd4364c0b898908be2f1a98a6b4a7890c623ae92a283640e44d87e048daa5\",\"PrivateSigningKey\":\"6e3f74236c3d4a20553be05963f624696990c22245599b3d1b30262af793d885\",\"PublicEncryptAddress\":\"032ebaf076203f15ac8119cfdbc9394d1c7b9929b0647e4f607e27da95701f8556\",\"PrivateEncryptKey\":\"1a68f2d543282dd612502a1b3688e85eeca280057129d512011645a51cf6d552\",\"Mnemonic\":\"abandon amount liar amount expire adjust cage candy arch gather drum bullet absurd math era live bid rhythm alien crouch range attend journey unaware\"}"
+    },
+    {
+      "errorCode": "DAT_UNKNOWN_FIELD",
+      "expected": "ERROR",
+      "id": "D-010",
+      "notes": "Unknown property appended.",
+      "operation": "PARSE",
+      "payloadJson": "{\"ProfileName\":\"public-test-profile-001\",\"PublicSigningAddress\":\"0237fdd4364c0b898908be2f1a98a6b4a7890c623ae92a283640e44d87e048daa5\",\"PrivateSigningKey\":\"6e3f74236c3d4a20553be05963f624696990c22245599b3d1b30262af793d885\",\"PublicEncryptAddress\":\"032ebaf076203f15ac8119cfdbc9394d1c7b9929b0647e4f607e27da95701f8556\",\"PrivateEncryptKey\":\"1a68f2d543282dd612502a1b3688e85eeca280057129d512011645a51cf6d552\",\"IsPublic\":true,\"Mnemonic\":\"abandon amount liar amount expire adjust cage candy arch gather drum bullet absurd math era live bid rhythm alien crouch range attend journey unaware\",\"ExtraField\":1}"
+    },
+    {
+      "errorCode": "DAT_DUPLICATE_FIELD",
+      "expected": "ERROR",
+      "id": "D-011",
+      "notes": "Duplicate ProfileName property must fail deterministically, not silently keep the last.",
+      "operation": "PARSE",
+      "payloadJson": "{\"ProfileName\":\"dup-a\",\"ProfileName\":\"dup-b\",\"PublicSigningAddress\":\"0237fdd4364c0b898908be2f1a98a6b4a7890c623ae92a283640e44d87e048daa5\",\"PrivateSigningKey\":\"6e3f74236c3d4a20553be05963f624696990c22245599b3d1b30262af793d885\",\"PublicEncryptAddress\":\"032ebaf076203f15ac8119cfdbc9394d1c7b9929b0647e4f607e27da95701f8556\",\"PrivateEncryptKey\":\"1a68f2d543282dd612502a1b3688e85eeca280057129d512011645a51cf6d552\",\"IsPublic\":true,\"Mnemonic\":\"abandon amount liar amount expire adjust cage candy arch gather drum bullet absurd math era live bid rhythm alien crouch range attend journey unaware\"}"
+    },
+    {
+      "errorCode": "DAT_INVALID_FIELD",
+      "expected": "ERROR",
+      "id": "D-012",
+      "notes": "Null IsPublic.",
+      "operation": "PARSE",
+      "payloadJson": "{\"ProfileName\":\"public-test-profile-001\",\"PublicSigningAddress\":\"0237fdd4364c0b898908be2f1a98a6b4a7890c623ae92a283640e44d87e048daa5\",\"PrivateSigningKey\":\"6e3f74236c3d4a20553be05963f624696990c22245599b3d1b30262af793d885\",\"PublicEncryptAddress\":\"032ebaf076203f15ac8119cfdbc9394d1c7b9929b0647e4f607e27da95701f8556\",\"PrivateEncryptKey\":\"1a68f2d543282dd612502a1b3688e85eeca280057129d512011645a51cf6d552\",\"IsPublic\":null,\"Mnemonic\":\"abandon amount liar amount expire adjust cage candy arch gather drum bullet absurd math era live bid rhythm alien crouch range attend journey unaware\"}"
+    },
+    {
+      "errorCode": "DAT_INVALID_FIELD",
+      "expected": "ERROR",
+      "id": "D-013",
+      "notes": "Wrong-type IsPublic (string instead of boolean).",
+      "operation": "PARSE",
+      "payloadJson": "{\"ProfileName\":\"public-test-profile-001\",\"PublicSigningAddress\":\"0237fdd4364c0b898908be2f1a98a6b4a7890c623ae92a283640e44d87e048daa5\",\"PrivateSigningKey\":\"6e3f74236c3d4a20553be05963f624696990c22245599b3d1b30262af793d885\",\"PublicEncryptAddress\":\"032ebaf076203f15ac8119cfdbc9394d1c7b9929b0647e4f607e27da95701f8556\",\"PrivateEncryptKey\":\"1a68f2d543282dd612502a1b3688e85eeca280057129d512011645a51cf6d552\",\"IsPublic\":\"true\",\"Mnemonic\":\"abandon amount liar amount expire adjust cage candy arch gather drum bullet absurd math era live bid rhythm alien crouch range attend journey unaware\"}"
+    },
+    {
+      "errorCode": "DAT_MNEMONIC_KEY_MISMATCH",
+      "expected": "ERROR",
+      "id": "D-014",
+      "notes": "Mnemonic does not derive the stored private keys.",
+      "operation": "KEY_CONSISTENCY",
+      "payloadJson": "{\"ProfileName\":\"public-test-profile-001\",\"PublicSigningAddress\":\"0237fdd4364c0b898908be2f1a98a6b4a7890c623ae92a283640e44d87e048daa5\",\"PrivateSigningKey\":\"6e3f74236c3d4a20553be05963f624696990c22245599b3d1b30262af793d885\",\"PublicEncryptAddress\":\"032ebaf076203f15ac8119cfdbc9394d1c7b9929b0647e4f607e27da95701f8556\",\"PrivateEncryptKey\":\"1a68f2d543282dd612502a1b3688e85eeca280057129d512011645a51cf6d552\",\"IsPublic\":true,\"Mnemonic\":\"avoid mass luggage choice fabric argue gather cash brand thought elegant dinner acoustic much milk lucky change deer apart february ready bird reward van\"}"
+    },
+    {
+      "errorCode": "DAT_KEY_MISMATCH",
+      "expected": "ERROR",
+      "id": "D-015",
+      "notes": "PrivateSigningKey does not match PublicSigningAddress.",
+      "operation": "KEY_CONSISTENCY",
+      "payloadJson": "{\"ProfileName\":\"public-test-profile-001\",\"PublicSigningAddress\":\"0237fdd4364c0b898908be2f1a98a6b4a7890c623ae92a283640e44d87e048daa5\",\"PrivateSigningKey\":\"45baec3bd2eac5290590beab7dfd761b0f746ddac9cc4d9a94c09a202ee9813c\",\"PublicEncryptAddress\":\"032ebaf076203f15ac8119cfdbc9394d1c7b9929b0647e4f607e27da95701f8556\",\"PrivateEncryptKey\":\"1a68f2d543282dd612502a1b3688e85eeca280057129d512011645a51cf6d552\",\"IsPublic\":true,\"Mnemonic\":\"abandon amount liar amount expire adjust cage candy arch gather drum bullet absurd math era live bid rhythm alien crouch range attend journey unaware\"}"
+    }
+  ]
+}

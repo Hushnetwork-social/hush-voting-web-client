@@ -1,0 +1,103 @@
+{
+  "$id": "urn:hushvoting:conformance:identity:v1:schemas:inventory",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Complete inventory of historical Hush credential producers considered by FEAT-001, with immutable IDs, evidence classification, and evidence references. Every externally usable implementation is represented; unavailable artifacts remain explicit entries.",
+  "properties": {
+    "attestation": {
+      "additionalProperties": false,
+      "properties": {
+        "date": {
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+          "type": "string"
+        },
+        "noBlockingUnverified": {
+          "const": true,
+          "type": "boolean"
+        },
+        "recordRef": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "date",
+        "recordRef",
+        "noBlockingUnverified"
+      ],
+      "type": "object"
+    },
+    "contractVersion": {
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "type": "string"
+    },
+    "inventoryVersion": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "kind": {
+      "const": "producer-inventory"
+    },
+    "producers": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "classification": {
+            "enum": [
+              "APPROVED",
+              "UNSUPPORTED",
+              "UNVERIFIED",
+              "EXCLUDED",
+              "NOT_A_PRODUCER"
+            ]
+          },
+          "evidence": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "name": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "producerId": {
+            "pattern": "^P-[0-9]{2}$",
+            "type": "string"
+          },
+          "recordFile": {
+            "pattern": "^(producers/[a-z0-9-]+\\.json)?$",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "producerId",
+          "name",
+          "classification",
+          "evidence"
+        ],
+        "type": "object"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "schemaVersion": {
+      "const": "1.0.0"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "contractVersion",
+    "kind",
+    "inventoryVersion",
+    "attestation",
+    "producers"
+  ],
+  "title": "Producer Inventory",
+  "type": "object"
+}

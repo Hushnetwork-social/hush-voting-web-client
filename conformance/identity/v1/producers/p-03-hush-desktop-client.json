@@ -1,0 +1,25 @@
+{
+  "classification": "APPROVED",
+  "contract": "C-B + C-C + C-E (wraps Olimpo.KeyDerivation, Olimpo.CredentialsManager, Olimpo.DigitalSignature)",
+  "contractVersion": "1.0.0",
+  "evidence": [
+    "hush-server-node git history (d5592d7, 2247668, ...)",
+    "Code comments 'matches HushClient' in hush-web-client/src/lib/crypto/keys.ts",
+    "attestation-record.md (FEAT-001, hush-voting-memory-bank)"
+  ],
+  "mnemonicSupport": "24",
+  "name": "Hush Desktop Client (Avalonia, historical HushClient)",
+  "notes": "No separate derivation implementation identified; contract equals the Olimpo path it wraps. Deduplicates with P-02 for identical exact address pairs (retains both producer IDs). Pre-tag binaries split: pre-6cd2dbe random-key era (see P-06 classification), post-6cd2dbe Olimpo path.",
+  "precedence": 5,
+  "producerId": "P-03",
+  "publicKeyEncoding": "UNCOMPRESSED",
+  "schemaVersion": "1.0.0",
+  "signatureBehavior": "Olimpo.DigitalSignature (see P-07)",
+  "supportedOperations": [
+    "MNEMONIC_DERIVE",
+    "KEY_ENCODE",
+    "DAT_V1",
+    "SIGN",
+    "VERIFY"
+  ]
+}

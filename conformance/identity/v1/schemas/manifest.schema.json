@@ -1,0 +1,49 @@
+{
+  "$id": "urn:hushvoting:conformance:identity:v1:schemas:manifest",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Deterministic integrity manifest for the conformance/identity/v1 corpus. Lists every schema, inventory, lookup, and vector file with relative path, byte length, and SHA-256 digest over the exact corpus formatting bytes (UTF-8, no BOM, LF endings, lexicographically stable object-key ordering, two-space indentation, one final newline).",
+  "properties": {
+    "contractVersion": {
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "type": "string"
+    },
+    "files": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "bytes": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "path": {
+            "pattern": "^(inventory\\.json|schemas/[a-z0-9-]+\\.schema\\.json|producers/[a-z0-9-]+\\.json|vectors/[a-z0-9-]+\\.json|lookup/[a-z0-9-]+\\.json)$",
+            "type": "string"
+          },
+          "sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes"
+        ],
+        "type": "object"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "schemaVersion": {
+      "const": "1.0.0"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "contractVersion",
+    "files"
+  ],
+  "title": "Identity Compatibility Manifest",
+  "type": "object"
+}

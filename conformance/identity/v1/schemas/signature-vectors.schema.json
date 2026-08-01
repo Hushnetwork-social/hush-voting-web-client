@@ -1,0 +1,95 @@
+{
+  "$id": "urn:hushvoting:conformance:identity:v1:schemas:signature-vectors",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "ECDSA-SHA256 signature fixtures over canonical message bytes: compact 64-byte r||s and DER forms, cross-runtime verification keys, wrong-key/wrong-message/malformed negatives. Producer contracts proven deterministic (P-01) carry fixed signature bytes; non-deterministic producers require only cross-verification.",
+  "properties": {
+    "contractVersion": {
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "type": "string"
+    },
+    "kind": {
+      "const": "signature-vectors"
+    },
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "vectors": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "errorCode": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "expected": {
+            "enum": [
+              "VALID",
+              "INVALID",
+              "ERROR"
+            ]
+          },
+          "id": {
+            "pattern": "^S-[0-9]{3}$",
+            "type": "string"
+          },
+          "messageUtf8": {
+            "type": "string"
+          },
+          "messageUtf8Hex": {
+            "pattern": "^[0-9a-f]+$",
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "operation": {
+            "enum": [
+              "VERIFY",
+              "DECODE"
+            ]
+          },
+          "producerId": {
+            "pattern": "^P-[0-9]{2}$",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "publicKeyHex": {
+            "pattern": "^(02|03|04)[0-9a-f]{64,128}$",
+            "type": "string"
+          },
+          "signatureCompactBase64": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "signatureCompactHex": {
+            "pattern": "^[0-9a-f]+$",
+            "type": "string"
+          },
+          "signatureDerHex": {
+            "pattern": "^[0-9a-f]+$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "operation",
+          "expected"
+        ],
+        "type": "object"
+      },
+      "minItems": 1,
+      "type": "array"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "contractVersion",
+    "kind",
+    "vectors"
+  ],
+  "title": "Signature Vectors",
+  "type": "object"
+}

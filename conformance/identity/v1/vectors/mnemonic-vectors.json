@@ -1,0 +1,77 @@
+{
+  "contractVersion": "1.0.0",
+  "kind": "mnemonic-vectors",
+  "schemaVersion": "1.0.0",
+  "vectors": [
+    {
+      "encryptionPrivateKeyHex": "1a68f2d543282dd612502a1b3688e85eeca280057129d512011645a51cf6d552",
+      "encryptionPublicKeyHex": "032ebaf076203f15ac8119cfdbc9394d1c7b9929b0647e4f607e27da95701f8556",
+      "entropyHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "expected": "MATCH",
+      "id": "M-001",
+      "mnemonic": "abandon amount liar amount expire adjust cage candy arch gather drum bullet absurd math era live bid rhythm alien crouch range attend journey unaware",
+      "producerId": "P-01",
+      "publicKeyEncoding": "COMPRESSED",
+      "seedHex": "0a6d060f6242aece4b074e48e7d8166f792a9b2bb7b295fa5ac289eda7647290c3d80e7436d6e9e34e72769c06f6582192d0b57ae4a97e9e24c8972a770a57d9",
+      "signingPrivateKeyHex": "6e3f74236c3d4a20553be05963f624696990c22245599b3d1b30262af793d885",
+      "signingPublicKeyHex": "0237fdd4364c0b898908be2f1a98a6b4a7890c623ae92a283640e44d87e048daa5",
+      "wordCount": 24
+    },
+    {
+      "encryptionPrivateKeyHex": "ae079785f25182c07a1efc4f5e317aced6f447ae70b399fe943df111f82472f4",
+      "encryptionPublicKeyHex": "03ea1613b73a648b069d523edf0a1e1eb57140ef22d634d176977811a2e837312b",
+      "entropyHex": "000102030405060708090a0b0c0d0e0f",
+      "expected": "MATCH",
+      "id": "M-002",
+      "mnemonic": "abandon amount liar amount expire adjust cage candy arch gather drum buyer",
+      "producerId": "P-01",
+      "publicKeyEncoding": "COMPRESSED",
+      "seedHex": "3779b041fab425e9c0fd55846b2a03e9a388fb12784067bd8ebdb464c2574a05bcc7a8eb54d7b2a2c8420ff60f630722ea5132d28605dbc996c8ca7d7a8311c0",
+      "signingPrivateKeyHex": "fb6883e9d27b0562aa4bc7b060ff35799613756628454cb846e27a152c8ee732",
+      "signingPublicKeyHex": "020d77546b1ae025f206151ead65192a167fd917b2a509d686b5ef3699864209ac",
+      "wordCount": 12
+    },
+    {
+      "encryptionPrivateKeyHex": "afc60995516cff629a1a7e4ac2aaa4448c2ff21912e4d0ae142b30ad3f7db9b2",
+      "encryptionPublicKeyHex": "03b6a82bd9967a8299b5ce995c308c2ffddd3b56abd302485257764818e31eccd3",
+      "entropyHex": "101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f",
+      "expected": "MATCH",
+      "id": "M-003",
+      "mnemonic": "avoid mass luggage choice fabric argue gather cash brand thought elegant dinner acoustic much milk lucky change deer apart february ready bird reward van",
+      "producerId": "P-01",
+      "publicKeyEncoding": "COMPRESSED",
+      "seedHex": "c85b2add5d33b8da0d770fe36b3bc400a6cfb5d39b7554c654576828c0808fbfb730c5a0e0620cb3f02702afc48991eba6b17d739799fba91b19068a900e665d",
+      "signingPrivateKeyHex": "bc07a884826d5067bc2571bc947cd2752bd55b60728105979cdc1b69572207f4",
+      "signingPublicKeyHex": "02428641d21f53e5a631373c4ce763674a6fa178703a99858ab748731d6f488a97",
+      "wordCount": 24
+    },
+    {
+      "encryptionPrivateKeyHex": "bf6ac7952f0565fd947e7f3705c964d54173ce637495046267fbedcdbb68c6f6",
+      "encryptionPublicKeyHex": "0400e26b2c6e77ce44f40f56eadd6add5a134d4f6f09d43ba38faadbf2f9a6b781d07e19ea77fdd21ba5c31c3975d2f7107c9e3be247401a7b0e5853fea09b3a10",
+      "entropyHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "expected": "MATCH",
+      "id": "M-004",
+      "mnemonic": "abandon amount liar amount expire adjust cage candy arch gather drum bullet absurd math era live bid rhythm alien crouch range attend journey unaware",
+      "producerId": "P-02",
+      "publicKeyEncoding": "UNCOMPRESSED",
+      "seedHex": "0a6d060f6242aece4b074e48e7d8166f792a9b2bb7b295fa5ac289eda7647290c3d80e7436d6e9e34e72769c06f6582192d0b57ae4a97e9e24c8972a770a57d9",
+      "signingPrivateKeyHex": "45baec3bd2eac5290590beab7dfd761b0f746ddac9cc4d9a94c09a202ee9813c",
+      "signingPublicKeyHex": "042b347a16473bab675d469b6094deb96cd21239b855b98f98a4f8194953988306f9a5c50de7d68eb543364cbca033c05201a7cc93e96b61a8fb95402bc6e3b66e",
+      "wordCount": 24
+    },
+    {
+      "encryptionPrivateKeyHex": "f82c5adf1a055e91fe0384e60edf48256b3deab57883c92f1cc67b3da0f4378b",
+      "encryptionPublicKeyHex": "04adaac2d1272bf0a3c7c7e2dcd2efe052a78311d32ad417dc3ada47ebda8fa29a236e8762c3b8355ff00dd46f8f5530afabace14af9b75aee9f7518045864e3cf",
+      "entropyHex": "101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f",
+      "expected": "MATCH",
+      "id": "M-005",
+      "mnemonic": "avoid mass luggage choice fabric argue gather cash brand thought elegant dinner acoustic much milk lucky change deer apart february ready bird reward van",
+      "producerId": "P-02",
+      "publicKeyEncoding": "UNCOMPRESSED",
+      "seedHex": "c85b2add5d33b8da0d770fe36b3bc400a6cfb5d39b7554c654576828c0808fbfb730c5a0e0620cb3f02702afc48991eba6b17d739799fba91b19068a900e665d",
+      "signingPrivateKeyHex": "5ac4f98b0f21247c9c16a0cf5fb37677e4e1c61026551899e61403a084c7e216",
+      "signingPublicKeyHex": "04423e037fa9a32a94b8f36316c706c9470903ea9e6cd9baa961b48cb272eef5a836c7fe86525a2fd79bfe2e044c5c4cca4321cefb69df996057248f5bc283df03",
+      "wordCount": 24
+    }
+  ]
+}

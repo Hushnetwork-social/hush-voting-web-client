@@ -1,0 +1,101 @@
+{
+  "$id": "urn:hushvoting:conformance:identity:v1:schemas:mnemonic-vectors",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Positive BIP-39 mnemonic derivation vectors for Approved producers: deterministic seed, derived private scalars, and expected public keys for both approved word counts.",
+  "properties": {
+    "contractVersion": {
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "type": "string"
+    },
+    "kind": {
+      "const": "mnemonic-vectors"
+    },
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "vectors": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "encryptionPrivateKeyHex": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "encryptionPublicKeyHex": {
+            "pattern": "^(02|03|04)[0-9a-f]{64,128}$",
+            "type": "string"
+          },
+          "entropyHex": {
+            "pattern": "^[0-9a-f]+$",
+            "type": "string"
+          },
+          "expected": {
+            "const": "MATCH"
+          },
+          "id": {
+            "pattern": "^M-[0-9]{3}$",
+            "type": "string"
+          },
+          "mnemonic": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "producerId": {
+            "pattern": "^P-[0-9]{2}$",
+            "type": "string"
+          },
+          "publicKeyEncoding": {
+            "enum": [
+              "COMPRESSED",
+              "UNCOMPRESSED"
+            ]
+          },
+          "seedHex": {
+            "pattern": "^[0-9a-f]{128}$",
+            "type": "string"
+          },
+          "signingPrivateKeyHex": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "signingPublicKeyHex": {
+            "pattern": "^(02|03|04)[0-9a-f]{64,128}$",
+            "type": "string"
+          },
+          "wordCount": {
+            "enum": [
+              12,
+              24
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "producerId",
+          "mnemonic",
+          "wordCount",
+          "entropyHex",
+          "seedHex",
+          "signingPrivateKeyHex",
+          "encryptionPrivateKeyHex",
+          "signingPublicKeyHex",
+          "encryptionPublicKeyHex",
+          "publicKeyEncoding",
+          "expected"
+        ],
+        "type": "object"
+      },
+      "minItems": 1,
+      "type": "array"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "contractVersion",
+    "kind",
+    "vectors"
+  ],
+  "title": "Mnemonic Derivation Vectors",
+  "type": "object"
+}

@@ -1,0 +1,141 @@
+{
+  "contractVersion": "1.0.0",
+  "files": [
+    {
+      "bytes": 4001,
+      "path": "inventory.json",
+      "sha256": "1f113e99cf53632f2bfe37b8a77c25e4b5d16ab7dcdfd7fdfaf6875448ca781b"
+    },
+    {
+      "bytes": 5662,
+      "path": "lookup/outcomes.json",
+      "sha256": "3d71cf451d0740c98cf0b1d5bd7af3869700080bfe1d9c82c133e17e7da029cc"
+    },
+    {
+      "bytes": 1162,
+      "path": "producers/p-01-hush-feeds-web-client.json",
+      "sha256": "5dbf98663efefc984e171c05b16cbe2d7ef5088c8a14f0122df4cf2611c7c0c0"
+    },
+    {
+      "bytes": 1375,
+      "path": "producers/p-02-olimpo-keyderivation.json",
+      "sha256": "9f5b49d1b79b54c8236ba6b0de8f92d09cda0fa4121f64b81d0423bbbe47c14a"
+    },
+    {
+      "bytes": 1081,
+      "path": "producers/p-03-hush-desktop-client.json",
+      "sha256": "794222959ac6904ce19cad6a36fa7d53044b112b821c06d2b1df50c528abe049"
+    },
+    {
+      "bytes": 957,
+      "path": "producers/p-04-dat-v1-typescript.json",
+      "sha256": "888111cd1cb6d2b4ff730174e90892d3e6419e2dea7893d4294a12ea3980f848"
+    },
+    {
+      "bytes": 901,
+      "path": "producers/p-05-dat-v1-dotnet.json",
+      "sha256": "db9dd68887ce90dd783e31e7d701016c01a875ccf2dd17fbd699f5333460b04b"
+    },
+    {
+      "bytes": 1389,
+      "path": "producers/p-06-rsa-2048-era.json",
+      "sha256": "92e0012207d5138956731e8bbe1b5b025bd8fd60f2e24a05ec335378a46754c0"
+    },
+    {
+      "bytes": 978,
+      "path": "producers/p-07-olimpo-digitalsignature.json",
+      "sha256": "7a71bd41694ac474c4b641956db8ad35f40aabf49973e007c072d47378f401fd"
+    },
+    {
+      "bytes": 708,
+      "path": "producers/p-08-test-only-generators.json",
+      "sha256": "e2c57d4f2840aa40ab2a4b6a4019c68f86b0f574e9a86c866a5f00c21234a254"
+    },
+    {
+      "bytes": 2094,
+      "path": "schemas/canonical-byte-vectors.schema.json",
+      "sha256": "309fbc67feeeb219e3754d752ab69f46caca9a9b60b2c72f449d64a033b8a07b"
+    },
+    {
+      "bytes": 2314,
+      "path": "schemas/dat-vectors.schema.json",
+      "sha256": "0543f5fe4a44c92462075c904bf8e575661e482a13e62e4bb4309ab83f6664db"
+    },
+    {
+      "bytes": 2553,
+      "path": "schemas/inventory.schema.json",
+      "sha256": "6fb99aa751084f05c52da53f424f07af5d0284d06c89643651f11fc7ca357458"
+    },
+    {
+      "bytes": 2457,
+      "path": "schemas/key-vectors.schema.json",
+      "sha256": "6b9c8eef351e7eb413b2b41afbbac990da27cef00a3e59751a48e91a5ef1a388"
+    },
+    {
+      "bytes": 3943,
+      "path": "schemas/lookup-outcomes.schema.json",
+      "sha256": "02e67a344954431993c4a12105bbca171f3b0a01c28f2f244f16bd148b6fa87c"
+    },
+    {
+      "bytes": 1537,
+      "path": "schemas/manifest.schema.json",
+      "sha256": "d86bd70453e86ba4e86db5fb479c94418fddbec7e3294ad54d30ccbc59e01d0d"
+    },
+    {
+      "bytes": 2628,
+      "path": "schemas/mnemonic-vectors.schema.json",
+      "sha256": "15908e5d3f359fc2fc57570dc3d46dfa0857c46f06966c49ef5a06df6f91c06a"
+    },
+    {
+      "bytes": 1870,
+      "path": "schemas/negative-vectors.schema.json",
+      "sha256": "4094239bab717fdd287a0657ce8b23861d41cd9084333167f39d004ed879802c"
+    },
+    {
+      "bytes": 1939,
+      "path": "schemas/producer.schema.json",
+      "sha256": "cf981ab7731a4bdcdf03235d0b9735b00397486df5cb9b5bd3f815f935a370a4"
+    },
+    {
+      "bytes": 2881,
+      "path": "schemas/report.schema.json",
+      "sha256": "547e23186b0f5bb211ab7ef3e629f2ca64b46d860dc3954f0148c3c2140a3014"
+    },
+    {
+      "bytes": 2485,
+      "path": "schemas/signature-vectors.schema.json",
+      "sha256": "934c5fb43e00b04f816e816fcb478baf8e0164ed9d8962bfccc96ef313342fbb"
+    },
+    {
+      "bytes": 12301,
+      "path": "vectors/canonical-byte-vectors.json",
+      "sha256": "907549993ecc158db20c5ea6223d213deb239e13f66c829571d90dc120db79d8"
+    },
+    {
+      "bytes": 16142,
+      "path": "vectors/dat-vectors.json",
+      "sha256": "8795152211115b27a53bf98628297aeec4c07c4735a3bda668b2bb724749a983"
+    },
+    {
+      "bytes": 4847,
+      "path": "vectors/key-vectors.json",
+      "sha256": "9b63fbc73e8ab614f40b578dca0fa6130ca12ce7084a4d02573e580e06ee641b"
+    },
+    {
+      "bytes": 5071,
+      "path": "vectors/mnemonic-vectors.json",
+      "sha256": "47317bc3b5d70c2c3fc703859c8e0a4503404390530359027baec181abc1913d"
+    },
+    {
+      "bytes": 3393,
+      "path": "vectors/negative-vectors.json",
+      "sha256": "417a502838a771ab9d7727a164c41e0e13cc428d39d2685e837c51bc95b2f77a"
+    },
+    {
+      "bytes": 14227,
+      "path": "vectors/signature-vectors.json",
+      "sha256": "bf9a900f52e1f5694d9290ed92d4126123b2ec9c278cb87438917678a3464d78"
+    }
+  ],
+  "schemaVersion": "1.0.0"
+}

@@ -1,0 +1,21 @@
+{
+  "classification": "APPROVED",
+  "contract": "C-E",
+  "contractVersion": "1.0.0",
+  "evidence": [
+    "hush-server-node/Shared/Olimpo.DigitalSignature/DigitalSignature.cs",
+    "attestation-record.md (FEAT-001, hush-voting-memory-bank)"
+  ],
+  "mnemonicSupport": "NONE",
+  "name": "Olimpo.DigitalSignature (.NET)",
+  "notes": "Signature contract used with both P-01 and P-02. .NET BouncyCastle ECDSA uses a random nonce by default: signature bytes are not required to match across runtimes; cross-verification of generated signatures is the contract for non-deterministic producers.",
+  "precedence": 3,
+  "producerId": "P-07",
+  "publicKeyEncoding": "NONE",
+  "schemaVersion": "1.0.0",
+  "signatureBehavior": "SHA-256withECDSA over UTF-8 message bytes; DER-encoded signature default; compact 64-byte r||s and base64 variants; verification accepts DER or compact; public address helpers include compressed encoding",
+  "supportedOperations": [
+    "SIGN",
+    "VERIFY"
+  ]
+}

@@ -1,0 +1,124 @@
+{
+  "attestation": {
+    "date": "2026-08-01",
+    "noBlockingUnverified": true,
+    "recordRef": "hush-voting-memory-bank/Features/03_IN_PROGRESS/FEAT-001-canonical-identity-compatibility-contract/attestation-record.md"
+  },
+  "contractVersion": "1.0.0",
+  "inventoryVersion": 1,
+  "kind": "producer-inventory",
+  "producers": [
+    {
+      "classification": "APPROVED",
+      "evidence": [
+        "hush-web-client/src/lib/crypto/keys.ts (07599a3)",
+        "WebClient-v1.0.90..v1.0.117 releases"
+      ],
+      "name": "Hush Feeds Web Client (TypeScript)",
+      "producerId": "P-01",
+      "recordFile": "producers/p-01-hush-feeds-web-client.json"
+    },
+    {
+      "classification": "APPROVED",
+      "evidence": [
+        "hush-server-node/Shared/Olimpo.KeyDerivation (6cd2dbe)"
+      ],
+      "name": "Olimpo.KeyDerivation (.NET)",
+      "producerId": "P-02",
+      "recordFile": "producers/p-02-olimpo-keyderivation.json"
+    },
+    {
+      "classification": "APPROVED",
+      "evidence": [
+        "hush-server-node git history (d5592d7, 2247668)",
+        "Wraps Olimpo path; no separate derivation"
+      ],
+      "name": "Hush Desktop Client (Avalonia, historical HushClient)",
+      "producerId": "P-03",
+      "recordFile": "producers/p-03-hush-desktop-client.json"
+    },
+    {
+      "classification": "APPROVED",
+      "evidence": [
+        "hush-web-client/src/lib/crypto/credentialsFile.ts"
+      ],
+      "name": ".dat v1 writer (TypeScript)",
+      "producerId": "P-04",
+      "recordFile": "producers/p-04-dat-v1-typescript.json"
+    },
+    {
+      "classification": "APPROVED",
+      "evidence": [
+        "hush-server-node/Shared/Olimpo.CredentialsManager (6cd2dbe)"
+      ],
+      "name": ".dat v1 writer (.NET Olimpo.CredentialsManager)",
+      "producerId": "P-05",
+      "recordFile": "producers/p-05-dat-v1-dotnet.json"
+    },
+    {
+      "classification": "UNSUPPORTED",
+      "evidence": [
+        "commit 6cd2dbe BREAKING CHANGE: incompatible, must be recreated",
+        "pre-6cd2dbe random SecureRandom key generation; no mnemonic path"
+      ],
+      "name": "RSA-2048 encryption era (.NET, pre-ECIES)",
+      "producerId": "P-06",
+      "recordFile": "producers/p-06-rsa-2048-era.json"
+    },
+    {
+      "classification": "APPROVED",
+      "evidence": [
+        "hush-server-node/Shared/Olimpo.DigitalSignature/DigitalSignature.cs"
+      ],
+      "name": "Olimpo.DigitalSignature (.NET)",
+      "producerId": "P-07",
+      "recordFile": "producers/p-07-olimpo-digitalsignature.json"
+    },
+    {
+      "classification": "EXCLUDED",
+      "evidence": [
+        "mobileBenchmark/* and *.test.ts only; no escape into real use"
+      ],
+      "name": "Test-only key generators (TypeScript)",
+      "producerId": "P-08",
+      "recordFile": "producers/p-08-test-only-generators.json"
+    },
+    {
+      "classification": "NOT_A_PRODUCER",
+      "evidence": [
+        "Source scan 2026-08-01: no Hush identity derivation code"
+      ],
+      "name": "Forge Token Launcher (hush-forge, hush-forge-android)",
+      "producerId": "P-09",
+      "recordFile": null
+    },
+    {
+      "classification": "NOT_A_PRODUCER",
+      "evidence": [
+        "Source scan 2026-08-01: Neo-domain identities are not Hush identities"
+      ],
+      "name": "Neo contracts/wallets (hush-neo-contracts, NeoLine)",
+      "producerId": "P-10",
+      "recordFile": null
+    },
+    {
+      "classification": "NOT_A_PRODUCER",
+      "evidence": [
+        "Fresh Next.js foundation; no crypto/identity code; future FEAT-001 API consumer"
+      ],
+      "name": "hush-voting-web-client (current)",
+      "producerId": "P-11",
+      "recordFile": null
+    },
+    {
+      "classification": "NOT_A_PRODUCER",
+      "evidence": [
+        "Source scan 2026-08-01: no Hush credential CLI or key-generation operator tool"
+      ],
+      "name": "CLI/operator tooling (scripts/tools, Deployment-Proof-Packages)",
+      "producerId": "P-12",
+      "recordFile": null
+    }
+  ],
+  "schemaVersion": "1.0.0"
+}

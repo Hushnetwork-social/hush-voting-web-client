@@ -1,0 +1,95 @@
+{
+  "contractVersion": "1.0.0",
+  "kind": "negative-vectors",
+  "schemaVersion": "1.0.0",
+  "vectors": [
+    {
+      "errorCode": "INVALID_WORD_COUNT",
+      "expected": "ERROR",
+      "id": "N-001",
+      "input": "abandon amount liar amount expire adjust cage candy arch gather drum buyer",
+      "notes": "P-02 supports 24-word only; 12-word rejected.",
+      "operation": "MNEMONIC_VALIDATE",
+      "producerId": "P-02"
+    },
+    {
+      "errorCode": "UNKNOWN_WORD",
+      "expected": "ERROR",
+      "id": "N-002",
+      "input": "abandon amount liar amount expire adjust cage candy arch gather drum bullet absurd math era live bid rhythm alien crouch range attend journey zzzzzz",
+      "notes": "Unknown word not in BIP-39 English wordlist.",
+      "operation": "MNEMONIC_VALIDATE",
+      "producerId": "P-01"
+    },
+    {
+      "errorCode": "INVALID_CHECKSUM",
+      "expected": "ERROR",
+      "id": "N-003",
+      "input": "abandon amount liar amount expire adjust cage candy arch gather drum bullet absurd math era live bid rhythm alien crouch range attend journey abandon",
+      "notes": "Valid words, wrong final checksum word.",
+      "operation": "MNEMONIC_VALIDATE",
+      "producerId": "P-01"
+    },
+    {
+      "errorCode": "INVALID_MNEMONIC",
+      "expected": "ERROR",
+      "id": "N-004",
+      "input": "",
+      "notes": "Empty input.",
+      "operation": "MNEMONIC_VALIDATE",
+      "producerId": "P-01"
+    },
+    {
+      "errorCode": "INVALID_WORD_COUNT",
+      "expected": "ERROR",
+      "id": "N-005",
+      "input": "abandon amount liar amount expire adjust cage candy arch gather drum bullet absurd math era live bid rhythm alien crouch range attend journey",
+      "notes": "23 words.",
+      "operation": "MNEMONIC_VALIDATE",
+      "producerId": "P-01"
+    },
+    {
+      "errorCode": "INVALID_MNEMONIC",
+      "expected": "ERROR",
+      "id": "N-006",
+      "input": "ABANDON AMOUNT LIAR AMOUNT EXPIRE ADJUST CAGE CANDY ARCH GATHER DRUM BULLET ABSURD MATH ERA LIVE BID RHYTHM ALIEN CROUCH RANGE ATTEND JOURNEY UNAWARE",
+      "notes": "Uppercase rejected by strict BIP-39 validation. P-02 normalizes to lowercase and accepts.",
+      "operation": "MNEMONIC_VALIDATE",
+      "producerId": "P-01"
+    },
+    {
+      "errorCode": "UNSUPPORTED_PRODUCER",
+      "expected": "ERROR",
+      "id": "N-100",
+      "input": "P-99",
+      "notes": "Unknown producer ID.",
+      "operation": "PRODUCER_SELECT"
+    },
+    {
+      "errorCode": "UNSUPPORTED_PRODUCER",
+      "expected": "ERROR",
+      "id": "N-101",
+      "input": "P-06",
+      "notes": "P-06 RSA-2048 era is classified UNSUPPORTED and is not an Approved derivation contract.",
+      "operation": "PRODUCER_SELECT"
+    },
+    {
+      "errorCode": "UNSUPPORTED_VERSION",
+      "expected": "ERROR",
+      "id": "N-102",
+      "input": "9.9.9",
+      "notes": "Contract version outside supported range.",
+      "operation": "VERSION_SELECT"
+    },
+    {
+      "errorCode": "UNSUPPORTED_PASSPHRASE",
+      "expected": "ERROR",
+      "id": "N-103",
+      "input": "abandon amount liar amount expire adjust cage candy arch gather drum bullet absurd math era live bid rhythm alien crouch range attend journey unaware",
+      "notes": "Approved contracts require an empty BIP-39 passphrase.",
+      "operation": "MNEMONIC_DERIVE",
+      "passphrase": "unsupported-passphrase",
+      "producerId": "P-01"
+    }
+  ]
+}

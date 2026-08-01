@@ -1,0 +1,24 @@
+{
+  "classification": "APPROVED",
+  "contract": "C-C",
+  "contractVersion": "1.0.0",
+  "evidence": [
+    "hush-server-node/Shared/Olimpo.CredentialsManager/CredentialsFileService.cs",
+    "hush-server-node/Shared/Olimpo.CredentialsManager/PortableCredentials.cs",
+    "Introduced by commit 6cd2dbe (2025-12-12)",
+    "attestation-record.md (FEAT-001, hush-voting-memory-bank)"
+  ],
+  "mnemonicSupport": "NONE",
+  "name": ".dat v1 writer (.NET Olimpo.CredentialsManager)",
+  "notes": "Identical envelope format to P-04 (mutually compatible). The .dat v1 contract did not exist before commit 6cd2dbe; the RSA-2048 era had no portable credential envelope.",
+  "precedence": 4,
+  "producerId": "P-05",
+  "publicKeyEncoding": "NONE",
+  "schemaVersion": "1.0.0",
+  "signatureBehavior": "N/A (envelope format)",
+  "supportedOperations": [
+    "DAT_V1_ENCRYPT",
+    "DAT_V1_DECRYPT",
+    "DAT_V1_PARSE"
+  ]
+}

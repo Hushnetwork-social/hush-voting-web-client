@@ -1,0 +1,19 @@
+{
+  "classification": "EXCLUDED",
+  "contract": "None",
+  "contractVersion": "1.0.0",
+  "evidence": [
+    "hush-web-client/src/lib/crypto/mobileBenchmark/*",
+    "hush-web-client/src/lib/crypto/*.test.ts (updateIdentity, group-crypto)",
+    "attestation-record.md (FEAT-001, hush-voting-memory-bank)"
+  ],
+  "mnemonicSupport": "UNKNOWN",
+  "name": "Test-only key generators (TypeScript)",
+  "notes": "Derives keys in tests/benchmarks only; no evidence of escape into real use (exclusion per inventory rule). Not a compatibility producer.",
+  "precedence": null,
+  "producerId": "P-08",
+  "publicKeyEncoding": "UNKNOWN",
+  "schemaVersion": "1.0.0",
+  "signatureBehavior": "N/A",
+  "supportedOperations": []
+}

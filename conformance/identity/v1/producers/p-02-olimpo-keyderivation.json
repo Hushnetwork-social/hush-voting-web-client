@@ -1,0 +1,26 @@
+{
+  "classification": "APPROVED",
+  "contract": "C-B",
+  "contractVersion": "1.0.0",
+  "evidence": [
+    "hush-server-node/Shared/Olimpo.KeyDerivation/DeterministicKeyGenerator.cs",
+    "hush-server-node/Shared/Olimpo.KeyDerivation/MnemonicGenerator.cs",
+    "Introduced by commit 6cd2dbe (2025-12-12, ECIES switch)",
+    "attestation-record.md (FEAT-001, hush-voting-memory-bank)"
+  ],
+  "mnemonicSupport": "24",
+  "name": "Olimpo.KeyDerivation (.NET)",
+  "notes": "Active server/desktop producer; uncompressed addresses are distinct candidates. 24-word only (word count validated exactly 24; 12-word rejected deterministically). Normalization: lowercase; split on space/tab/newline/CR; rejoin single spaces. HKDF-SHA256 info 'hush/signing/secp256k1/v1'/'hush/encrypt/secp256k1/v1'; invalid-scalar retry with '{info}/{attempt}'. Critical divergence from P-01: different HKDF info strings and different public-key encoding from the same mnemonic.",
+  "precedence": 2,
+  "producerId": "P-02",
+  "publicKeyEncoding": "UNCOMPRESSED",
+  "schemaVersion": "1.0.0",
+  "signatureBehavior": "Olimpo.DigitalSignature SHA-256withECDSA over UTF-8 message bytes; DER default with compact 64-byte r||s and base64 variants; verification accepts DER or compact",
+  "supportedOperations": [
+    "MNEMONIC_DERIVE",
+    "KEY_ENCODE",
+    "TRANSACTION_SERIALIZE",
+    "SIGN",
+    "VERIFY"
+  ]
+}

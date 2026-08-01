@@ -1,0 +1,26 @@
+{
+  "classification": "APPROVED",
+  "contract": "C-A",
+  "contractVersion": "1.0.0",
+  "evidence": [
+    "hush-web-client/src/lib/crypto/keys.ts (single source revision 07599a3, 2025-12-18)",
+    "hush-web-client/src/lib/crypto/transactions.ts",
+    "Releases WebClient-v1.0.90..v1.0.117",
+    "attestation-record.md (FEAT-001, hush-voting-memory-bank)"
+  ],
+  "mnemonicSupport": "12_AND_24",
+  "name": "Hush Feeds Web Client (TypeScript)",
+  "notes": "Active web producer; compressed addresses are the current UI surface. 24-word generated; 12-word accepted via BIP-39 standard library. Seed: BIP-39 PBKDF2-HMAC-SHA512 2048; HKDF-SHA256 info 'signing'/'encryption'; 32-byte output used directly as private scalar (no retry path documented).",
+  "precedence": 1,
+  "producerId": "P-01",
+  "publicKeyEncoding": "COMPRESSED",
+  "schemaVersion": "1.0.0",
+  "signatureBehavior": "ECDSA-SHA256 prehash of exact UTF-8 canonical transaction JSON bytes; compact 64-byte r||s; base64 in UserSignature.Signature; deterministic RFC 6979 nonce",
+  "supportedOperations": [
+    "MNEMONIC_DERIVE",
+    "KEY_ENCODE",
+    "TRANSACTION_SERIALIZE",
+    "SIGN",
+    "VERIFY"
+  ]
+}

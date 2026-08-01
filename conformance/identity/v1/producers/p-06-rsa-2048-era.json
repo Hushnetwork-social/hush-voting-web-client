@@ -1,0 +1,21 @@
+{
+  "classification": "UNSUPPORTED",
+  "contract": "C-D (historical evidence only; not an approved derivation contract)",
+  "contractVersion": "1.0.0",
+  "evidence": [
+    "hush-server-node commit 6cd2dbe (2025-12-12) BREAKING CHANGE: 'Existing accounts and encrypted data are incompatible and must be recreated'",
+    "Shared/Olimpo.EncryptingManager/EncryptKeys.cs at 6cd2dbe^ (RSA-2048, Modulus|Exponent base64; XML RSAKeyValue variant)",
+    "Shared/Olimpo.DigitalSignature/DigitalSignature.cs at 6cd2dbe^ (SecureRandom key generation, not mnemonic-derived)",
+    "Olimpo.KeyDerivation introduced BY commit 6cd2dbe (no mnemonic path before it)",
+    "attestation-record.md (FEAT-001, hush-voting-memory-bank, decision A2)"
+  ],
+  "mnemonicSupport": "NONE",
+  "name": "RSA-2048 encryption era (.NET, pre-ECIES)",
+  "notes": "Classified UNSUPPORTED with evidence: the producer's own breaking-change declaration documents intentional exclusion, and source proves pre-6cd2dbe signing keys were randomly generated (SecureRandom), so no mnemonic-to-key path exists for RSA-era accounts. Serialization formats are recorded as historical evidence only and receive no positive vectors. No blocking Unverified producer remains.",
+  "precedence": null,
+  "producerId": "P-06",
+  "publicKeyEncoding": "NONE",
+  "schemaVersion": "1.0.0",
+  "signatureBehavior": "N/A",
+  "supportedOperations": []
+}

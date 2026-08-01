@@ -1,0 +1,22 @@
+{
+  "classification": "APPROVED",
+  "contract": "C-C",
+  "contractVersion": "1.0.0",
+  "evidence": [
+    "hush-web-client/src/lib/crypto/credentialsFile.ts",
+    "attestation-record.md (FEAT-001, hush-voting-memory-bank)"
+  ],
+  "mnemonicSupport": "NONE",
+  "name": ".dat v1 writer (TypeScript)",
+  "notes": "Envelope: 4-byte magic 'HUSH'; int32 little-endian version 1; 16-byte salt; 12-byte nonce; AES-256-GCM ciphertext (128-bit tag) of UTF-8 JSON. Key: PBKDF2-SHA256 100000 iterations, password = UTF-8 bytes. Payload shape: PortableCredentials (ProfileName, PublicSigningAddress, PrivateSigningKey, PublicEncryptAddress, PrivateEncryptKey, IsPublic, Mnemonic string|null). Mutually compatible with P-05.",
+  "precedence": 4,
+  "producerId": "P-04",
+  "publicKeyEncoding": "NONE",
+  "schemaVersion": "1.0.0",
+  "signatureBehavior": "N/A (envelope format)",
+  "supportedOperations": [
+    "DAT_V1_ENCRYPT",
+    "DAT_V1_DECRYPT",
+    "DAT_V1_PARSE"
+  ]
+}

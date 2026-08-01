@@ -1,0 +1,118 @@
+{
+  "contractVersion": "1.0.0",
+  "kind": "key-vectors",
+  "schemaVersion": "1.0.0",
+  "vectors": [
+    {
+      "encoding": "COMPRESSED",
+      "expected": "OK",
+      "expectedPublicKeyHex": "0237fdd4364c0b898908be2f1a98a6b4a7890c623ae92a283640e44d87e048daa5",
+      "id": "K-001",
+      "operation": "PUBLIC_KEY_DERIVE",
+      "privateScalarHex": "6e3f74236c3d4a20553be05963f624696990c22245599b3d1b30262af793d885",
+      "producerId": "P-01"
+    },
+    {
+      "encoding": "UNCOMPRESSED",
+      "expected": "OK",
+      "expectedPublicKeyHex": "0437fdd4364c0b898908be2f1a98a6b4a7890c623ae92a283640e44d87e048daa538a4404b9bfccf61c2cf633964a1ce7619534c26f552dd21ee1880a49cb140a0",
+      "id": "K-002",
+      "notes": "Compressed and uncompressed encodings of the same curve point are distinct lookup candidates, but decode to the same point.",
+      "operation": "POINT_EQUIVALENCE",
+      "privateScalarHex": "6e3f74236c3d4a20553be05963f624696990c22245599b3d1b30262af793d885",
+      "producerId": "P-01"
+    },
+    {
+      "encoding": "UNCOMPRESSED",
+      "expected": "OK",
+      "expectedPublicKeyHex": "042b347a16473bab675d469b6094deb96cd21239b855b98f98a4f8194953988306f9a5c50de7d68eb543364cbca033c05201a7cc93e96b61a8fb95402bc6e3b66e",
+      "id": "K-003",
+      "operation": "PUBLIC_KEY_DERIVE",
+      "privateScalarHex": "45baec3bd2eac5290590beab7dfd761b0f746ddac9cc4d9a94c09a202ee9813c",
+      "producerId": "P-02"
+    },
+    {
+      "encoding": "COMPRESSED",
+      "expected": "OK",
+      "expectedPublicKeyHex": "022b347a16473bab675d469b6094deb96cd21239b855b98f98a4f8194953988306",
+      "id": "K-004",
+      "operation": "POINT_EQUIVALENCE",
+      "privateScalarHex": "45baec3bd2eac5290590beab7dfd761b0f746ddac9cc4d9a94c09a202ee9813c",
+      "producerId": "P-02"
+    },
+    {
+      "expected": "OK",
+      "expectedPointXHex": "37fdd4364c0b898908be2f1a98a6b4a7890c623ae92a283640e44d87e048daa5",
+      "expectedPointYHex": "38a4404b9bfccf61c2cf633964a1ce7619534c26f552dd21ee1880a49cb140a0",
+      "id": "K-005",
+      "inputHex": "0237fdd4364c0b898908be2f1a98a6b4a7890c623ae92a283640e44d87e048daa5",
+      "notes": "Compressed key 02||X decodes to the same point as the P-01 derived key.",
+      "operation": "DECODE"
+    },
+    {
+      "expected": "OK",
+      "expectedPointXHex": "2b347a16473bab675d469b6094deb96cd21239b855b98f98a4f8194953988306",
+      "expectedPointYHex": "f9a5c50de7d68eb543364cbca033c05201a7cc93e96b61a8fb95402bc6e3b66e",
+      "id": "K-006",
+      "inputHex": "042b347a16473bab675d469b6094deb96cd21239b855b98f98a4f8194953988306f9a5c50de7d68eb543364cbca033c05201a7cc93e96b61a8fb95402bc6e3b66e",
+      "notes": "Uncompressed key 04||X||Y decodes to the same point as the P-02 derived key.",
+      "operation": "DECODE"
+    },
+    {
+      "errorCode": "INVALID_KEY_ENCODING",
+      "expected": "ERROR",
+      "id": "K-007",
+      "inputHex": "0537fdd4364c0b898908be2f1a98a6b4a7890c623ae92a283640e44d87e048daa5",
+      "notes": "Unknown 0x05 prefix.",
+      "operation": "DECODE"
+    },
+    {
+      "errorCode": "INVALID_KEY_ENCODING",
+      "expected": "ERROR",
+      "id": "K-008",
+      "inputHex": "0237fdd4364c0b898908be2f1a98a6b4a7890c623ae92a283640e44d87e048da",
+      "notes": "Truncated compressed key (32 bytes after prefix instead of 32 X bytes).",
+      "operation": "DECODE"
+    },
+    {
+      "errorCode": "INVALID_KEY_ENCODING",
+      "expected": "ERROR",
+      "id": "K-009",
+      "inputHex": "0400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "notes": "All-zero uncompressed key (not on curve).",
+      "operation": "DECODE"
+    },
+    {
+      "errorCode": "INVALID_PRIVATE_SCALAR",
+      "expected": "ERROR",
+      "id": "K-010",
+      "notes": "Zero scalar.",
+      "operation": "SCALAR_VALIDATE",
+      "privateScalarHex": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "errorCode": "INVALID_PRIVATE_SCALAR",
+      "expected": "ERROR",
+      "id": "K-011",
+      "notes": "Scalar equal to curve order N.",
+      "operation": "SCALAR_VALIDATE",
+      "privateScalarHex": "fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141"
+    },
+    {
+      "errorCode": "INVALID_PRIVATE_SCALAR",
+      "expected": "ERROR",
+      "id": "K-012",
+      "notes": "Scalar above curve order N.",
+      "operation": "SCALAR_VALIDATE",
+      "privateScalarHex": "fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364142"
+    },
+    {
+      "expected": "OK",
+      "expectedPublicKeyHex": "0379be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "id": "K-013",
+      "notes": "N-1 is a valid scalar boundary.",
+      "operation": "SCALAR_VALIDATE",
+      "privateScalarHex": "fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364140"
+    }
+  ]
+}

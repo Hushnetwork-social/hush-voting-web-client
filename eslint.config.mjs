@@ -16,5 +16,6 @@ export default defineConfig([
     'src-tauri/target/**',
     'src-tauri/gen/**',
     'next-env.d.ts',
+    'conformance/identity/v1/scripts/vendor/**',
   ]),
 ]);
