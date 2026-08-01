@@ -44,8 +44,14 @@ conformance/identity/v1/
 │   ├── generate-manifest.mjs       ← manifest generator (+ --check mode)
 │   ├── validate.mjs                ← schema + integrity + completeness validation
 │   ├── derive-vectors.mjs          ← provenance: how vectors were produced
+│   ├── create-release-archive.mjs  ← deterministic immutable release archive
 │   └── vendor/ajv-bundle.mjs       ← self-contained JSON Schema 2020-12 engine
 └── tests/                          ← node:test suites (framework-independent)
+    ├── manifest-integrity.test.mjs
+    ├── negative-matrix.test.mjs
+    ├── schema-boundaries.test.mjs
+    ├── documentation.test.mjs      ← consumer/contributor doc checks
+    └── release-archive.test.mjs    ← archive reproducibility gate
 ```
 
 ## Versioning
@@ -109,6 +115,103 @@ newline.
 - **Downstream features**: FEAT-002/003/007/008/009 and future Rust adapters
   (FEAT-005/006) must replay every applicable corpus version.
 
+## Consumer contract
+
+Consumers interact with the compatibility boundary in exactly this order
+(defined and implemented by Phase 3/4):
+
+1. **Normalize and validate** the supplied compatibility input (mnemonic words,
+   word count, checksum, `.dat` envelope, key encoding) against the Approved
+   producer contracts.
+2. **Derive ordered public candidate descriptors** with producer provenance,
+   in frozen manifest precedence order. Candidates with exactly identical
+   encoded signing+encryption address pairs are deduplicated while retaining
+   every contributing producer ID; compressed and uncompressed encodings of
+   the same curve point remain distinct candidates.
+3. **Resolve candidates** against caller-supplied deterministic lookup
+   outcomes (zero, one, or multiple matches; never silently choose among
+   distinct matching identities).
+4. **Derive private credential material only for the selected producer** after
+   lookup/selection. The API never returns every candidate's private keys to
+   application state simultaneously.
+
+Expected failures are typed data with stable machine-readable codes; they do
+not throw. Diagnostics never contain mnemonics, passwords, private keys,
+decrypted credentials, or ciphertext.
+
+| Code | Meaning |
+|---|---|
+| `INVALID_WORD_COUNT` / `UNKNOWN_WORD` / `INVALID_CHECKSUM` / `INVALID_MNEMONIC` | Mnemonic rejection (producer-specific) |
+| `UNSUPPORTED_PRODUCER` / `UNSUPPORTED_VERSION` / `UNSUPPORTED_PASSPHRASE` | Unsupported contract selection |
+| `INVALID_KEY_ENCODING` / `INVALID_PRIVATE_SCALAR` | Key/encoding rejection |
+| `DAT_INVALID_MAGIC` / `DAT_UNSUPPORTED_VERSION` / `DAT_MALFORMED` / `DAT_WRONG_PASSWORD` | Envelope rejection |
+| `DAT_MISSING_FIELD` / `DAT_UNKNOWN_FIELD` / `DAT_DUPLICATE_FIELD` / `DAT_INVALID_FIELD` | Strict record parse rejection |
+| `DAT_KEY_MISMATCH` / `DAT_MNEMONIC_KEY_MISMATCH` | Key consistency rejection |
+| `SIGNATURE_MALFORMED` | Signature encoding rejection |
+| `DERIVATION_FAILURE` / `CANONICAL_MISMATCH` | Derivation/internal contract failure |
+
+Consumption rules:
+
+- Pin a **tagged HushVoting release** (never a mutable default branch) and the
+  **expected `manifest.json` SHA-256** from its release evidence.
+- Every supported release permanently replays all prior approved corpus
+  versions; consumers must keep the replay path.
+- Runtime/conformance output must never echo fixture material (see Security).
+
+## Contributor contract
+
+Adding a producer, vector, schema, or expected output requires:
+
+1. **Evidence**: reproducible derivation from an approved historical producer,
+   or a documented migration/security decision for changed behavior.
+2. **Semantic version bump** (major for behavior/ordering/encoding/expected
+   output changes; minor for additive producers/vectors; patch for docs,
+   diagnostics, or negative vectors).
+3. **Dual-owner review**: HushVoting + HushNetwork platform review for any
+   producer, algorithm, precedence, expected-output, or schema change
+   (see Review ownership).
+4. **Deterministic formatting**: UTF-8 without BOM, LF endings, lexicographic
+   object-key order, two-space indent, one final newline — then regenerate:
+   ```bash
+   node scripts/generate-manifest.mjs && node scripts/generate-manifest.mjs --check
+   node scripts/validate.mjs
+   node --test "tests/*.test.mjs"
+   ```
+5. **Public-test warnings**: any new fixture mnemonic/password/private key is
+   synthetic, clearly labelled test-only, and prohibited from production use.
+   Secret scanning allows fixtures only on exact corpus paths.
+6. **Cross-runtime obligations**: TypeScript and .NET conformance must pass on
+   every applicable corpus version; future Rust/native implementations must
+   replay every applicable version and must not derive from a separate
+   undocumented algorithm.
+7. **Server-runtime exclusion**: HushServerNode runtime DI never references the
+   corpus or derives user private keys from it; the .NET runner is
+   non-production tooling only.
+
+Producer IDs are immutable. Incomplete evidence must never be silently
+converted to Unsupported or omitted; an Unverified producer that may have
+created recoverable identities blocks release.
+
+## Release archive
+
+Each approved corpus version is published as a deterministic immutable archive
+attached to a tagged HushVoting release:
+
+```bash
+node scripts/create-release-archive.mjs \
+  --version 1.0.0 \
+  --output release/ \
+  [--ts-report conformance/reports/typescript-identity-report.json] \
+  [--dotnet-report <path-to-dotnet-identity-report.json>]
+```
+
+The archive contains the exact corpus bytes, `manifest.json` digest,
+`contractVersion`/`schemaVersion` (report fields per `schemas/report.schema.json`),
+inventory attestation reference, optional TS/.NET conformance reports, and a
+`release-evidence.json` recording both repository SHAs and the manifest digest. Two builds from identical inputs produce
+byte-identical archives (deterministic ordering and fixed timestamps). See
+`tests/release-archive.test.mjs` for the reproducibility gate.
+
 ## Attestation
 
 Producer classifications and precedence are frozen by the FEAT-001 attestation
@@ -116,3 +219,16 @@ record (decision record in `hush-voting-memory-bank`,
 `Features/03_IN_PROGRESS/FEAT-001-.../attestation-record.md`). Classification
 changes require a semantic version bump and dual-owner (HushVoting + HushNetwork
 platform) review.
+
+## Review ownership
+
+- **Dual-owner review is mandatory** for any change to a producer, algorithm,
+  precedence, schema, or expected output: one HushVoting owner and one
+  HushNetwork platform owner, recorded on the pull request with evidence
+  references.
+- **Release evidence** records the HushVoting SHA, HushServerNode SHA,
+  contract/schema versions, and the `manifest.json` digest in
+  `release-evidence.json` inside the immutable archive.
+- The attestation record's reviewer roles, dates, evidence references, and
+  conclusion provide the approval trail; fixtures never embed personal
+  signatures.
