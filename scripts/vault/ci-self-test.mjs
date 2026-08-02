@@ -11,15 +11,17 @@
  *   4. production import of a conformance module -> `vault:production-exclusion` fails
  *   5. missing conformance module -> `vault:conformance` fails (no isolated path)
  *
- * Every scenario restores the original bytes in a `finally` block and re-runs the
- * gate to prove the clean state still passes. The path-trigger analysis (unrelated
- * files never select expensive vault blocks) is enforced by the workflow `paths:`
- * declaration; the self-test asserts those paths cover every vault artifact area.
+ * Every scenario captures the PRISTINE file bytes before tampering and restores them
+ * in a `finally` block (never `git checkout`, so uncommitted developer changes are
+ * never destroyed), then re-runs the gate to prove the clean state still passes.
+ * The path-trigger analysis (unrelated files never select expensive vault blocks) is
+ * enforced by the workflow `paths:` declaration; the self-test asserts those paths
+ * cover every vault artifact area.
  *
  * Exit codes: 0 = all scenarios behave, 1 = a scenario failed, 2 = internal error.
  */
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const REPO_ROOT = join(import.meta.dirname, '..', '..');
@@ -27,29 +29,41 @@ const run = (args, opts = {}) => execFileSync('npm', ['run', ...args], { cwd: RE
 
 let failures = 0;
 
-function scenario(name, gate, tamper, restore) {
+function gateExit(gate) {
+  try {
+    run([gate], { timeout: 900_000 });
+    return 0;
+  } catch (err) {
+    return typeof err.status === 'number' && err.status !== 0 ? err.status : 1;
+  }
+}
+
+/**
+ * Run a tamper/restore scenario. `tamper` mutates the working tree; the PRISTINE
+ * bytes of every listed path are restored in `finally` before the clean-state
+ * re-run. Returns true when the tampered gate FAILS and the restored gate PASSES.
+ */
+function scenario(name, gate, tamper, pathsToRestore, extraRestore) {
   process.stdout.write(`scenario: ${name}\n`);
-  tamper();
+  const pristine = new Map(pathsToRestore.map((p) => [p, readFileSync(p)]));
   let tamperedExit = 0;
   try {
-    run([gate], { timeout: 900_000 });
-  } catch (err) {
-    tamperedExit = typeof err.status === 'number' && err.status !== 0 ? err.status : 1;
+    tamper();
+    tamperedExit = gateExit(gate);
+  } catch {
+    tamperedExit = 1;
+  } finally {
+    for (const [p, bytes] of pristine) writeFileSync(p, bytes);
+    extraRestore?.();
   }
-  restore();
-  let restoredExit = 0;
-  try {
-    run([gate], { timeout: 900_000 });
-  } catch (err) {
-    restoredExit = typeof err.status === 'number' ? err.status : 1;
-  }
+  const restoredExit = gateExit(gate);
   const ok = tamperedExit !== 0 && restoredExit === 0;
   if (!ok) failures += 1;
   process.stdout.write(`  tampered=${tamperedExit !== 0 ? 'FAILS (ok)' : 'PASSES (BAD)'} restored=${restoredExit === 0 ? 'PASSES (ok)' : 'FAILS (BAD)'} -> ${ok ? 'ok' : 'FAIL'}\n`);
   return ok;
 }
 
-// ---- scenario helpers -------------------------------------------------------
+// ---- paths ------------------------------------------------------------------
 const SCHEMA = join(REPO_ROOT, 'conformance/vault/v1/schemas/suite.schema.json');
 const VECTOR = join(REPO_ROOT, 'conformance/vault/v1/vectors/canonical-byte-vectors.json');
 const MANIFEST = join(REPO_ROOT, 'conformance/vault/v1/manifest.json');
@@ -61,14 +75,10 @@ scenario(
   'tampered schema fails vault:integrity',
   'vault:integrity',
   () => {
-    const backup = readFileSync(SCHEMA);
-    writeFileSync(SCHEMA, backup.toString('utf8').replace('https://json-schema.org/draft/2020-12/schema', 'https://json-schema.org/draft/2020-12/bogus'));
+    const content = readFileSync(SCHEMA, 'utf8');
+    writeFileSync(SCHEMA, content.replace('https://json-schema.org/draft/2020-12/schema', 'https://json-schema.org/draft/2020-12/bogus'));
   },
-  () => {
-    // restored by integrity --check? No: manifest pins the digest, so the original
-    // bytes must be restored exactly. Keep a pristine copy via git.
-    execFileSync('git', ['checkout', '--', 'conformance/vault/v1/schemas/suite.schema.json'], { cwd: REPO_ROOT, stdio: 'ignore' });
-  },
+  [SCHEMA],
 );
 
 // ---- 2. tampered vector -----------------------------------------------------
@@ -76,12 +86,10 @@ scenario(
   'tampered vector fails vault:conformance',
   'vault:conformance',
   () => {
-    const backup = readFileSync(VECTOR);
-    writeFileSync(VECTOR, backup.toString('utf8').replace('"id": "C-001"', '"id": "C-001" "tamper": true'));
+    const content = readFileSync(VECTOR, 'utf8');
+    writeFileSync(VECTOR, content.replace('"id": "C-001"', '"id": "C-001" "tamper": true'));
   },
-  () => {
-    execFileSync('git', ['checkout', '--', 'conformance/vault/v1/vectors/canonical-byte-vectors.json'], { cwd: REPO_ROOT, stdio: 'ignore' });
-  },
+  [VECTOR],
 );
 
 // ---- 3. tampered manifest ---------------------------------------------------
@@ -89,13 +97,10 @@ scenario(
   'tampered manifest digest fails vault:integrity',
   'vault:integrity',
   () => {
-    const backup = readFileSync(MANIFEST);
-    // Replace the first sha256 entry with a bogus digest; manifest check must fail.
-    writeFileSync(MANIFEST, backup.toString('utf8').replace(/"sha256": "[0-9a-f]{64}"/, '"sha256": "' + '0'.repeat(64) + '"'));
+    const content = readFileSync(MANIFEST, 'utf8');
+    writeFileSync(MANIFEST, content.replace(/"sha256": "[0-9a-f]{64}"/, '"sha256": "' + '0'.repeat(64) + '"'));
   },
-  () => {
-    execFileSync('git', ['checkout', '--', 'conformance/vault/v1/manifest.json'], { cwd: REPO_ROOT, stdio: 'ignore' });
-  },
+  [MANIFEST],
 );
 
 // ---- 4. production import fixture ------------------------------------------
@@ -106,9 +111,8 @@ scenario(
     mkdirSync(NEGATIVE_DIR, { recursive: true });
     writeFileSync(join(NEGATIVE_DIR, 'imports-conformance.ts'), "import { runIsolatedValidation } from '../lib/vault-core/conformance/isolated-validator';\n");
   },
-  () => {
-    rmSync(NEGATIVE_DIR, { recursive: true, force: true });
-  },
+  [],
+  () => rmSync(NEGATIVE_DIR, { recursive: true, force: true }),
 );
 
 // ---- 5. missing conformance module -----------------------------------------
@@ -118,8 +122,9 @@ scenario(
   () => {
     renameSync(ISOLATED, `${ISOLATED}.bak`);
   },
+  [],
   () => {
-    renameSync(`${ISOLATED}.bak`, ISOLATED);
+    if (existsSync(`${ISOLATED}.bak`)) renameSync(`${ISOLATED}.bak`, ISOLATED);
   },
 );
 
