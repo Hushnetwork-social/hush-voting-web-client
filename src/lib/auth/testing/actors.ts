@@ -51,8 +51,7 @@ export interface ScriptedResults {
   coordination: CoordinationResult[];
 }
 
-function shift<T>(queue: T[], fallback: T): T {
-  if (queue.length > 0) {
+function shift<T>(queue: T[], fallback: T): T {  if (queue.length > 0) {
     return queue.shift() as T;
   }
   return fallback;
