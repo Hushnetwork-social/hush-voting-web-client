@@ -1,4 +1,5 @@
 import type { NextConfig } from 'next';
+import { productionSecurityHeaderConfig } from './src/lib/browser-vault/deployment/headers';
 
 const isStaticExport = process.env.STATIC_EXPORT === 'true';
 const isStandaloneBuild = process.env.STANDALONE_BUILD === 'true';
@@ -21,6 +22,9 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: process.cwd(),
   },
+  // FEAT-004: restrictive security headers on the production web build only
+  // (dev/HMR and test harnesses are unaffected).
+  headers: productionSecurityHeaderConfig(),
 };
 
 export default nextConfig;
