@@ -34,7 +34,7 @@ const request = {
 
 describe('capability-phase kernel', () => {
   it('starts Locked with no capabilities', () => {
-    expect(INITIAL_KERNEL_STATE).toEqual({ epoch: 0, phase: 'Locked', channels: [], fresh: {} });
+    expect(INITIAL_KERNEL_STATE).toEqual({ epoch: 0, phase: 'Locked', fresh: {} });
   });
 
   it('local unlock produces VerificationOnly, not Authenticated', () => {

@@ -54,7 +54,6 @@ export const EPOCH_BUMP_CAUSES: readonly EpochBumpCause[] = [
 export interface SessionKernelState {
   readonly epoch: number;
   readonly phase: CapabilityPhase;
-  readonly channels: readonly string[];
   /** Fresh-password capability per channel (one-use, expiring). */
   readonly fresh: Readonly<Record<string, FreshPasswordCapability | undefined>>;
 }
@@ -62,7 +61,6 @@ export interface SessionKernelState {
 export const INITIAL_KERNEL_STATE: SessionKernelState = {
   epoch: 0,
   phase: 'Locked',
-  channels: [],
   fresh: {},
 } as const;
 
@@ -156,7 +154,6 @@ export function invalidateSession(state: SessionKernelState, cause: EpochBumpCau
   return {
     epoch: state.epoch + 1,
     phase: 'Locked',
-    channels: [],
     fresh: {},
   };
 }

@@ -22,7 +22,7 @@ export type VaultToAuthProjection =
  * Explicit deterministic mapping: vault v1 result -> existing FEAT-002 outcome.
  * Every entry maps to ONE safe FEAT-002 code (no blank screens, no ambiguity).
  */
-const MAPPED: Readonly<Record<string, AuthOutcomeCode>> = {
+const MAPPED: Readonly<Partial<Record<VaultResultCode, AuthOutcomeCode>>> = {
   NoVault: 'INIT_NO_LOCAL_USER',
   UnsupportedVaultVersion: 'INIT_UNSUPPORTED_VAULT_VERSION',
   MalformedEnvelope: 'INIT_CORRUPT_VAULT',
