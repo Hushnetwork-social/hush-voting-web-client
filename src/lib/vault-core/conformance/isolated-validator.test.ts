@@ -12,7 +12,7 @@ import { describe, expect, it, beforeAll } from 'vitest';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
-import { runIsolatedValidation, verifyManifestIndependently, type IsolatedReport } from './isolated-validator';
+import { runIsolatedValidation, verifyManifestIndependently, isCorpusHealthy, type IsolatedReport } from './isolated-validator';
 
 let report: IsolatedReport;
 
@@ -26,6 +26,7 @@ beforeAll(async () => {
 
 describe('FEAT-003 isolated TypeScript/Node conformance', () => {
   it('replays the complete corpus with zero mismatch records', () => {
+    expect(isCorpusHealthy({ report })).toBe(true);
     expect(report.passed).toBe(true);
     expect(report.records.filter((r) => !r.ok)).toHaveLength(0);
     expect(report.total).toBeGreaterThan(50);

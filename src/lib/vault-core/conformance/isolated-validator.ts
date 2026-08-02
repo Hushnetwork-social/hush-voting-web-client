@@ -292,9 +292,9 @@ function replayCore(root: string, records: IsolatedReportRecord[]): void {
     vectors: Array<{ id: string; family: string; operation: string; input: Record<string, unknown>; expectedCode: string; expectedSha256?: string }>;
   }>(root, 'vectors/core-vectors.json');
   for (const v of vectors) {
+    let category: IsolatedReportRecord['category'] = 'typed-result';
     try {
       let result: { code: string; output?: unknown };
-      let category: IsolatedReportRecord['category'];
       switch (v.family) {
         case 'extension': {
           const input = v.input as { container: { extensions: Record<string, unknown>; criticalExtensions: string[] }; knownExtensions: string[] };
@@ -327,7 +327,7 @@ function replayCore(root: string, records: IsolatedReportRecord[]): void {
           break;
         }
         default:
-          record(records, { id: v.id, category: 'typed-result', ok: false, expectedCode: v.expectedCode, actualCode: 'UNKNOWN_FAMILY' });
+          record(records, { id: v.id, category, ok: false, expectedCode: v.expectedCode, actualCode: 'UNKNOWN_FAMILY' });
           continue;
       }
       const codeOk = result.code === v.expectedCode;
@@ -344,7 +344,7 @@ function replayCore(root: string, records: IsolatedReportRecord[]): void {
       }
       record(records, { id: v.id, category, ok: codeOk && digestOk, expectedCode: v.expectedCode, actualCode: result.code, expectedDigest: expectedDigest || undefined, actualDigest: actualDigest || undefined });
     } catch (err) {
-      record(records, { id: v.id, category: 'typed-result', ok: false, expectedCode: v.expectedCode, actualCode: `ERROR:${(err as Error).name}` });
+      record(records, { id: v.id, category, ok: false, expectedCode: v.expectedCode, actualCode: `ERROR:${(err as Error).name}` });
     }
   }
 }
