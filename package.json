@@ -51,11 +51,14 @@
     "browser-vault:production-exclusion": "node scripts/browser-vault/production-exclusion.mjs",
     "browser-vault:audit": "node scripts/browser-vault/artifact-audit.mjs",
     "browser-vault:dependency-audit": "npm audit --audit-level=high",
-    "browser-vault:browser-blocks": "playwright test browser/vault-storage.spec.ts browser/vault-coordination.spec.ts",
+    "browser-vault:browser-blocks": "playwright test browser/vault-storage.spec.ts browser/vault-coordination.spec.ts browser/vault-qualification.spec.ts browser/vault-performance.spec.ts",
     "browser-vault:deployment-policy": "node scripts/browser-vault/deployment-policy.mjs",
     "browser-vault:handoff": "node scripts/browser-vault/handoff.mjs",
     "browser-vault:ci": "node scripts/browser-vault/ci-browser-vault.mjs",
-    "browser-vault:ci:selftest": "node scripts/browser-vault/ci-browser-vault.mjs --selftest"
+    "browser-vault:ci:selftest": "node scripts/browser-vault/ci-browser-vault.mjs --selftest",
+    "browser-vault:matrix": "node scripts/browser-vault/matrix.mjs",
+    "browser-vault:security-qualification": "node scripts/browser-vault/security-qualification.mjs",
+    "browser-vault:qualification-report": "node scripts/browser-vault/qualification-report.mjs"
   },
   "dependencies": {
     "@noble/hashes": "2.2.0",
