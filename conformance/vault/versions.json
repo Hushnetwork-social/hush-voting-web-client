@@ -1,0 +1,11 @@
+{
+  "contract": "FEAT-003 vault corpus version registry v1",
+  "versions": [
+    {
+      "corpusVersion": "1.0.0",
+      "dir": "v1",
+      "manifestSha256": "e8dfdfa49b9e33cfc8a47b1266c5a14cb978c4be28f21d87cc2f034d435582e5",
+      "retained": true
+    }
+  ]
+}

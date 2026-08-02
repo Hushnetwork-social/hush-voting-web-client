@@ -37,6 +37,8 @@
     "vault:conformance": "vitest run --silent=true src/lib/vault-core/conformance",
     "vault:conformance:isolated": "vitest run --silent=true src/lib/vault-core/conformance/isolated-validator.test.ts",
     "vault:production-exclusion": "node scripts/vault/production-exclusion.mjs",
+    "vault:ci": "node scripts/vault/ci-vault.mjs",
+    "vault:ci:replay": "node scripts/vault/replay-prior-versions.mjs",
     "test:browser": "playwright test",
     "test:browser:auth": "playwright test browser/",
     "auth:audit": "node scripts/auth/artifact-audit.mjs",
