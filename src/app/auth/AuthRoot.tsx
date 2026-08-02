@@ -2,15 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AuthAdapter, useAuthProjection, synchronouslyPermitsProtectedContent } from '../../lib/auth/react/adapter';
-import { createProductionComposition, createDevelopmentComposition } from '../../lib/auth/composition';
+import { createProductionComposition } from '../../lib/auth/composition';
 import { emitTelemetry } from '../../lib/auth/telemetry';
 import type { AllowlistedTelemetryEvent } from '../../lib/auth/ports';
 import type { AuthIntent, CapabilityId } from '../../lib/auth/types';
 import type { AuthMachineInput } from '../../lib/auth/state/machine';
 import { AuthGate } from './AuthGate';
-
-/** Explicit production switch: dev/test actors are impossible to select here. */
-const ALLOW_DEVELOPMENT_ACTORS = process.env.NODE_ENV !== 'production';
 
 /** Telemetry preference: only an already-recorded explicit opt-in enables emission. */
 const TELEMETRY_PREFERENCE = { explicitOptIn: false };
@@ -36,9 +33,12 @@ function coarseStage(authState: string): AllowlistedTelemetryEvent['coarseStage'
 }
 
 /** Build the one authoritative machine input for this instance. */
-function buildMachineInput(): AuthMachineInput {
-  if (ALLOW_DEVELOPMENT_ACTORS) {
-    const composition = createDevelopmentComposition(true);
+async function buildMachineInput(): Promise<AuthMachineInput> {
+  if (process.env.NODE_ENV !== 'production') {
+    // Dev-only synthetic actors live behind a dynamic import so production
+    // bundlers prune the module (verified by the Phase 7 bundle scan).
+    const dev = await import('../../lib/auth/testing/composition.dev');
+    const composition = dev.createDevelopmentComposition(true);
     return {
       actors: composition.actors,
       registeredCapabilities: new Set<CapabilityId>(['localUserAuthority', 'secretAuthority', 'identityVerification', 'browserCoordination']),
@@ -54,9 +54,21 @@ function buildMachineInput(): AuthMachineInput {
 }
 
 export default function AuthRoot() {
-  // Single authority per application instance, created once via lazy state init
-  // (safe: no ref reads/writes during render).
-  const [adapter] = useState<AuthAdapter>(() => new AuthAdapter(buildMachineInput()));
+  // Single authority per application instance. In dev the machine input is
+  // built via a dynamic import (pruned in production builds); the adapter is
+  // created once the input resolves and never re-created.
+  const [adapter, setAdapter] = useState<AuthAdapter | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void buildMachineInput().then((input) => {
+      if (!cancelled) {
+        setAdapter(new AuthAdapter(input));
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const projection = useAuthProjection(adapter);
 
   // Telemetry gate: no event is emitted without explicit opt-in (currently off).
@@ -78,8 +90,8 @@ export default function AuthRoot() {
 
   const handlers = useMemo(
     () => ({
-      dispatch: (intent: AuthIntent) => adapter.send(intent),
-      submitSecret: (secret: string) => adapter.submitSecret(secret),
+      dispatch: (intent: AuthIntent) => adapter?.send(intent),
+      submitSecret: (secret: string) => adapter?.submitSecret(secret),
     }),
     [adapter],
   );

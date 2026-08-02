@@ -14,10 +14,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import {
-  createDevelopmentComposition,
   createProductionComposition,
   emptyActors,
 } from './composition';
+import { createDevelopmentComposition } from './testing/composition.dev';
 import { registerCapability } from './registry';
 import { emitTelemetry, telemetryEnabled, validateTelemetryEvent } from './telemetry';
 import type { AllowlistedTelemetryEvent } from './ports';
@@ -94,10 +94,10 @@ function makeDemoActors(): AuthActors {
 describe('root rendering privacy', () => {
   it('renders the branded auth shell without protected content initially', async () => {
     render(<AuthRoot />);
-    // In dev composition the init actor resolves asynchronously; flush the
-    // pending test operation so the shell advances to first-run.
-    completeAllPendingOperations();
+    // The adapter mounts asynchronously (dynamic dev import); flush pending
+    // test operations repeatedly until the init actor resolves to first-run.
     await waitFor(() => {
+      completeAllPendingOperations();
       expect(screen.getByText(/welcome to hushvoting/i)).toBeInTheDocument();
     });
     expect(screen.queryByTestId('authenticated-shell')).toBeNull();

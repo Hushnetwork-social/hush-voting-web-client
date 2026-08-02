@@ -18,13 +18,6 @@
 import type { AuthActors, AuthActorsBuilder, CapabilityRegistration, NavigationPort } from './ports';
 import { validateProductionRegistry } from './registry';
 import { InMemoryNavigationStack } from './navigation/navigation';
-import {
-  createBrowserCoordinationTestActor,
-  createIdentityVerificationTestActor,
-  createLocalUserAuthorityTestActor,
-  createNavigationTestActor,
-  createSecretAuthorityTestActor,
-} from './testing/actors';
 
 /** Production-safe in-memory navigation port (no persistence, no secrets). */
 function productionNavigationPort(): NavigationPort {
@@ -69,7 +62,7 @@ export function createProductionComposition(
     };
   }
 
-  const builder = buildActors();
+  const builder = buildEmptyActors();
   for (const registration of registrations) {
     if (registration.synthetic) {
       continue; // unreachable: validation already rejected synthetic in production
@@ -84,11 +77,11 @@ export function createProductionComposition(
 
 /** A fully null actor set (all flows fail closed until registered). */
 export function emptyActors(): AuthActors {
-  return buildActors();
+  return buildEmptyActors();
 }
 
 /** Mutable builder; the result is frozen into the public AuthActors shape. */
-function buildActors(): AuthActorsBuilder {
+export function buildEmptyActors(): AuthActorsBuilder {
   return {
     localUserAuthority: null,
     secretAuthority: null,
@@ -135,61 +128,4 @@ function assignPort(actors: AuthActorsBuilder, capability: CapabilityRegistratio
       // temporaryMode is a capability flag, not an actor port.
       break;
   }
-}
-
-/**
- * Development/test composition: synthetic actors wired to the machine.
- * ONLY selectable when `allowDevelopmentActors` is explicitly true. In a
- * production build this flag must resolve to false; callers gate it on
- * `process.env.NODE_ENV !== 'production'` or an equivalent explicit switch.
- */
-export function createDevelopmentComposition(allowDevelopmentActors: boolean): CompositionResult {
-  if (!allowDevelopmentActors) {
-    return { actors: emptyActors(), registrations: [], ok: false, diagnostics: [{ code: 'DEV_ACTORS_DISALLOWED', capability: '*' }] };
-  }
-
-  const registrations: CapabilityRegistration[] = [
-    { capability: 'localUserAuthority', availability: 'mandatory', synthetic: true },
-    { capability: 'secretAuthority', availability: 'mandatory', synthetic: true },
-    { capability: 'identityVerification', availability: 'mandatory', synthetic: true },
-    { capability: 'browserCoordination', availability: 'mandatory', synthetic: true },
-  ];
-
-  const builder = buildActors();
-  builder.localUserAuthority = createLocalUserAuthorityTestActorForComposition();
-  builder.secretAuthority = createSecretAuthorityTestActorForComposition();
-  builder.identityVerification = createIdentityVerificationTestActorForComposition();
-  builder.browserCoordination = createBrowserCoordinationTestActorForComposition();
-  builder.navigation = createNavigationTestActor();
-  const actors = builder as AuthActors;
-
-  return { actors, registrations, ok: true, diagnostics: [] };
-}
-
-// Dev-only synthetic actors (imported from the test kit; never used by
-// createProductionComposition). Kept explicit so production bundlers can
-// tree-shake them when the development composition is not imported.
-function createLocalUserAuthorityTestActorForComposition() {
-  return createLocalUserAuthorityTestActor([
-    { code: 'INIT_NO_LOCAL_USER' },
-    { code: 'INIT_LOCKED_USER', safeIdentity: { alias: 'Demo User', abbreviatedSigningAddress: 'NVh…demo' } },
-  ]);
-}
-
-function createSecretAuthorityTestActorForComposition() {
-  return createSecretAuthorityTestActor([
-    { code: 'UNLOCK_SUCCESS' },
-    { code: 'UNLOCK_WRONG_PASSWORD_OR_DAMAGED' },
-  ]);
-}
-
-function createIdentityVerificationTestActorForComposition() {
-  return createIdentityVerificationTestActor([
-    { code: 'VERIFY_SUCCESS' },
-    { code: 'VERIFY_NETWORK_UNAVAILABLE' },
-  ]);
-}
-
-function createBrowserCoordinationTestActorForComposition() {
-  return createBrowserCoordinationTestActor([{ code: 'COORDINATION_SAFE' }]);
 }
