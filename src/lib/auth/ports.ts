@@ -25,7 +25,7 @@ import type {
   OperationId,
   SessionEpoch,
   TypedDestinationKind,
-} from './types.js';
+} from './types';
 import type {
   CoordinationResult,
   InitializationResult,
@@ -33,7 +33,7 @@ import type {
   RemovalResult,
   UnlockResult,
   VerificationResult,
-} from './results.js';
+} from './results';
 
 /** One cancellable actor operation bound to an epoch + operation ID. */
 export interface ActorOperation<TResult> {
@@ -133,6 +133,18 @@ export interface AuthActors {
   readonly browserCoordination: BrowserCoordinationPort | null;
   readonly navigation: NavigationPort;
   readonly telemetry: TelemetryPort | null;
+}
+
+/** Mutable builder used internally by composition (not part of the public contract). */
+export interface AuthActorsBuilder {
+  localUserAuthority: LocalUserAuthorityPort | null;
+  secretAuthority: SecretAuthorityPort | null;
+  identityVerification: IdentityVerificationPort | null;
+  onboarding: Record<OnboardingKind, OnboardingPort | null>;
+  removal: RemovalPort | null;
+  browserCoordination: BrowserCoordinationPort | null;
+  navigation: NavigationPort;
+  telemetry: TelemetryPort | null;
 }
 
 /** Registered capability descriptor used by production registration validation. */

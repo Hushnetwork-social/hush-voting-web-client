@@ -21,14 +21,14 @@ import {
   type CapabilityId,
   type OperationId,
   type SessionEpoch,
-} from './types.js';
+} from './types';
 import {
   outcomeErrorCategory,
   outcomeSafeActions,
   outcomeToAuthState,
   outcomeToConnectivityState,
-} from './results.js';
-import type { AllowlistedTelemetryEvent, CapabilityRegistration } from './ports.js';
+} from './results';
+import type { AllowlistedTelemetryEvent, CapabilityRegistration } from './ports';
 
 // ---------------------------------------------------------------------------
 // Compile-time allowlist assertions

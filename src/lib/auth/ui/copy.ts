@@ -11,8 +11,8 @@
  * "Locked-user screen", "Removal confirmation".
  */
 
-import { AUTH_TERMINOLOGY, COMBINED_CREDENTIAL_ERROR } from '../types.js';
-import type { AuthStateCode } from '../types.js';
+import { AUTH_TERMINOLOGY, COMBINED_CREDENTIAL_ERROR } from '../types';
+import type { AuthStateCode } from '../types';
 
 /** Safe document title for each reachable auth state. */
 export function documentTitleForState(state: AuthStateCode): string {

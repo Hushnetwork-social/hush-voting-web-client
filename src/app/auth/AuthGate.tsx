@@ -12,13 +12,13 @@
  * removal confirmation, and temporary-mode warning.
  */
 
-import type { AuthRenderProjection } from '../../lib/auth/react/adapter.js';
-import type { AuthIntent } from '../../lib/auth/types.js';
-import { AuthShell } from './AuthShell.js';
-import { FirstRun } from './FirstRun.js';
-import { LockedUser } from './LockedUser.js';
-import { RemovalConfirmation } from './RemovalConfirmation.js';
-import { ErrorSurface, RecoveryNavigation, TemporaryMode } from './ErrorSurfaces.js';
+import type { AuthRenderProjection } from '../../lib/auth/react/adapter';
+import type { AuthIntent } from '../../lib/auth/types';
+import { AuthShell } from './AuthShell';
+import { FirstRun } from './FirstRun';
+import { LockedUser } from './LockedUser';
+import { RemovalConfirmation } from './RemovalConfirmation';
+import { ErrorSurface, RecoveryNavigation, TemporaryMode } from './ErrorSurfaces';
 import { useState } from 'react';
 
 export interface AuthGateHandlers {

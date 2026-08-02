@@ -10,7 +10,7 @@
  * "Core transitions", "Errors", and "Test Requirements" sections.
  */
 
-import type { AuthOutcomeCode, AuthStateCode, ConnectivityStateCode } from './types.js';
+import type { AuthOutcomeCode, AuthStateCode, ConnectivityStateCode } from './types';
 
 /** Every documented typed state (including recoverable/blocked categories). */
 export type ErrorCategory = 'recoverable' | 'blocked';

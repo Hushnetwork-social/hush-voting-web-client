@@ -17,7 +17,7 @@
  * expected input errors; diagnostics never contain credentials.
  */
 
-export * from './types.js';
-export * from './results.js';
-export * from './ports.js';
-export * from './registry.js';
+export * from './types';
+export * from './results';
+export * from './ports';
+export * from './registry';

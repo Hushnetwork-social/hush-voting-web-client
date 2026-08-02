@@ -30,7 +30,7 @@
  */
 
 import { assign, fromCallback, setup } from 'xstate';
-import { INITIAL_EPOCH, isStaleEpoch, nextEpoch } from './policies.js';
+import { INITIAL_EPOCH, isStaleEpoch, nextEpoch } from './policies';
 import type {
   AuthIntent,
   AuthMachineContext,
@@ -42,15 +42,15 @@ import type {
   OnboardingKind,
   SessionEpoch,
   SupportCode,
-} from '../types.js';
-import type { AuthActors } from '../ports.js';
+} from '../types';
+import type { AuthActors } from '../ports';
 import type {
   InitializationResult,
   OnboardingResult,
   RemovalResult,
   UnlockResult,
   VerificationResult,
-} from '../results.js';
+} from '../results';
 
 /** Actor kinds the machine can start. */
 export type OperationKind =

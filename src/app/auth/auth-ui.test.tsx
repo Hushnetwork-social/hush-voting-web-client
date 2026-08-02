@@ -10,13 +10,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { AuthGate } from './AuthGate.js';
-import { FirstRun } from './FirstRun.js';
-import { LockedUser } from './LockedUser.js';
-import { RemovalConfirmation } from './RemovalConfirmation.js';
-import { ErrorSurface, RecoveryNavigation, TemporaryMode } from './ErrorSurfaces.js';
-import { errorCopyForOutcome, documentTitleForState } from '../../lib/auth/ui/copy.js';
-import type { AuthRenderProjection } from '../../lib/auth/react/adapter.js';
+import { AuthGate } from './AuthGate';
+import { FirstRun } from './FirstRun';
+import { LockedUser } from './LockedUser';
+import { RemovalConfirmation } from './RemovalConfirmation';
+import { ErrorSurface, RecoveryNavigation, TemporaryMode } from './ErrorSurfaces';
+import { errorCopyForOutcome, documentTitleForState } from '../../lib/auth/ui/copy';
+import type { AuthRenderProjection } from '../../lib/auth/react/adapter';
 
 function projection(overrides: Partial<AuthRenderProjection>): AuthRenderProjection {
   return {

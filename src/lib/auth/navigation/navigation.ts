@@ -15,8 +15,8 @@
  * restoration".
  */
 
-import { NAVIGATION_ROOT_PATH } from './constants.js';
-import type { NavigationToken, TypedDestinationKind } from '../types.js';
+import { NAVIGATION_ROOT_PATH } from './constants';
+import type { NavigationToken, TypedDestinationKind } from '../types';
 
 /** Per-tab in-memory destination stack (never persisted). */
 export class InMemoryNavigationStack {

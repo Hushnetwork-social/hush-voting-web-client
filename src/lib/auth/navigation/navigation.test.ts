@@ -19,14 +19,14 @@ import {
   replaceWithOpaqueHistoryEntry,
   resumeAfterRevalidation,
   type HistoryLike,
-} from './navigation.js';
-import { NAVIGATION_ROOT_PATH } from './constants.js';
+} from './navigation';
+import { NAVIGATION_ROOT_PATH } from './constants';
 import {
   LifecycleShield,
   shouldShowProtectedContent,
   type PageLifecycleEnvironment,
-} from './lifecycle.js';
-import { synchronouslyPermitsProtectedContent, type AuthRenderProjection } from '../react/adapter.js';
+} from './lifecycle';
+import { synchronouslyPermitsProtectedContent, type AuthRenderProjection } from '../react/adapter';
 
 function makeHistory(): HistoryLike & { entries: unknown[] } {
   const entries: unknown[] = [null];

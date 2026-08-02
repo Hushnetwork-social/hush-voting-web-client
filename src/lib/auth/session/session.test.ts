@@ -18,7 +18,7 @@ import {
   isOwnerStale,
   selectCoordinationMode,
   type CoordinationEnvironment,
-} from './authority.js';
+} from './authority';
 import {
   isBackgrounded,
   isPolicyWithinBounds,
@@ -28,9 +28,9 @@ import {
   shouldLockAfterBackground,
   type ActivityEvent,
   type VisibilitySnapshot,
-} from './timers.js';
-import { isLeaseStale } from '../state/policies.js';
-import { AUTH_TIMING } from '../types.js';
+} from './timers';
+import { isLeaseStale } from '../state/policies';
+import { AUTH_TIMING } from '../types';
 
 /** Deterministic fake coordination environment. */
 function makeEnv(overrides: Partial<CoordinationEnvironment> = {}): CoordinationEnvironment {

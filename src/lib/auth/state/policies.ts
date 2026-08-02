@@ -10,7 +10,7 @@
  * - timing boundary checks (progress, init, verify, KDF).
  */
 
-import { AUTH_TIMING, type SessionEpoch } from '../types.js';
+import { AUTH_TIMING, type SessionEpoch } from '../types';
 
 /** True when a late actor result belongs to a superseded session. */
 export function isStaleEpoch(resultEpoch: SessionEpoch, currentEpoch: SessionEpoch): boolean {

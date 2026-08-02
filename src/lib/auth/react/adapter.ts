@@ -17,8 +17,8 @@
 
 import { useMemo, useSyncExternalStore } from 'react';
 import { createActor, type Actor, type SnapshotFrom } from 'xstate';
-import { authMachine, type AuthMachineEvent, type AuthMachineInput } from '../state/machine.js';
-import type { AuthIntent, AuthStateCode, ConnectivityStateCode } from '../types.js';
+import { authMachine, type AuthMachineEvent, type AuthMachineInput } from '../state/machine';
+import type { AuthIntent, AuthStateCode, ConnectivityStateCode } from '../types';
 
 /** Render-safe projection of the authority snapshot. */
 export interface AuthRenderProjection {
@@ -73,24 +73,46 @@ function projectSnapshot(snapshot: AuthSnapshot): AuthRenderProjection {
   };
 }
 
-/** Create the authority actor and start it. */
+/** Create the authority adapter and start it (convenience wrapper). */
 export function createAuthAdapter(input: AuthMachineInput): AuthAdapter {
-  const actor = createActor(authMachine, { input });
-  actor.start();
-  return new AuthAdapter(actor);
+  return new AuthAdapter(input);
 }
 
 /** Thin adapter wrapping one actor instance. */
 export class AuthAdapter {
   private readonly actor: Actor<typeof authMachine>;
+  private cachedProjection: AuthRenderProjection | null = null;
 
-  constructor(actor: Actor<typeof authMachine>) {
-    this.actor = actor;
+  /** Build from machine input (production/composition path) or an existing actor (tests). */
+  constructor(inputOrActor: AuthMachineInput | Actor<typeof authMachine>) {
+    if ('send' in (inputOrActor as Actor<typeof authMachine>)) {
+      this.actor = inputOrActor as Actor<typeof authMachine>;
+    } else {
+      this.actor = createActor(authMachine, { input: inputOrActor as AuthMachineInput });
+      this.actor.start();
+    }
+    // Refresh the cached projection whenever the actor snapshot changes.
+    this.actor.subscribe(() => {
+      this.cachedProjection = projectSnapshot(this.actor.getSnapshot());
+    });
   }
 
   /** Dispatch a typed intent. Intents never carry secrets. */
   send(intent: AuthIntent): void {
     this.actor.send(intent as AuthMachineEvent);
+  }
+
+  /**
+   * Direct secret transfer channel (UI → secret authority). The secret is
+   * handed to the downstream sink and NEVER enters the machine, React state,
+   * logs, or telemetry. Downstream FEAT-003/004 wire the real sink; until
+   * then the secret is discarded after the UI clears its input.
+   */
+  submitSecret(secret: string): void {
+    // The machine only learns an opaque operation result; the secret itself
+    // travels via SecretSubmissionSink owned by the vault/session actor.
+    void secret;
+    this.send({ type: 'INTENT.UNLOCK' });
   }
 
   /** Dispatch a system/actor-scoped event (used by the browser controller). */
@@ -104,9 +126,12 @@ export class AuthAdapter {
     return () => subscription.unsubscribe();
   }
 
-  /** Current render-safe projection. */
+  /** Current render-safe projection (cached: stable reference between snapshot changes). */
   snapshot(): AuthRenderProjection {
-    return projectSnapshot(this.actor.getSnapshot());
+    if (this.cachedProjection === null) {
+      this.cachedProjection = projectSnapshot(this.actor.getSnapshot());
+    }
+    return this.cachedProjection;
   }
 
   stop(): void {

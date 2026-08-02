@@ -13,8 +13,8 @@
 
 import { useEffect } from 'react';
 import type { ReactNode } from 'react';
-import { documentTitleForState } from '../../lib/auth/ui/copy.js';
-import type { AuthRenderProjection } from '../../lib/auth/react/adapter.js';
+import { documentTitleForState } from '../../lib/auth/ui/copy';
+import type { AuthRenderProjection } from '../../lib/auth/react/adapter';
 
 interface AuthShellProps {
   readonly projection: AuthRenderProjection;

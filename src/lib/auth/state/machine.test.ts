@@ -16,12 +16,12 @@
 
 import { describe, expect, it } from 'vitest';
 import { createActor } from 'xstate';
-import { authMachine, onboardingKindForIntent } from './machine.js';
-import { INITIAL_EPOCH } from './policies.js';
-import { outcomeToAuthState } from '../results.js';
-import type { AuthActors } from '../ports.js';
-import type { AuthMachineEvent } from './machine.js';
-import type { CapabilityId } from '../types.js';
+import { authMachine, onboardingKindForIntent } from './machine';
+import { INITIAL_EPOCH } from './policies';
+import { outcomeToAuthState } from '../results';
+import type { AuthActors } from '../ports';
+import type { AuthMachineEvent } from './machine';
+import type { CapabilityId } from '../types';
 import {
   completeAllPendingOperations,
   pendingOperationCount,
@@ -32,7 +32,7 @@ import {
   createOnboardingTestActor,
   createRemovalTestActor,
   createSecretAuthorityTestActor,
-} from '../testing/actors.js';
+} from '../testing/actors';
 
 /** Build a full scripted actor set. */
 function makeActors(overrides: Partial<AuthActors> = {}): AuthActors {

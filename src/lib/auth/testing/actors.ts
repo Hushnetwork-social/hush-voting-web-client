@@ -20,11 +20,11 @@ import type {
   OnboardingPort,
   RemovalPort,
   SecretAuthorityPort,
-} from '../ports.js';
+} from '../ports';
 import type {
   OperationId,
   SessionEpoch,
-} from '../types.js';
+} from '../types';
 import type {
   CoordinationResult,
   InitializationResult,
@@ -32,7 +32,7 @@ import type {
   RemovalResult,
   UnlockResult,
   VerificationResult,
-} from '../results.js';
+} from '../results';
 
 let operationSeq = 0;
 
@@ -220,14 +220,14 @@ export function createBrowserCoordinationTestActor(
 export function createNavigationTestActor(): NavigationPort {
   const stack: string[] = [];
   return {
-    push(destination: import('../types.js').TypedDestinationKind) {
+    push(destination: import('../types').TypedDestinationKind) {
       const token = `nav-${stack.length}-${destination}`;
       stack.push(token);
-      return token as import('../types.js').NavigationToken;
+      return token as import('../types').NavigationToken;
     },
-    resolve(token: import('../types.js').NavigationToken) {
+    resolve(token: import('../types').NavigationToken) {
       const found = stack.find((entry) => entry === token);
-      return found ? (found.split('-')[2] as import('../types.js').TypedDestinationKind) : null;
+      return found ? (found.split('-')[2] as import('../types').TypedDestinationKind) : null;
     },
     clear() {
       stack.length = 0;

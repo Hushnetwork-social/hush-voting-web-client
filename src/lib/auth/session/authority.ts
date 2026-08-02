@@ -17,8 +17,8 @@
  * deterministic. No secret is ever written to page state or browser storage.
  */
 
-import { isLeaseStale } from '../state/policies.js';
-import { AUTH_TIMING } from '../types.js';
+import { isLeaseStale } from '../state/policies';
+import { AUTH_TIMING } from '../types';
 
 /** Supported coordination primitives (injected by the browser adapter). */
 export interface CoordinationEnvironment {

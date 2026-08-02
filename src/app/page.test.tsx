@@ -1,14 +1,12 @@
 import { render, screen } from '@testing-library/react';
-import HomePage from './page';
+import AuthRoot from './auth/AuthRoot';
 
-describe('HomePage', () => {
-  it('describes each supported delivery target without presenting live election actions', () => {
-    render(<HomePage />);
+describe('HomePage (auth-gated root)', () => {
+  it('never mounts protected/authenticated content before authentication', () => {
+    render(<AuthRoot />);
 
-    expect(screen.getByRole('heading', { level: 1, name: /becoming its own application/i })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 3, name: 'Web application' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 3, name: 'Ubuntu desktop' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 3, name: 'Android application' })).toBeInTheDocument();
-    expect(screen.getByText(/does not yet expose live election actions/i)).toBeInTheDocument();
+    // The foundation hero/targets are gone; no authenticated shell initially.
+    expect(screen.queryByTestId('authenticated-shell')).toBeNull();
+    expect(screen.queryByRole('heading', { level: 1, name: /becoming its own application/i })).toBeNull();
   });
 });

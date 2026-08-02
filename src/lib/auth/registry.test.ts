@@ -14,14 +14,14 @@ import {
   TEMPORARY_MODE_CAPABILITY,
   registerCapability,
   validateProductionRegistry,
-} from './registry.js';
-import type { CapabilityId } from './types.js';
-import type { UnlockResult } from './results.js';
+} from './registry';
+import type { CapabilityId } from './types';
+import type { UnlockResult } from './results';
 import {
   createLocalUserAuthorityTestActor,
   createSecretAuthorityTestActor,
   type TestActorOperation,
-} from './testing/actors.js';
+} from './testing/actors';
 
 /** Complete, non-synthetic production registration (all mandatory + onboarding + temp). */
 function completeRegistration() {

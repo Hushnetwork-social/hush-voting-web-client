@@ -115,6 +115,7 @@ export type CapabilityId =
   | 'onboardingCreateUser'
   | 'onboardingRestoreCredentialFile'
   | 'onboardingRestoreRecoveryWords'
+  | 'removal'
   | 'temporaryMode';
 
 /** Availability classification used by production registration validation. */

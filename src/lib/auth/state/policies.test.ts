@@ -21,9 +21,9 @@ import {
   isStaleEpoch,
   nextEpoch,
   INITIAL_EPOCH,
-} from './policies.js';
-import { outcomeErrorCategory, outcomeSafeActions, outcomeToAuthState } from '../results.js';
-import { AUTH_TIMING } from '../types.js';
+} from './policies';
+import { outcomeErrorCategory, outcomeSafeActions, outcomeToAuthState } from '../results';
+import { AUTH_TIMING } from '../types';
 
 describe('session epoch lifecycle', () => {
   it('increments monotonically and rejects stale epochs', () => {

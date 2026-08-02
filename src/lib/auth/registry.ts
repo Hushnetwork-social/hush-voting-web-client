@@ -12,8 +12,8 @@
  * criterion 22, and security invariants.
  */
 
-import type { CapabilityId } from './types.js';
-import type { CapabilityRegistration, RegistrationDiagnostic, RegistryValidationResult } from './ports.js';
+import type { CapabilityId } from './types';
+import type { CapabilityRegistration, RegistrationDiagnostic, RegistryValidationResult } from './ports';
 
 /** Capabilities mandatory for any persistent authentication flow. */
 export const MANDATORY_CAPABILITIES: readonly CapabilityId[] = [

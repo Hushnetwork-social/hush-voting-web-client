@@ -12,8 +12,8 @@
  * Temporary Mode, and Error Surfaces" task spec.
  */
 
-import type { AuthRenderProjection } from '../../lib/auth/react/adapter.js';
-import { errorCopyForOutcome } from '../../lib/auth/ui/copy.js';
+import type { AuthRenderProjection } from '../../lib/auth/react/adapter';
+import { errorCopyForOutcome } from '../../lib/auth/ui/copy';
 
 interface ErrorSurfaceProps {
   readonly projection: AuthRenderProjection;

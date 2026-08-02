@@ -11,7 +11,7 @@
  * Normative source: FeatureDescription "Aggregate idle and background policy".
  */
 
-import { AUTH_TIMING } from '../types.js';
+import { AUTH_TIMING } from '../types';
 
 /** Activity sources that may reset the shared idle timer. */
 export type TrustedActivityKind = 'keyboard' | 'pointer' | 'touch' | 'wheel' | 'scroll' | 'accessibility';
