@@ -22,9 +22,8 @@ conformance/vault/v1/
 │   ├── metadata.schema.json corpus metadata schema
 │   ├── manifest.schema.json corpus manifest schema
 │   └── report.schema.json   secret-safe conformance report schema (TS + Rust)
-├── vectors/                 canonical/AAD/suite/password/core public vectors
 ├── scripts/                 deterministic tooling (manifest generation, validation)
-└── tests/                   integrity, report-parity, exclusion, and boundary tests
+└── tests/                   node:test integrity / exclusion / boundary tests
 ```
 
 ## v1 Contract Highlights
@@ -59,21 +58,8 @@ never appear in production artifacts; `scripts/vault/` scans enforce this.
 ```bash
 npm run vault:manifest        # regenerate manifest.json (deterministic)
 npm run vault:integrity       # manifest check + schema validation (CI gate)
-npm run vault:conformance          # TypeScript reference replay
-npm run vault:conformance:report   # emit digest-only TypeScript report
-npm run vault:reports:compare      # compare pre-generated TS/Rust reports
-npm run vault:production-exclusion # source/Tauri/build-artifact boundary proof
-npm run vault:test:adversarial     # property/fuzz/fault/concurrency (introduced Phase 7)
-```
-
-The independent non-production Rust validator is in `tools/vault-reference-runner/` with
-its own locked Cargo package. It validates manifest and schema integrity before replaying
-all 84 v1 checks, and accepts an optional immutable manifest digest pin.
-
-```bash
-cargo run --locked --manifest-path tools/vault-reference-runner/Cargo.toml -- \
-  --corpus conformance/vault/v1 --check \
-  --report conformance/reports/vault-rust-reference.json
+npm run vault:conformance     # TypeScript reference conformance (introduced Phase 3)
+npm run vault:test:adversarial# property/fuzz/fault/concurrency (introduced Phase 7)
 ```
 
 ## Pinned Upstream (FEAT-001)
