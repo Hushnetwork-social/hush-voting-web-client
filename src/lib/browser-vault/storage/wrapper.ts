@@ -171,12 +171,11 @@ function createSession(db: IDBDatabase): VaultStorageSession {
 
   /** CAS: reread expected generation and atomically switch the journal pointer. */
   const casJournal = async (expected: VaultJournalRecord, next: VaultJournalRecord): Promise<VaultResult<{ readonly ok: true }>> => {
-    if (typeof expected.generation !== 'number' || typeof next.generation !== 'number') {
+    if (typeof expected.generation !== 'number' || typeof next.generation !== 'number' || !Number.isFinite(expected.generation) || !Number.isFinite(next.generation) || next.generation < 0) {
       return failure('GenerationConflict');
     }
-    if (expected.activeSlot !== next.activeSlot && next.generation !== expected.generation + 1) {
-      return failure('GenerationConflict');
-    }
+    // Transition policy (forward-only vs verified rollback) is owned by the
+    // journal layer; the wrapper CAS guarantees atomicity only.
     return new Promise((resolve) => {
       let conflict = false;
       let transaction: IDBTransaction;

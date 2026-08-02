@@ -112,10 +112,30 @@ describe('storage wrapper — journal CAS', () => {
     session.close();
   });
 
-  it('rejects non-sequential generation transitions', async () => {
+  it('rejects malformed generation values', async () => {
     const session = await openSession();
-    const bad = await session.casJournal({ generation: 0, activeSlot: 'slot-a' }, { generation: 5, activeSlot: 'slot-b' });
+    const bad = await session.casJournal({ generation: Number.NaN, activeSlot: 'slot-a' }, { generation: 5, activeSlot: 'slot-b' });
     expect(bad.ok).toBe(false);
+    if (!bad.ok) {
+      expect(bad.code).toBe('GenerationConflict');
+    }
+    const negative = await session.casJournal({ generation: 0, activeSlot: 'slot-a' }, { generation: -1, activeSlot: 'slot-b' });
+    expect(negative.ok).toBe(false);
+    session.close();
+  });
+
+  it('permits verified rollback transitions at the wrapper level (journal owns policy)', async () => {
+    const session = await openSession();
+    const seed = await session.casJournal({ generation: 0, activeSlot: 'slot-a' }, { generation: 2, activeSlot: 'slot-b' });
+    expect(seed.ok).toBe(true);
+    // Backward transition to a verified lower generation is allowed here; the
+    // journal layer enforces rollback confirmation/re-verification.
+    const rollback = await session.casJournal({ generation: 2, activeSlot: 'slot-b' }, { generation: 1, activeSlot: 'slot-a' });
+    expect(rollback.ok).toBe(true);
+    const journal = await session.readJournal();
+    if (journal.ok) {
+      expect(journal.value.journal).toEqual({ generation: 1, activeSlot: 'slot-a' });
+    }
     session.close();
   });
 
