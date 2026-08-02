@@ -182,6 +182,12 @@ export function createBrowserSuiteExecutor(
   return {
     derivePasswordKey: async (params) => {
       // Suite v1: Argon2id with authenticated closed parameters; no caller influence.
+      if (!Number.isFinite(params.memoryKiB) || params.memoryKiB < 1024 || !Number.isFinite(params.iterations) || params.iterations < 1 || !Number.isFinite(params.parallelism) || params.parallelism < 1 || !Number.isFinite(params.outputBytes) || params.outputBytes < 1) {
+        // Internal misuse guard: calibration/assertStoredParamsUsable enforce the
+        // closed suite bounds before any secret work; this is a programming-error
+        // boundary, never an expected user failure.
+        throw new Error('invalid closed suite KDF parameters');
+      }
       const output = await env.argon2id(toBytes(params.passwordBytes), toBytes(params.salt), {
         t: params.iterations,
         m: params.memoryKiB,

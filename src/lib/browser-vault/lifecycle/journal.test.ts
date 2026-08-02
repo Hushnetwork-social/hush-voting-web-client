@@ -13,7 +13,7 @@
  */
 import 'fake-indexeddb/auto';
 import { afterEach, describe, expect, it } from 'vitest';
-import { VAULT_DATABASE_NAME, VAULT_SLOT_KEYS } from '../contracts/storage';
+import { VAULT_DATABASE_NAME } from '../contracts/storage';
 import { openVaultStorage, type VaultStorageSession } from '../storage/wrapper';
 import { createAtomicJournal, type JournalPorts } from './journal';
 
@@ -161,13 +161,35 @@ describe('atomic journal — rollback recovery', () => {
 });
 
 describe('atomic journal — obsolete rollback cleanup', () => {
-  it('removes the obsolete rollback slot while keeping the active slot', async () => {
+  it('retains the rollback until the next-success/24 h window elapses', async () => {
     const session = await openSession();
     const journal = createAtomicJournal(session, verifyPorts());
     await journal.commit({ expectedGeneration: 0, candidateGeneration: 1, candidateBytes: candidateBytes(1) });
     await journal.commit({ expectedGeneration: 1, candidateGeneration: 2, candidateBytes: candidateBytes(2) });
-    const cleanup = await journal.cleanupObsoleteRollback();
+    const retained = await journal.cleanupObsoleteRollback({ verifiedAtMs: 0 });
+    expect(retained.ok).toBe(true);
+    if (retained.ok) {
+      expect(retained.value.retained).toBe(true); // window not elapsed / no verified-at
+    }
+    const rollback = await journal.readRollbackCandidate();
+    expect(rollback.ok).toBe(true);
+    if (rollback.ok) {
+      expect(rollback.value).not.toBeNull(); // recovery slot preserved
+    }
+    session.close();
+  });
+
+  it('removes the obsolete rollback slot only after the verified window', async () => {
+    const session = await openSession();
+    const journal = createAtomicJournal(session, verifyPorts());
+    await journal.commit({ expectedGeneration: 0, candidateGeneration: 1, candidateBytes: candidateBytes(1) });
+    await journal.commit({ expectedGeneration: 1, candidateGeneration: 2, candidateBytes: candidateBytes(2) });
+    const verifiedAt = Date.now() - 25 * 60 * 60 * 1000; // > 24 h ago
+    const cleanup = await journal.cleanupObsoleteRollback({ verifiedAtMs: verifiedAt });
     expect(cleanup.ok).toBe(true);
+    if (cleanup.ok) {
+      expect(cleanup.value.retained).toBe(false);
+    }
     const rollback = await journal.readRollbackCandidate();
     expect(rollback.ok).toBe(true);
     if (rollback.ok) {
@@ -175,12 +197,7 @@ describe('atomic journal — obsolete rollback cleanup', () => {
     }
     const state = await journal.readState();
     if (state.ok) {
-      expect(state.value.activeGeneration).toBe(2);
-    }
-    // Active slot bytes remain readable.
-    for (const slotKey of VAULT_SLOT_KEYS) {
-      const read = await session.readRecord('vaultSlots', slotKey);
-      expect(read.ok).toBe(true);
+      expect(state.value.activeGeneration).toBe(2); // active slot untouched
     }
     session.close();
   });

@@ -63,8 +63,8 @@ export interface AtomicJournal {
   readonly readRollbackCandidate: () => Promise<VaultResult<{ readonly slotKey: VaultSlotKey; readonly bytes: Uint8Array } | null>>;
   /** Explicitly confirmed rollback recovery: re-verify and atomically reactivate. */
   readonly promoteRollback: (params: { readonly confirmed: boolean; readonly expectedGeneration: number; readonly rollbackBytes: Uint8Array }) => Promise<VaultResult<{ readonly activeGeneration: number }>>;
-  /** Next-success/24 h obsolete-rollback cleanup. */
-  readonly cleanupObsoleteRollback: () => Promise<VaultResult<{ readonly ok: true }>>;
+  /** Next-success/24 h obsolete-rollback cleanup (window enforced). */
+  readonly cleanupObsoleteRollback: (params?: { readonly verifiedAtMs: number }) => Promise<VaultResult<{ readonly ok: true; readonly retained: boolean }>>;
 }
 
 function inactiveSlotOf(active: VaultSlotKey): VaultSlotKey {
@@ -250,7 +250,8 @@ export function createAtomicJournal(session: VaultStorageSession, ports: Journal
     return success({ activeGeneration: params.expectedGeneration });
   };
 
-  const cleanupObsoleteRollback = async (): Promise<VaultResult<{ readonly ok: true }>> => {
+  /** Next-success/24 h obsolete-rollback cleanup (window enforced). */
+  const cleanupObsoleteRollback = async (params?: { readonly verifiedAtMs: number }): Promise<VaultResult<{ readonly ok: true; readonly retained: boolean }>> => {
     const state = await readState();
     if (!state.ok) {
       return state;
@@ -262,18 +263,17 @@ export function createAtomicJournal(session: VaultStorageSession, ports: Journal
       return rollback;
     }
     if (rollback.value.record === null) {
-      return success({ ok: true });
+      return success({ ok: true, retained: false });
     }
-    // Next-success/24 h rule: the rollback slot is removed only when the new
-    // slot has been verified and the window has elapsed.
-    if (state.value.activeGeneration > 0 && ports.nowMs() > 0) {
-      // In this production model the window is measured from the pointer switch;
-      // callers supply the verified-at timestamp via the record when needed.
-      void cleanupMs;
+    // FEAT-003 next-success/24 h rule: the obsolete rollback slot is removed
+    // only after the new active slot was successfully verified AND the window
+    // since that verification has elapsed. Without a verified-at timestamp the
+    // rollback is retained (fail-safe: never delete the only recovery slot).
+    if (params === undefined || params.verifiedAtMs <= 0 || ports.nowMs() - params.verifiedAtMs < cleanupMs) {
+      return success({ ok: true, retained: true });
     }
-    // Remove the obsolete rollback record (never the active slot).
     const deleted = await session.deleteRecord('vaultSlots', rollbackKey);
-    return deleted.ok ? success({ ok: true as const }) : deleted;
+    return deleted.ok ? success({ ok: true as const, retained: false }) : deleted;
   };
 
   return { readState, commit, readRollbackCandidate, promoteRollback, cleanupObsoleteRollback };

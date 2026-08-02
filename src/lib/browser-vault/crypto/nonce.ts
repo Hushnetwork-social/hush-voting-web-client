@@ -21,7 +21,16 @@ export function nonceToHex(nonce: Uint8Array): string {
   return out;
 }
 
-/** Bounded per-session nonce tracker (active + rollback record scopes). */
+/**
+ * Bounded per-session nonce tracker (active + rollback record scopes).
+ *
+ * Scope contract: record scopes MUST include the record generation
+ * (e.g. `active:gen-3`, `rollback:gen-2`) so a re-encrypted record is a fresh
+ * scope and rotation is never mistaken for reuse. The tracker rejects:
+ *  - the same nonce under two different scopes (coexisting records reuse);
+ *  - a same-scope nonce change (a scope may only ever hold one nonce);
+ *  - growth beyond `maxEntries` (bounded, fail closed).
+ */
 export interface NonceTracker {
   /** Record a nonce under a record scope; false when the nonce is already used. */
   readonly observe: (recordScope: string, nonce: Uint8Array) => boolean;

@@ -173,10 +173,18 @@ describe('nonce uniqueness and cleanup', () => {
   it('rejects cross-scope nonce reuse and accepts fresh scopes', () => {
     const tracker = createNonceTracker();
     const nonce = new Uint8Array([1, 2, 3]);
-    expect(tracker.observe('active', nonce)).toBe(true);
-    expect(tracker.observe('rollback', nonce)).toBe(false);
-    expect(tracker.observe('rollback', new Uint8Array([4, 5, 6]))).toBe(true);
+    expect(tracker.observe('active:gen-1', nonce)).toBe(true);
+    expect(tracker.observe('rollback:gen-1', nonce)).toBe(false);
+    expect(tracker.observe('rollback:gen-1', new Uint8Array([4, 5, 6]))).toBe(true);
     expect(tracker.size()).toBe(2);
+  });
+
+  it('enforces the generation-scope contract (rotation is a fresh scope)', () => {
+    const tracker = createNonceTracker();
+    // Re-encrypting a record is a fresh scope; the same scope cannot change nonce.
+    expect(tracker.observe('active:gen-1', new Uint8Array([1]))).toBe(true);
+    expect(tracker.observe('active:gen-1', new Uint8Array([2]))).toBe(false);
+    expect(tracker.observe('active:gen-2', new Uint8Array([2]))).toBe(true);
   });
 
   it('fails closed when the tracker is bounded', () => {
