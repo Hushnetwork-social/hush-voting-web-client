@@ -20,10 +20,6 @@ export interface RedactedEvidence {
 export function trackRedactedEvidence(page: Page): { get(): Promise<RedactedEvidence> } {
   const consoleErrors: string[] = [];
   const networkFailures: string[] = [];
-  const storageKeys: string[] = [];
-  const historyStates: unknown[] = [];
-  void storageKeys;
-  void historyStates;
 
   page.on('console', (msg) => {
     if (msg.type() === 'error') {
