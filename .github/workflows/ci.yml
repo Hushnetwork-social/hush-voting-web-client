@@ -39,7 +39,7 @@ jobs:
           cache-dependency-path: package-lock.json
 
       - name: Cache Next.js compilation
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .next-web/cache
           key: next-v1-${{ runner.os }}-node22-${{ hashFiles('package-lock.json') }}-${{ hashFiles('src/**', 'next.config.ts', 'tailwind.config.ts') }}
