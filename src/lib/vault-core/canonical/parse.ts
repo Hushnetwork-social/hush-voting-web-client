@@ -27,6 +27,10 @@ export const DEFAULT_PARSE_LIMITS: ParseLimits = {
   maxCollections: 64,
 };
 
+/** Brand separating parse failures from legitimate parsed values (symbol keys can never
+ *  appear in parsed JSON, so duck-typing on `ok` would misclassify objects like {"ok":false}). */
+const PARSE_FAILURE_BRAND = Symbol('vault-parse-failure');
+
 export type ParseErrorCode =
   | 'OVERSIZED_INPUT'
   | 'TOO_DEEP'
@@ -40,12 +44,22 @@ export type ParseErrorCode =
 
 export interface ParseFailure {
   readonly ok: false;
+  readonly [PARSE_FAILURE_BRAND]: true;
   readonly code: ParseErrorCode;
   readonly message: string;
   readonly offset: number;
 }
 
 export type ParseOutcome<T> = { readonly ok: true; readonly value: T; readonly consumed: number } | ParseFailure;
+
+/** Internal guard: is this value a branded parse failure? */
+function isParseFailure(value: unknown): value is ParseFailure {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    (value as Record<PropertyKey, unknown>)[PARSE_FAILURE_BRAND] === true
+  );
+}
 
 /** Strict unpadded base64url check (RFC 4648 §5, no padding, no whitespace). */
 const BASE64URL_RE = /^[A-Za-z0-9_-]+$/;
@@ -63,7 +77,7 @@ interface TokenizerState {
 }
 
 function fail(state: TokenizerState, code: ParseErrorCode, message: string, offset = state.pos): ParseFailure {
-  return { ok: false, code, message, offset };
+  return { ok: false, [PARSE_FAILURE_BRAND]: true, code, message, offset };
 }
 
 function skipWhitespace(state: TokenizerState): void {
@@ -193,8 +207,8 @@ function parseValue(state: TokenizerState, depth: number): unknown | ParseFailur
       skipWhitespace(state);
       if (state.text[state.pos] !== '"') return fail(state, 'MALFORMED_JSON', 'expected object key');
       const keyResult = parseString(state);
-      if (keyResult instanceof Object && 'ok' in (keyResult as ParseFailure) && (keyResult as ParseFailure).ok === false) {
-        return keyResult as ParseFailure;
+      if (isParseFailure(keyResult)) {
+        return keyResult;
       }
       const key = keyResult as string;
       if (seen.has(key)) return fail(state, 'DUPLICATE_KEY', `duplicate key: ${key}`);
@@ -203,8 +217,8 @@ function parseValue(state: TokenizerState, depth: number): unknown | ParseFailur
       if (state.text[state.pos] !== ':') return fail(state, 'MALFORMED_JSON', 'expected colon');
       state.pos += 1;
       const valueResult = parseValue(state, depth + 1);
-      if (valueResult instanceof Object && 'ok' in (valueResult as ParseFailure) && (valueResult as ParseFailure).ok === false) {
-        return valueResult as ParseFailure;
+      if (isParseFailure(valueResult)) {
+        return valueResult;
       }
       obj[key] = valueResult;
       skipWhitespace(state);
@@ -234,8 +248,8 @@ function parseValue(state: TokenizerState, depth: number): unknown | ParseFailur
     }
     for (;;) {
       const valueResult = parseValue(state, depth + 1);
-      if (valueResult instanceof Object && 'ok' in (valueResult as ParseFailure) && (valueResult as ParseFailure).ok === false) {
-        return valueResult as ParseFailure;
+      if (isParseFailure(valueResult)) {
+        return valueResult;
       }
       arr.push(valueResult);
       skipWhitespace(state);
@@ -252,8 +266,8 @@ function parseValue(state: TokenizerState, depth: number): unknown | ParseFailur
   }
   if (ch === '"') {
     const s = parseString(state);
-    if (s instanceof Object && 'ok' in (s as ParseFailure) && (s as ParseFailure).ok === false) {
-      return s as ParseFailure;
+    if (isParseFailure(s)) {
+      return s;
     }
     return s as string;
   }
@@ -296,18 +310,18 @@ export function parseBoundedJson<T = unknown>(
 ): ParseOutcome<T> {
   const limits = options.limits ?? DEFAULT_PARSE_LIMITS;
   if (bytes.byteLength > limits.maxBytes) {
-    return { ok: false, code: 'OVERSIZED_INPUT', message: `input exceeds ${limits.maxBytes} bytes`, offset: 0 };
+    return { ok: false, [PARSE_FAILURE_BRAND]: true, code: 'OVERSIZED_INPUT', message: `input exceeds ${limits.maxBytes} bytes`, offset: 0 };
   }
   let text: string;
   try {
     text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
   } catch {
-    return { ok: false, code: 'MALFORMED_JSON', message: 'invalid UTF-8', offset: 0 };
+    return { ok: false, [PARSE_FAILURE_BRAND]: true, code: 'MALFORMED_JSON', message: 'invalid UTF-8', offset: 0 };
   }
   const state: TokenizerState = { text, bytes, limits, pos: 0, collections: 0 };
   const value = parseValue(state, 0);
-  if (value instanceof Object && 'ok' in (value as ParseFailure) && (value as ParseFailure).ok === false) {
-    return value as ParseFailure;
+  if (isParseFailure(value)) {
+    return value;
   }
   skipWhitespace(state);
   if (state.pos < text.length) {
@@ -317,7 +331,7 @@ export function parseBoundedJson<T = unknown>(
     if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
       for (const key of Object.keys(value as Record<string, unknown>)) {
         if (!options.unknownRootProperties.includes(key)) {
-          return { ok: false, code: 'UNKNOWN_ROOT_PROPERTY', message: `unknown root property: ${key}`, offset: 0 };
+          return { ok: false, [PARSE_FAILURE_BRAND]: true, code: 'UNKNOWN_ROOT_PROPERTY', message: `unknown root property: ${key}`, offset: 0 };
         }
       }
     }

@@ -19,6 +19,14 @@ describe('bounded strict parser', () => {
     }
   });
 
+  it('does NOT misclassify legitimate objects shaped like {ok:false} as parse failures', () => {
+    const out = parseBoundedJson(enc('{"ok":false,"code":"x"}'));
+    expect(out.ok).toBe(true);
+    if (out.ok) {
+      expect(out.value).toEqual({ ok: false, code: 'x' });
+    }
+  });
+
   it('rejects duplicate keys (JSON.parse alone is insufficient)', () => {
     const out = parseBoundedJson(enc('{"a":1,"a":2}'));
     expect(out.ok).toBe(false);

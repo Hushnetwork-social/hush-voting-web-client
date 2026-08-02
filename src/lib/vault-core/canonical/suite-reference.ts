@@ -15,7 +15,7 @@
  * Normative source: FEAT-003 FeatureDescription "Cryptographic Suite", "Randomness".
  */
 import { argon2id } from '@noble/hashes/argon2.js';
-import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash, hkdfSync, randomBytes } from 'node:crypto';
 import { PARAMETER_SUITE_V1 } from '../contracts/suite';
 import type { SuiteCryptoOperations } from '../contracts/ports';
 
@@ -109,8 +109,6 @@ export const DETERMINISTIC_RANDOM = {
     return new Uint8Array(randomBytes(length));
   },
 } as const;
-
-import { createHash } from 'node:crypto';
 
 function requireSha256(input: string): Uint8Array {
   return new Uint8Array(createHash('sha256').update(input).digest());
