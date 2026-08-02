@@ -57,7 +57,9 @@ export class InMemoryNavigationStack {
 
   private tokenForDepth(depth: number): NavigationToken {
     // Opaque token: random, per-tab, memory-only, carries no destination data.
-    return `nav-${Math.random().toString(36).slice(2, 12)}-${depth}` as NavigationToken;
+    // crypto is preferred for entropy; Math.random is an acceptable fallback
+    // because the token grants no authority (it only resolves in-memory state).
+    return `nav-${randomOpaquePart()}-${depth}` as NavigationToken;
   }
 
   private depthForToken(token: NavigationToken): number | null {
@@ -67,6 +69,16 @@ export class InMemoryNavigationStack {
     }
     return Number(match[1]);
   }
+}
+
+/** 10-character random opaque part for navigation tokens. */
+function randomOpaquePart(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    const bytes = new Uint8Array(8);
+    crypto.getRandomValues(bytes);
+    return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('').slice(0, 10);
+  }
+  return Math.random().toString(36).slice(2, 12);
 }
 
 /** Browser history abstraction (injected so tests are deterministic). */

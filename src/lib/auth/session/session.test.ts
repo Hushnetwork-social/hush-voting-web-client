@@ -112,13 +112,16 @@ describe('ownership acquisition', () => {
 
 describe('takeover decisions', () => {
   it('permits takeover only after authority loss or staleness, never while owned', () => {
-    const env = makeEnv();
+    const env = makeEnv({ now: () => 1000 });
     env.writeLease('hushvoting-auth-lease', { ownerId: 'owner-1', heartbeatMs: 1000 });
 
     // Owned and fresh → not allowed.
     expect(decideTakeover(env, 'owner-1').allowed).toBe(false);
+    // Foreign owner that is FRESH → not allowed (active elsewhere).
+    expect(decideTakeover(env, 'someone-else').allowed).toBe(false);
 
-    // Different owner (lost/foreign) → allowed.
+    // Foreign owner that is STALE → allowed (takeover after staleness).
+    env.writeLease('hushvoting-auth-lease', { ownerId: 'owner-1', heartbeatMs: 1000 - AUTH_TIMING.leaseStalenessMs - 1 });
     expect(decideTakeover(env, 'someone-else').allowed).toBe(true);
 
     // No lease at all → authority lost → allowed.

@@ -89,7 +89,7 @@ export async function acquireOwnership(
       return acquired ? { kind: 'exclusive' } : { kind: 'blocked' };
     }
     case 'lease': {
-      const ownerId = `owner-${env.now()}-${Math.random().toString(36).slice(2, 10)}`;
+      const ownerId = `owner-${env.now()}-${randomOwnerPart()}`;
       env.writeLease('hushvoting-auth-lease', { ownerId, heartbeatMs: env.now() });
       return { kind: 'lease', ownerId };
     }
@@ -107,14 +107,19 @@ export function decideTakeover(
   env: CoordinationEnvironment,
   currentOwnerId: string | null,
 ): TakeoverDecision {
-  if (currentOwnerId === null) {
-    return { allowed: true, reason: 'authorityLost' };
-  }
   const lease = env.readLease('hushvoting-auth-lease');
   if (lease === null) {
     return { allowed: true, reason: 'authorityLost' };
   }
-  if (lease.ownerId !== currentOwnerId) {
+  // Own lease still fresh → this tab owns the session; no takeover needed.
+  if (lease.ownerId === currentOwnerId) {
+    if (isLeaseStale(lease.heartbeatMs, env.now())) {
+      return { allowed: true, reason: 'ownerStale' };
+    }
+    return { allowed: false, reason: 'alreadyOwned' };
+  }
+  // Foreign lease: takeover only when THAT authority is stale or gone.
+  if (isLeaseStale(lease.heartbeatMs, env.now())) {
     return { allowed: true, reason: 'ownerStale' };
   }
   return { allowed: false, reason: 'alreadyOwned' };
@@ -138,3 +143,13 @@ export function isOwnerStale(env: CoordinationEnvironment, ownerId: string): boo
 }
 
 export { AUTH_TIMING };
+
+/** Random non-secret owner-id part (crypto preferred; Math.random fallback). */
+function randomOwnerPart(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    const bytes = new Uint8Array(6);
+    crypto.getRandomValues(bytes);
+    return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  }
+  return Math.random().toString(36).slice(2, 10);
+}
