@@ -5,13 +5,65 @@
       "id": "S-001",
       "kind": "hkdf",
       "label": "hush/vault/v1/credential-kek",
+      "ikmB64url": "cGFzc3dvcmQtYnl0ZXM",
+      "saltB64url": "BwcHBwcHBwcHBwcHBwcHBw",
       "outputSha256": "8222d5d542f8c968553cb0a768e8bd4a2dd2da568743db50f6b613e983c2f18a"
     },
     {
       "id": "S-002",
       "kind": "hkdf",
       "label": "hush/vault/v1/mnemonic-kek",
+      "ikmB64url": "cGFzc3dvcmQtYnl0ZXM",
+      "saltB64url": "BwcHBwcHBwcHBwcHBwcHBw",
       "outputSha256": "6b21ea70a0bfc40f75ff242b407b6899e7b7418a1b86fec7fe94d3dc777670b9"
+    },
+    {
+      "id": "S-003",
+      "kind": "aes-gcm",
+      "label": "aes-256-gcm-record-wrap",
+      "keyHex": "0303030303030303030303030303030303030303030303030303030303030303",
+      "nonceHex": "050505050505050505050505",
+      "plaintextUtf8": "ordinary record payload",
+      "aadVectorId": "A-001",
+      "ciphertextSha256": "2108a393bc4d933c90cb9ae5410946b67f24c96afac9ab9778ffabc3c1e01939",
+      "tagSha256": "cf6950d51982ea37b9f353d92e22274e692da837f19af091fbb7f478b3337539"
+    },
+    {
+      "id": "S-004",
+      "kind": "argon2id",
+      "passwordUtf8": "password-bytes",
+      "saltHex": "07070707070707070707070707070707",
+      "memoryKiB": 19456,
+      "iterations": 2,
+      "parallelism": 1,
+      "outputBytes": 32,
+      "outputSha256": "c78cf17e0576ca8836864cd1623d97359564eb5dafff779bacf42e6c77fc03e2"
+    },
+    {
+      "id": "S-005",
+      "kind": "argon2id-kat",
+      "source": "RFC 9106 §5.3",
+      "passwordHex": "0101010101010101010101010101010101010101010101010101010101010101",
+      "saltHex": "02020202020202020202020202020202",
+      "secretHex": "0303030303030303",
+      "adHex": "040404040404040404040404",
+      "memoryKiB": 32,
+      "iterations": 3,
+      "parallelism": 4,
+      "outputBytes": 32,
+      "outputHex": "0d640df58d78766c08c037a34a8b53c9d01ef0452d75b65eb52520e96b01e659",
+      "outputSha256": "e1bfc35d1c47aaa688bdd95ccf4796bf675641feacb115ee7a550875a41abe19"
+    },
+    {
+      "id": "S-006",
+      "kind": "hkdf-kat",
+      "source": "RFC 5869 §2.2 Test Case 1",
+      "ikmHex": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "saltHex": "000102030405060708090a0b0c",
+      "infoHex": "f0f1f2f3f4f5f6f7f8f9",
+      "outputBytes": 42,
+      "outputHex": "3cb25f25faacd57a90434f64d0362f2a2d2d0a90cf1a5a4c5db02d56ecc4c5bf34007208d5b887185865",
+      "outputSha256": "b421bf493199866037dfe54b7dc67467326bad6055cdb78e48525eb1db5841a8"
     }
   ]
 }

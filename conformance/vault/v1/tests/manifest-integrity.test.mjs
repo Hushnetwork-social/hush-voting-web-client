@@ -61,5 +61,17 @@ test('manifest schema is stable and self-describing', () => {
   const manifest = JSON.parse(readFileSync(MANIFEST_PATH, 'utf8'));
   assert.equal(manifest.contractVersion, '1.0.0');
   assert.equal(manifest.corpusVersion, '1.0.0');
-  assert.ok(manifest.files.length >= 9, `expected >= 9 data files, got ${manifest.files.length}`);
+  assert.ok(manifest.files.length >= 15, `expected >= 15 data files (schemas + metadata + vectors), got ${manifest.files.length}`);
+});
+
+test('manifest pins every vector file for downstream adapter replay', () => {
+  const manifest = JSON.parse(readFileSync(MANIFEST_PATH, 'utf8'));
+  const vectorPaths = manifest.files.filter((f) => f.path.startsWith('vectors/')).map((f) => f.path);
+  assert.deepEqual(vectorPaths.sort(), [
+    'vectors/aad-vectors.json',
+    'vectors/canonical-byte-vectors.json',
+    'vectors/core-vectors.json',
+    'vectors/password-vectors.json',
+    'vectors/suite-vectors.json',
+  ]);
 });

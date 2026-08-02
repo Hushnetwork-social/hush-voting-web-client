@@ -8,7 +8,7 @@
   "required": ["schemaVersion", "generator", "corpusVersion", "manifestSha256", "passed", "total", "records"],
   "properties": {
     "schemaVersion": { "const": 1 },
-    "generator": { "enum": ["hush-vault-ts-reference", "hush-vault-rust-reference"] },
+    "generator": { "enum": ["hush-vault-ts-reference", "hush-vault-ts-isolated"] },
     "corpusVersion": { "const": "1.0.0" },
     "manifestSha256": { "type": "string", "minLength": 64, "maxLength": 64, "pattern": "^[0-9a-f]{64}$" },
     "passed": { "type": "boolean" },

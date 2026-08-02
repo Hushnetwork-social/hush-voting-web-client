@@ -39,6 +39,33 @@
       },
       "expectedCanonical": "{\"alias\":\"Alice\",\"lifecycleStatus\":\"Active\",\"signingAddressPrefix\":\"01234567\"}",
       "expectedSha256": "02b8e03282f1252be90485d2b7bc2cdaa7a6801888b9b98a67eefe3f9a1d1e87"
+    },
+    {
+      "id": "C-005",
+      "input": {
+        "é": 2,
+        "😀": 1
+      },
+      "expectedCanonical": "{\"é\":2,\"😀\":1}",
+      "expectedSha256": "87c5769198d455043356be00e8cae567ead59ce6b0af6f01d52752752fc92d0a"
+    },
+    {
+      "id": "C-006",
+      "input": 100000000000000000000,
+      "expectedCanonical": "100000000000000000000",
+      "expectedSha256": "c344e9487bfbd5c4e03c9fb90d62a5dde5e00b54d55c46e9f4a803aea162b80c"
+    },
+    {
+      "id": "C-007",
+      "input": 1e-7,
+      "expectedCanonical": "1e-7",
+      "expectedSha256": "5b33e02f2c5103a05d32f6ba9cb058294452bfbf393967f68bb30c1bdcbbab22"
+    },
+    {
+      "id": "C-008",
+      "input": 1e+21,
+      "expectedCanonical": "1e+21",
+      "expectedSha256": "241c4643fa70b1dcde1205b71be4e3bebb17e9f880c8e1a33d0ead6c27271d3c"
     }
   ]
 }

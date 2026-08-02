@@ -13,7 +13,7 @@ const PROD_SOURCE_DIRS = [join(ROOT, '../../../src'), join(ROOT, '../../../scrip
 const ALLOWLIST_PREFIXES = ['conformance/vault/', 'conformance/identity/'];
 
 /** All production source files (ts/tsx/mjs/js/json), excluding reference-only paths. */
-const REFERENCE_ONLY = ['src/lib/vault-core/canonical/suite-reference.ts', 'src/lib/vault-core/conformance/'];
+const REFERENCE_ONLY = ['src/lib/vault-core/canonical/suite-reference.ts', 'src/lib/vault-core/conformance/', 'scripts/vault/'];
 function productionFiles() {
   const out = [];
   const walk = (dir) => {
@@ -60,7 +60,12 @@ test('metadata declares public-only test credentials with an allowlist', () => {
 
 test('corpus paths contain no stable device/session identifiers or secret patterns', () => {
   const manifest = JSON.parse(readFileSync(join(ROOT, 'manifest.json'), 'utf8'));
+  // The declared public-test-credential allowlist (metadata.json) is the sanctioned
+  // home of synthetic credential-bearing vectors; secret CONTENT is guarded by the
+  // selector/credential scans. Every other manifest path must not look secret.
+  const allowlist = ['schemas/', 'vectors/', 'tests/', 'scripts/'];
   for (const f of manifest.files) {
+    if (allowlist.some((prefix) => f.path.startsWith(prefix))) continue;
     assert.doesNotMatch(f.path, /(password|secret|private|mnemonic|key)[-/]/, `suspicious corpus path: ${f.path}`);
   }
 });

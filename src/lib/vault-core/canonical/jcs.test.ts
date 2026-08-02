@@ -27,6 +27,17 @@ describe('RFC 8785 JCS canonicalizer', () => {
     expect(() => canonicalizeJson(Infinity)).toThrow();
   });
 
+  it('uses ECMAScript shortest round-trip for exponent numbers (RFC 8785 §3.2.2.1)', () => {
+    // RFC 8785 delegates to ES6 Number::toString; exponent thresholds are preserved.
+    expect(canonicalizeJson(1e-7)).toBe('1e-7');
+    expect(canonicalizeJson(1e+21)).toBe('1e+21');
+    expect(canonicalizeJson(-1e-7)).toBe('-1e-7');
+    // |n| < 1e21 serializes as an integer without a fraction.
+    expect(canonicalizeJson(100000000000000000000)).toBe('100000000000000000000');
+    // Negative zero normalizes to 0.
+    expect(canonicalizeJson(-0)).toBe('0');
+  });
+
   it('is byte-deterministic across property insertion orders', () => {
     const a = canonicalizeJsonBytes({ alias: 'Alice', lifecycleStatus: 'Active', signingAddressPrefix: '01234567' });
     const b = canonicalizeJsonBytes({ lifecycleStatus: 'Active', alias: 'Alice', signingAddressPrefix: '01234567' });

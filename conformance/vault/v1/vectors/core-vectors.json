@@ -1,0 +1,529 @@
+{
+  "version": "1.0.0",
+  "vectors": [
+    {
+      "id": "E-001",
+      "family": "extension",
+      "operation": "validate",
+      "input": {
+        "container": {
+          "extensions": {
+            "hush.vault.future": {
+              "enabled": true
+            }
+          },
+          "criticalExtensions": []
+        },
+        "knownExtensions": []
+      },
+      "expectedCode": "OK",
+      "expectedSha256": "25d98546a5bdd498f28e2779b14e6b4acde0a20f77dde45d0aef19a6d9130482"
+    },
+    {
+      "id": "E-002",
+      "family": "extension",
+      "operation": "validate",
+      "input": {
+        "container": {
+          "extensions": {
+            "hush.vault.required": {
+              "version": 1
+            }
+          },
+          "criticalExtensions": [
+            "hush.vault.required"
+          ]
+        },
+        "knownExtensions": []
+      },
+      "expectedCode": "ExtensionUnsupported"
+    },
+    {
+      "id": "E-003",
+      "family": "extension",
+      "operation": "validate",
+      "input": {
+        "container": {
+          "extensions": {
+            "INVALID namespace": true
+          },
+          "criticalExtensions": []
+        },
+        "knownExtensions": []
+      },
+      "expectedCode": "INVALID_EXTENSIONS"
+    },
+    {
+      "id": "L-001",
+      "family": "lifecycle",
+      "operation": "stagePendingRegistration",
+      "input": {
+        "state": {
+          "status": "NoVault",
+          "pendingSubmission": false
+        },
+        "verified": true
+      },
+      "expectedCode": "OK",
+      "expectedSha256": "4c305d5882d54eebcf460345ef2e6232c8432427907a31aa9834669cd2019c17"
+    },
+    {
+      "id": "L-002",
+      "family": "lifecycle",
+      "operation": "stagePendingRegistration",
+      "input": {
+        "state": {
+          "status": "NoVault",
+          "pendingSubmission": false
+        },
+        "verified": false
+      },
+      "expectedCode": "NOT_VERIFIED",
+      "expectedSha256": "4adc1237b8d670a2f75f30baa0e3c97c7e72acc3d6e5a48ef7ec933772c68fa3"
+    },
+    {
+      "id": "L-003",
+      "family": "lifecycle",
+      "operation": "beginSubmission",
+      "input": {
+        "state": {
+          "status": "PendingRegistration",
+          "pendingSubmission": false
+        }
+      },
+      "expectedCode": "OK",
+      "expectedSha256": "881231bbee28e88808f447307e34918a9aedf3974e958c023888827e9420896c"
+    },
+    {
+      "id": "L-004",
+      "family": "lifecycle",
+      "operation": "reconcileToActive",
+      "input": {
+        "state": {
+          "status": "PendingRegistration",
+          "pendingSubmission": true
+        },
+        "confirmed": true
+      },
+      "expectedCode": "OK",
+      "expectedSha256": "3f864040d49b8db1e0b0f975b65b01a507ce3737a9453ae998d2e05531f322d9"
+    },
+    {
+      "id": "L-005",
+      "family": "lifecycle",
+      "operation": "completeRemoval",
+      "input": {
+        "state": {
+          "status": "Active",
+          "pendingSubmission": false
+        }
+      },
+      "expectedCode": "OK",
+      "expectedSha256": "4adc1237b8d670a2f75f30baa0e3c97c7e72acc3d6e5a48ef7ec933772c68fa3"
+    },
+    {
+      "id": "L-006",
+      "family": "lifecycle",
+      "operation": "passwordChange",
+      "input": {
+        "rewrappedRecordCount": 2
+      },
+      "expectedCode": "OK",
+      "expectedSha256": "e86c72b27e9adc5d8344c097f8985c805d31b5700de13734dbdbb9b7ed09c140"
+    },
+    {
+      "id": "M-001",
+      "family": "migration",
+      "operation": "checkVersion",
+      "input": {
+        "version": {
+          "envelopeFormatVersion": 1,
+          "parameterSuiteVersion": 1,
+          "recordSchemaVersion": 1,
+          "platformWrapperVersion": 0
+        }
+      },
+      "expectedCode": "OK",
+      "expectedSha256": "1a2ab6d7bc875f8dbf8bda959af0d630a62d2067c2e1469d5ac25314e7ff70e3"
+    },
+    {
+      "id": "M-002",
+      "family": "migration",
+      "operation": "checkVersion",
+      "input": {
+        "version": {
+          "envelopeFormatVersion": 2,
+          "parameterSuiteVersion": 1,
+          "recordSchemaVersion": 1,
+          "platformWrapperVersion": 0
+        }
+      },
+      "expectedCode": "UnsupportedVaultVersion"
+    },
+    {
+      "id": "G-001",
+      "family": "generation",
+      "operation": "commit",
+      "input": {
+        "state": {
+          "activeSlotGeneration": null,
+          "rollbackSlotGeneration": null,
+          "activeGeneration": 0,
+          "newSlotVerified": false
+        },
+        "expectedGeneration": 0,
+        "newGeneration": 1,
+        "writeOk": true,
+        "verifyOk": true,
+        "switchOk": true
+      },
+      "expectedCode": "OK",
+      "expectedSha256": "eaa06b652c223d0a673f066404779c924ee1243325e50eab2c7f504ce4eb0617"
+    },
+    {
+      "id": "G-002",
+      "family": "generation",
+      "operation": "commit",
+      "input": {
+        "state": {
+          "activeSlotGeneration": 1,
+          "rollbackSlotGeneration": null,
+          "activeGeneration": 1,
+          "newSlotVerified": true
+        },
+        "expectedGeneration": 1,
+        "newGeneration": 2,
+        "writeOk": true,
+        "verifyOk": true,
+        "switchOk": true
+      },
+      "expectedCode": "OK",
+      "expectedSha256": "421a257863acffb2d64faaf22168150bd8ead1f74a3fd6103f37fb6e66b04143"
+    },
+    {
+      "id": "G-003",
+      "family": "generation",
+      "operation": "commit",
+      "input": {
+        "state": {
+          "activeSlotGeneration": 2,
+          "rollbackSlotGeneration": 1,
+          "activeGeneration": 2,
+          "newSlotVerified": false
+        },
+        "expectedGeneration": 1,
+        "newGeneration": 3,
+        "writeOk": true,
+        "verifyOk": true,
+        "switchOk": true
+      },
+      "expectedCode": "GENERATION_CONFLICT",
+      "expectedSha256": "421a257863acffb2d64faaf22168150bd8ead1f74a3fd6103f37fb6e66b04143"
+    },
+    {
+      "id": "G-004",
+      "family": "generation",
+      "operation": "commit",
+      "input": {
+        "state": {
+          "activeSlotGeneration": 2,
+          "rollbackSlotGeneration": 1,
+          "activeGeneration": 2,
+          "newSlotVerified": false
+        },
+        "expectedGeneration": 2,
+        "newGeneration": 3,
+        "writeOk": true,
+        "verifyOk": false,
+        "switchOk": true
+      },
+      "expectedCode": "VERIFY_FAILED",
+      "expectedSha256": "421a257863acffb2d64faaf22168150bd8ead1f74a3fd6103f37fb6e66b04143"
+    },
+    {
+      "id": "Q-001",
+      "family": "session",
+      "operation": "localUnlock",
+      "input": {
+        "state": {
+          "epoch": 0,
+          "phase": "Locked",
+          "fresh": {}
+        }
+      },
+      "expectedCode": "OK",
+      "expectedSha256": "903e8c9b910bdbb9bb320ecb8d39084f88361e5f84f1c4c41ffcd49abb20bcd8"
+    },
+    {
+      "id": "Q-002",
+      "family": "session",
+      "operation": "exactOnlineVerification",
+      "input": {
+        "state": {
+          "epoch": 0,
+          "phase": "VerificationOnly",
+          "fresh": {}
+        }
+      },
+      "expectedCode": "OK",
+      "expectedSha256": "39fcde03e9c6d3cc28982353feb100b2fe9afb93187eaaad221d2ef6594e8757"
+    },
+    {
+      "id": "Q-003",
+      "family": "session",
+      "operation": "invalidate",
+      "input": {
+        "state": {
+          "epoch": 0,
+          "phase": "Authenticated",
+          "fresh": {}
+        },
+        "cause": "lock"
+      },
+      "expectedCode": "OK",
+      "expectedSha256": "2caa549e39f232045de8c4d8839731befca5b5218ee8c5f09c4142b3274cf0b9"
+    },
+    {
+      "id": "Q-004",
+      "family": "session",
+      "operation": "freshPassword",
+      "input": {
+        "state": {
+          "epoch": 0,
+          "phase": "Authenticated",
+          "fresh": {}
+        },
+        "channelId": "public-test-channel",
+        "purpose": "mnemonic-reveal",
+        "nowMs": 1000
+      },
+      "expectedCode": "OK",
+      "expectedSha256": "e0380ec1da22c4bfe64e241179887b8d382f5cb226a857e51e0e85ee60cc348f"
+    },
+    {
+      "id": "Q-005",
+      "family": "session",
+      "operation": "consumeFreshPassword",
+      "input": {
+        "state": {
+          "epoch": 0,
+          "phase": "FreshPasswordVerified",
+          "fresh": {
+            "public-test-channel": {
+              "purpose": "mnemonic-reveal",
+              "expiresAtMs": 61000,
+              "consumed": false
+            }
+          }
+        },
+        "channelId": "public-test-channel",
+        "purpose": "mnemonic-reveal",
+        "nowMs": 1001
+      },
+      "expectedCode": "OK",
+      "expectedSha256": "3b3109da3404871b44296e63f210b0ec68ab947d8f49f2c212bf9fd9ef90cbc3"
+    },
+    {
+      "id": "Q-006",
+      "family": "session",
+      "operation": "consumeFreshPassword",
+      "input": {
+        "state": {
+          "epoch": 0,
+          "phase": "FreshPasswordVerified",
+          "fresh": {
+            "public-test-channel": {
+              "purpose": "mnemonic-reveal",
+              "expiresAtMs": 61000,
+              "consumed": false
+            }
+          }
+        },
+        "channelId": "public-test-channel",
+        "purpose": "mnemonic-reveal",
+        "nowMs": 61001
+      },
+      "expectedCode": "OperationForbidden"
+    },
+    {
+      "id": "T-001",
+      "family": "typed-result",
+      "operation": "registry",
+      "input": {
+        "code": "NoVault"
+      },
+      "expectedCode": "OK",
+      "expectedSha256": "2636418ba0036f037dc8bee8cc11378edda315aa1891ed55965e41ad7b7c5557"
+    },
+    {
+      "id": "T-002",
+      "family": "typed-result",
+      "operation": "registry",
+      "input": {
+        "code": "UnsupportedVaultVersion"
+      },
+      "expectedCode": "OK",
+      "expectedSha256": "799ea8fa6d89e2b32d0d27df6f3f6ddad310b1c0db4697919c6dc0498d5bd4e5"
+    },
+    {
+      "id": "T-003",
+      "family": "typed-result",
+      "operation": "registry",
+      "input": {
+        "code": "MalformedEnvelope"
+      },
+      "expectedCode": "OK",
+      "expectedSha256": "b56ee31be234c963da91b5e9962fa3acd123f13899d58d4cb4ac5471216ce1b3"
+    },
+    {
+      "id": "T-004",
+      "family": "typed-result",
+      "operation": "registry",
+      "input": {
+        "code": "WrongPasswordOrDamagedData"
+      },
+      "expectedCode": "OK",
+      "expectedSha256": "33d3043302842c3bda210904743d6f00fa281e9bf706591ef8672b8048e02c80"
+    },
+    {
+      "id": "T-005",
+      "family": "typed-result",
+      "operation": "registry",
+      "input": {
+        "code": "Throttled"
+      },
+      "expectedCode": "OK",
+      "expectedSha256": "6294089a936e13cbfb1b771e61b181dd73d5b31e6e62dbc5ad637f7b544dd563"
+    },
+    {
+      "id": "T-006",
+      "family": "typed-result",
+      "operation": "registry",
+      "input": {
+        "code": "KdfResourceLimit"
+      },
+      "expectedCode": "OK",
+      "expectedSha256": "4ad4b877ecceeda822baf816a082ab1b9e0db27d1b098cb9e41d7b678ea20a25"
+    },
+    {
+      "id": "T-007",
+      "family": "typed-result",
+      "operation": "registry",
+      "input": {
+        "code": "PlatformProtectionUnavailable"
+      },
+      "expectedCode": "OK",
+      "expectedSha256": "84f5405cd06159d1929705d73cf3729a19c49b8a57c106c3b043907aa7a9f5c5"
+    },
+    {
+      "id": "T-008",
+      "family": "typed-result",
+      "operation": "registry",
+      "input": {
+        "code": "PlatformProtectionInvalidated"
+      },
+      "expectedCode": "OK",
+      "expectedSha256": "dc1c86207aff932d632471ad4b9313b3937652eefa353a20a543361624b3a175"
+    },
+    {
+      "id": "T-009",
+      "family": "typed-result",
+      "operation": "registry",
+      "input": {
+        "code": "IdentityBindingMismatch"
+      },
+      "expectedCode": "OK",
+      "expectedSha256": "b146fd53a84de4808634ea8e0da8ab6720b09e5d99f6dc570c255093302fada5"
+    },
+    {
+      "id": "T-010",
+      "family": "typed-result",
+      "operation": "registry",
+      "input": {
+        "code": "MigrationFailedRollbackAvailable"
+      },
+      "expectedCode": "OK",
+      "expectedSha256": "29b81a3e51cf65d6e4455374e1051a262876b4d0438c0cece0e62f28bbb7f14b"
+    },
+    {
+      "id": "T-011",
+      "family": "typed-result",
+      "operation": "registry",
+      "input": {
+        "code": "GenerationConflict"
+      },
+      "expectedCode": "OK",
+      "expectedSha256": "350004a4588354d35b3e410437301c2de2cf66297c854d687bdb4bf0ea1e01dc"
+    },
+    {
+      "id": "T-012",
+      "family": "typed-result",
+      "operation": "registry",
+      "input": {
+        "code": "StorageUnavailable"
+      },
+      "expectedCode": "OK",
+      "expectedSha256": "22633821445c5ba6fe95ccaa2f0dbb34cb06d04dc372c1e9af53aee62dc5e851"
+    },
+    {
+      "id": "T-013",
+      "family": "typed-result",
+      "operation": "registry",
+      "input": {
+        "code": "StorageQuotaExceeded"
+      },
+      "expectedCode": "OK",
+      "expectedSha256": "405c08c3f2c1ec7f3d0715171ab2f1ad7da21d2a81fd4f07f7cf710c8f7d97c5"
+    },
+    {
+      "id": "T-014",
+      "family": "typed-result",
+      "operation": "registry",
+      "input": {
+        "code": "PersistenceDenied"
+      },
+      "expectedCode": "OK",
+      "expectedSha256": "a1ad9a0555904c663fa19d8161b7cdf7ba04bc8f83a03e305b3e85cdc2b31b71"
+    },
+    {
+      "id": "T-015",
+      "family": "typed-result",
+      "operation": "registry",
+      "input": {
+        "code": "StaleSession"
+      },
+      "expectedCode": "OK",
+      "expectedSha256": "ef46bc24ec10afeab6cced8dcaf158be8b56f4c8237ff5a02e94ca942f74400d"
+    },
+    {
+      "id": "T-016",
+      "family": "typed-result",
+      "operation": "registry",
+      "input": {
+        "code": "OperationForbidden"
+      },
+      "expectedCode": "OK",
+      "expectedSha256": "9a0467d5ffe80c440af72af327d2c1db27ba0ed3ce8cd56d95166ea908b39918"
+    },
+    {
+      "id": "T-017",
+      "family": "typed-result",
+      "operation": "registry",
+      "input": {
+        "code": "CleanupFailed"
+      },
+      "expectedCode": "OK",
+      "expectedSha256": "6fdbab1452cd45195be4538954ca97907e9666fb2fc5a926040ee6f1a38268ae"
+    },
+    {
+      "id": "T-018",
+      "family": "typed-result",
+      "operation": "registry",
+      "input": {
+        "code": "ExtensionUnsupported"
+      },
+      "expectedCode": "OK",
+      "expectedSha256": "1e3f6355c0cbd3913d0687f72ad576b84cffd920b5f3469dc8e1e292c0ece75e"
+    }
+  ]
+}

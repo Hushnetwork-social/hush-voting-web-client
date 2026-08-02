@@ -63,6 +63,7 @@ function productionExclusionScan() {
   const referenceOnlyRelPaths = [
     'src/lib/vault-core/canonical/suite-reference.ts',
     'src/lib/vault-core/conformance/',
+    'scripts/vault/',
   ];
   const walk = (dir) => {
     if (!existsSync(dir)) return;

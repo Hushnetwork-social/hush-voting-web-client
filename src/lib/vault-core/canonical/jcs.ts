@@ -45,36 +45,19 @@ export function escapeJsonString(value: string): string {
 
 /**
  * RFC 8785 §3.2.2.1 canonical number serialization.
- * Rejects NaN, Infinity, and non-finite values. Integers serialize without a fraction;
- * floats serialize with shortest round-trip representation.
+ *
+ * RFC 8785 requires ECMAScript's shortest round-trip number-to-string conversion
+ * (ES6 Number::toString, ECMA-262 §7.1.12.1). `String(value)` preserves the engine's
+ * fixed/exponent thresholds exactly (`1e-7` stays `1e-7`; `1e21` stays `1e+21`;
+ * `1e20` serializes as the integer `100000000000000000000`) and normalizes `-0` to
+ * `0`. Expanding exponent forms into decimal notation is NOT RFC 8785 compliant and
+ * would produce non-canonical authenticated bytes.
  */
 export function canonicalNumber(value: number): string {
   if (!Number.isFinite(value)) {
     throw new TypeError('JCS: non-finite number cannot be canonicalized');
   }
-  if (Number.isInteger(value) && Math.abs(value) < 1e21) {
-    return String(value);
-  }
-  // Shortest round-trip via String(number); strip trailing zeros on exponents.
-  const s = String(value);
-  if (s.includes('e') || s.includes('E')) {
-    // Normalize exponent form: e.g. 1e-7 -> 0.0000001 per RFC 8785.
-    const [mantissa, expPart] = s.split(/[eE]/);
-    const exp = Number(expPart);
-    const digits = mantissa.replace('-', '').replace('.', '');
-    const sign = mantissa.startsWith('-') ? '-' : '';
-    const dotPos = mantissa.indexOf('.');
-    const intDigits = dotPos === -1 ? mantissa.length : dotPos;
-    const adjusted = intDigits + exp;
-    if (adjusted <= 0) {
-      return `${sign}0.${'0'.repeat(-adjusted)}${digits}`;
-    }
-    if (adjusted >= digits.length) {
-      return `${sign}${digits}${'0'.repeat(adjusted - digits.length)}`;
-    }
-    return `${sign}${digits.slice(0, adjusted)}.${digits.slice(adjusted)}`;
-  }
-  return s;
+  return String(value);
 }
 
 /** Canonical serialization of a JSON value to a string (RFC 8785). */

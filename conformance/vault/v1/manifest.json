@@ -39,8 +39,8 @@
     },
     {
       "path": "schemas/report.schema.json",
-      "bytes": 1877,
-      "sha256": "2ac143df6d25810d182ea89b047ac3d098d59eb6a021663ee86621ce92774413"
+      "bytes": 1874,
+      "sha256": "259cc2987810fd8b82e965582aa34b19a6e07733ce84e300730c062180719e33"
     },
     {
       "path": "schemas/sidecar.schema.json",
@@ -51,6 +51,31 @@
       "path": "schemas/suite.schema.json",
       "bytes": 2929,
       "sha256": "0274432b9cbc5cf4a905dcb79b5142886c7df380094582defd4cd3af0397599b"
+    },
+    {
+      "path": "vectors/aad-vectors.json",
+      "bytes": 6563,
+      "sha256": "22c8311a9880dea51cff352a372626e296a206bd14125ac6cacdfd4586cd9e67"
+    },
+    {
+      "path": "vectors/canonical-byte-vectors.json",
+      "bytes": 1995,
+      "sha256": "93309afcfde8551c4149c030d0c13a642224f1f046b7c207ab5fc198c87b0746"
+    },
+    {
+      "path": "vectors/core-vectors.json",
+      "bytes": 14196,
+      "sha256": "2342e04223e30d4e56a907f60c012ccfceaf8c5fad6a9339862c76c99b4e2167"
+    },
+    {
+      "path": "vectors/password-vectors.json",
+      "bytes": 1584,
+      "sha256": "30a8c5ad89632ff69beeec942fcd57631add2b28b3d9cfa36144d66764ac00bc"
+    },
+    {
+      "path": "vectors/suite-vectors.json",
+      "bytes": 2505,
+      "sha256": "b828273c58e4b4a4de7777b57e6d7fad46095ec4d550f684a4907fa0fde74e0e"
     }
   ]
 }

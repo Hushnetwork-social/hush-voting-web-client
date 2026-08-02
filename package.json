@@ -35,6 +35,8 @@
     "vault:integrity": "node conformance/vault/v1/scripts/generate-manifest.mjs --check && node conformance/vault/v1/scripts/validate.mjs",
     "vault:integrity:tests": "node --test conformance/vault/v1/tests/manifest-integrity.test.mjs conformance/vault/v1/tests/production-exclusion.test.mjs",
     "vault:conformance": "vitest run --silent=true src/lib/vault-core/conformance",
+    "vault:conformance:isolated": "vitest run --silent=true src/lib/vault-core/conformance/isolated-validator.test.ts",
+    "vault:production-exclusion": "node scripts/vault/production-exclusion.mjs",
     "test:browser": "playwright test",
     "test:browser:auth": "playwright test browser/",
     "auth:audit": "node scripts/auth/artifact-audit.mjs",

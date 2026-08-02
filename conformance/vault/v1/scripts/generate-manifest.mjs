@@ -21,7 +21,7 @@ import { fileURLToPath } from 'node:url';
 
 export const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 export const MANIFEST_PATH = join(ROOT, 'manifest.json');
-const DATA_DIRS = ['schemas'];
+const DATA_DIRS = ['schemas', 'vectors'];
 const ROOT_DATA_FILES = ['metadata.json'];
 
 /** Collect every manifest-tracked data file in stable sorted order. */

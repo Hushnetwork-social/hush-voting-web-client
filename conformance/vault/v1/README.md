@@ -58,9 +58,27 @@ never appear in production artifacts; `scripts/vault/` scans enforce this.
 ```bash
 npm run vault:manifest        # regenerate manifest.json (deterministic)
 npm run vault:integrity       # manifest check + schema validation (CI gate)
-npm run vault:conformance     # TypeScript reference conformance (introduced Phase 3)
+npm run vault:integrity:tests # node:test manifest + production-exclusion tests
+npm run vault:conformance     # primary + isolated TypeScript conformance (Phase 5)
+npm run vault:conformance:isolated # isolated validator only
+npm run vault:production-exclusion  # import-graph + selector + artifact scans
 npm run vault:test:adversarial# property/fuzz/fault/concurrency (introduced Phase 7)
 ```
+
+## Phase 5 — Isolated TypeScript/Node Validation
+
+- `src/lib/vault-core/conformance/isolated/` holds independently written replay modules
+  (RFC 8785 JCS, AAD assembly, Unicode contract, policy hard-rejection, core
+  lifecycle/session/generation/migration/extension/typed-result engines). They never
+  import the primary implementation helpers being checked.
+- `src/lib/vault-core/conformance/isolated-validator.ts` verifies the manifest digest
+  before replaying every vector family and emits a deterministic secret-safe report
+  (`generator: hush-vault-ts-isolated`) per `schemas/report.schema.json`.
+- The manifest covers `schemas/`, `metadata.json`, and every `vectors/` file so
+  downstream adapters (FEAT-004/005/006) replay an exact pinned revision.
+- No Rust, Cargo, compiled sidecar binary, or standalone validator project belongs to
+  this feature (Deep-Dive decision); the report generator enum is
+  `hush-vault-ts-reference` | `hush-vault-ts-isolated`.
 
 ## Pinned Upstream (FEAT-001)
 
