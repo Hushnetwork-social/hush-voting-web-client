@@ -30,7 +30,11 @@
     "tauri:android:init": "tauri android init",
     "tauri:android:dev": "tauri android dev",
     "tauri:android:build:debug": "tauri android build --debug --apk --aab",
-    "identity:conformance": "vitest run --silent=true src/lib/identity-compatibility/conformance"
+    "identity:conformance": "vitest run --silent=true src/lib/identity-compatibility/conformance",
+    "test:browser": "playwright test",
+    "test:browser:auth": "playwright test browser/",
+    "auth:audit": "node scripts/auth/artifact-audit.mjs",
+    "auth:audit:selftest": "node scripts/auth/artifact-audit.mjs --selftest"
   },
   "dependencies": {
     "@noble/hashes": "^2.2.0",
@@ -44,6 +48,7 @@
     "xstate": "^5.32.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@tauri-apps/cli": "^2.11.4",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.1",

@@ -13,12 +13,14 @@
 import type { AuthActors, CapabilityRegistration } from '../ports';
 import { buildEmptyActors } from '../composition';
 import {
-  createBrowserCoordinationTestActor,
-  createIdentityVerificationTestActor,
-  createLocalUserAuthorityTestActor,
-  createNavigationTestActor,
-  createSecretAuthorityTestActor,
-} from './actors';
+  createAutoResolvingBrowserCoordination,
+  createAutoResolvingIdentityVerification,
+  createAutoResolvingLocalUserAuthority,
+  createAutoResolvingNavigation,
+  createAutoResolvingOnboarding,
+  createAutoResolvingRemoval,
+  createAutoResolvingSecretAuthority,
+} from './actors.auto';
 
 /** Result of validating and assembling a composition. */
 export interface CompositionResult {
@@ -52,20 +54,26 @@ export function createDevelopmentComposition(allowDevelopmentActors: boolean): C
   ];
 
   const builder = buildEmptyActors();
-  builder.localUserAuthority = createLocalUserAuthorityTestActor([
+  builder.localUserAuthority = createAutoResolvingLocalUserAuthority([
     { code: 'INIT_NO_LOCAL_USER' },
     { code: 'INIT_LOCKED_USER', safeIdentity: { alias: 'Demo User', abbreviatedSigningAddress: 'NVh…demo' } },
   ]);
-  builder.secretAuthority = createSecretAuthorityTestActor([
+  builder.secretAuthority = createAutoResolvingSecretAuthority([
     { code: 'UNLOCK_SUCCESS' },
     { code: 'UNLOCK_WRONG_PASSWORD_OR_DAMAGED' },
   ]);
-  builder.identityVerification = createIdentityVerificationTestActor([
+  builder.identityVerification = createAutoResolvingIdentityVerification([
     { code: 'VERIFY_SUCCESS' },
     { code: 'VERIFY_NETWORK_UNAVAILABLE' },
   ]);
-  builder.browserCoordination = createBrowserCoordinationTestActor([{ code: 'COORDINATION_SAFE' }]);
-  builder.navigation = createNavigationTestActor();
+  builder.onboarding = {
+    createUser: createAutoResolvingOnboarding([{ code: 'ONBOARDING_COMPLETED', localUserRef: 'dev-user-ref' }]),
+    restoreCredentialFile: createAutoResolvingOnboarding([{ code: 'ONBOARDING_COMPLETED', localUserRef: 'dev-user-ref' }]),
+    restoreRecoveryWords: createAutoResolvingOnboarding([{ code: 'ONBOARDING_COMPLETED', localUserRef: 'dev-user-ref' }]),
+  };
+  builder.removal = createAutoResolvingRemoval([{ code: 'REMOVAL_COMPLETE' }]);
+  builder.browserCoordination = createAutoResolvingBrowserCoordination([{ code: 'COORDINATION_SAFE' }]);
+  builder.navigation = createAutoResolvingNavigation();
   const actors = builder as AuthActors;
 
   return { actors, registrations, ok: true, diagnostics: [] };
