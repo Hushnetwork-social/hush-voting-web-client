@@ -35,6 +35,10 @@ const GATES = [
   { name: 'build-static', script: 'build:static', timeoutMs: 1_200_000, skip: false },
   { name: 'auth-audit', script: 'auth:audit', timeoutMs: 180_000, skip: false },
   { name: 'production-exclusion', script: 'vault:production-exclusion', timeoutMs: 300_000, skip: false },
+  { name: 'adversarial', script: 'vault:test:adversarial', timeoutMs: 900_000, skip: false },
+  { name: 'security-gates', script: 'vault:security-gates', timeoutMs: 300_000, skip: false },
+  { name: 'archive', script: 'vault:archive', timeoutMs: 180_000, skip: false },
+  { name: 'archive-check', script: 'vault:archive:check', timeoutMs: 180_000, skip: false },
 ];
 
 function runNpmScript(name, timeoutMs) {
