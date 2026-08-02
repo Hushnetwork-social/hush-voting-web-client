@@ -19,7 +19,9 @@ import { verifyManifestIndependently } from '../conformance/isolated-validator';
 const ROOT = process.cwd();
 const SECURITY_SCRIPT = join(ROOT, 'scripts', 'vault', 'security-gates.mjs');
 const ARCHIVE_SCRIPT = join(ROOT, 'scripts', 'vault', 'archive.mjs');
-const FIXTURE_DIR = join(ROOT, 'src', 'vault-security-negative-fixture');
+// Negative fixtures live OUTSIDE the scanned default trees (tmp/) so parallel
+// vitest workers and tsc never observe them; the scan targets them explicitly.
+const FIXTURE_DIR = join(ROOT, 'tmp', 'vault-security-negative-fixture');
 
 function runScript(script: string, args: string[] = []): { status: number; stdout: string; stderr: string } {
   try {
@@ -43,9 +45,8 @@ describe('FEAT-003 security gates verification', () => {
 
   it('an injected private-key pattern fails the gate (negative fixture)', () => {
     mkdirSync(FIXTURE_DIR, { recursive: true });
-    const rel = join('src', 'vault-security-negative-fixture', 'leak.ts');
-    writeFileSync(join(ROOT, rel), '-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA\n-----END RSA PRIVATE KEY-----\n');
-    const result = runScript(SECURITY_SCRIPT, ['--skip-audit']);
+    writeFileSync(join(FIXTURE_DIR, 'leak.ts'), '-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA\n-----END RSA PRIVATE KEY-----\n');
+    const result = runScript(SECURITY_SCRIPT, ['--skip-audit', 'tmp/vault-security-negative-fixture']);
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('private key PEM header');
     rmSync(FIXTURE_DIR, { recursive: true, force: true });

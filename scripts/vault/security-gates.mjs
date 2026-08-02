@@ -132,14 +132,18 @@ function threatChecklist() {
 }
 
 function main() {
-  const args = new Set(process.argv.slice(2));
+  const args = process.argv.slice(2);
+  const flags = new Set(args.filter((a) => a.startsWith('--')));
+  const extraScans = args.filter((a) => !a.startsWith('--')).map((p) => join(REPO_ROOT, p));
   scanDir(join(REPO_ROOT, 'src'), false);
   scanDir(join(REPO_ROOT, 'scripts'), false);
   scanDir(join(REPO_ROOT, 'conformance'), false);
-  if (!args.has('--skip-caches')) {
+  if (!flags.has('--skip-caches')) {
     for (const cache of CACHE_DIRS) scanDir(join(REPO_ROOT, cache), true);
   }
-  dependencyAudit([...args]);
+  // Negative-fixture scans target an explicit directory (never the shared src/ tree).
+  for (const dir of extraScans) scanDir(dir, false);
+  dependencyAudit([...flags]);
   threatChecklist();
   if (findings.length) {
     process.stderr.write(`VAULT SECURITY GATES FAILED:\n${findings.join('\n')}\n`);
