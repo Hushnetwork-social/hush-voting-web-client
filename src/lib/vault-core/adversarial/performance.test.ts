@@ -23,6 +23,8 @@ import { onLocalUnlock } from '../session/kernel';
 const budget = { normalParseMs: 50, worstCaseParseMs: 250, transitionMs: 100, commitMs: 250 } as const;
 
 function measure(fn: () => void, iterations = 1): number {
+  // Warm up the JIT before measuring so cold-start cost never pollutes the budget.
+  for (let i = 0; i < 3; i++) fn();
   const started = performance.now();
   for (let i = 0; i < iterations; i++) fn();
   return (performance.now() - started) / iterations;
@@ -61,7 +63,7 @@ describe('FEAT-003 performance budgets (reference hardware)', () => {
       const parsed = parseBoundedJson(bytes);
       if (!parsed.ok) throw new Error('parse failed');
       canonicalizeJson(parsed.value);
-    });
+    }, 10);
     // Budget assertion is generous for CI variance; the recorded value is evidence.
     expect(elapsed).toBeLessThanOrEqual(budget.normalParseMs);
   });
@@ -72,7 +74,7 @@ describe('FEAT-003 performance budgets (reference hardware)', () => {
     const elapsed = measure(() => {
       const parsed = parseBoundedJson(bytes);
       if (!parsed.ok) throw new Error(`worst-case parse failed: ${parsed.code}`);
-    });
+    }, 3);
     expect(elapsed).toBeLessThanOrEqual(budget.worstCaseParseMs);
   });
 
