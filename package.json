@@ -74,6 +74,7 @@
     "cross-env": "^10.1.0",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.2.12",
+    "fake-indexeddb": "^6.2.5",
     "jsdom": "^27.3.0",
     "postcss": "^8.5.15",
     "rimraf": "^6.1.2",
