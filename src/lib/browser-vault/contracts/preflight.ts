@@ -93,6 +93,14 @@ export const MANDATORY_CAPABILITY_CHECKS: readonly CapabilityCheck[] = [
 ];
 
 /**
+ * Advisory checks: reported when available but never block secret workflows on
+ * their own (acceptance criterion 3 lists only secure-context/crypto/randomness/
+ * worker/storage/coordination as fail-closed capabilities). `unknown` on an
+ * advisory check must not fail preflight.
+ */
+export const ADVISORY_CAPABILITY_CHECKS: readonly CapabilityCheck[] = ['storageEstimate', 'storagePersisted'];
+
+/**
  * Browser primitives injected into preflight. Every probe uses non-secret
  * bounded data only and never collects or retains credential material.
  */
@@ -128,10 +136,13 @@ export async function runCapabilityPreflight(env: BrowserPreflightEnvironment): 
       ok = false;
     }
     if (status === 'temporary') {
+      // Temporary denial must not collect secrets: fail closed with bounded Retry.
+      ok = false;
       retryable = true;
     }
-    if (status === 'unknown') {
-      ok = false; // unknown capability cannot prove safety; fail closed
+    if (status === 'unknown' && !ADVISORY_CAPABILITY_CHECKS.includes(check)) {
+      // Unknown mandatory capability cannot prove safety; advisory checks report only.
+      ok = false;
     }
   };
 

@@ -178,6 +178,7 @@ function createSession(db: IDBDatabase): VaultStorageSession {
       return failure('GenerationConflict');
     }
     return new Promise((resolve) => {
+      let conflict = false;
       let transaction: IDBTransaction;
       try {
         transaction = db.transaction('vaultJournal', 'readwrite');
@@ -190,10 +191,13 @@ function createSession(db: IDBDatabase): VaultStorageSession {
       getRequest.onsuccess = () => {
         const current = getRequest.result as VaultJournalRecord | undefined;
         if (current !== undefined && current.generation !== expected.generation) {
+          // DB-side race: the stored generation differs from the expected one.
+          conflict = true;
           transaction.abort();
           return;
         }
         if (current === undefined && expected.generation !== 0) {
+          conflict = true;
           transaction.abort();
           return;
         }
@@ -201,7 +205,13 @@ function createSession(db: IDBDatabase): VaultStorageSession {
       };
       transaction.oncomplete = () => resolve(success({ ok: true as const }));
       transaction.onerror = () => resolve(storageFailureToVaultResult(classifyStorageError(transaction.error)));
-      transaction.onabort = () => resolve(storageFailureToVaultResult(classifyStorageError(transaction.error ?? new DOMException('aborted', 'AbortError'))));
+      transaction.onabort = () => {
+        resolve(
+          conflict
+            ? failure('GenerationConflict')
+            : storageFailureToVaultResult(classifyStorageError(transaction.error ?? new DOMException('aborted', 'AbortError'))),
+        );
+      };
     });
   };
 

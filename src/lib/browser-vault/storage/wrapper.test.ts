@@ -118,6 +118,27 @@ describe('storage wrapper — journal CAS', () => {
     expect(bad.ok).toBe(false);
     session.close();
   });
+
+  it('maps a DB-side generation race to GenerationConflict (not a storage error)', async () => {
+    const session = await openSession();
+    // Establish DB generation 1 / slot-b.
+    const seed = await session.casJournal({ generation: 0, activeSlot: 'slot-a' }, { generation: 1, activeSlot: 'slot-b' });
+    expect(seed.ok).toBe(true);
+    // Pre-check passes (0 -> 1 arithmetic), but the stored generation is 1, not 0:
+    // the in-transaction reread must detect the race and report GenerationConflict.
+    const conflict = await session.casJournal({ generation: 0, activeSlot: 'slot-a' }, { generation: 1, activeSlot: 'slot-b' });
+    expect(conflict.ok).toBe(false);
+    if (!conflict.ok) {
+      expect(conflict.code).toBe('GenerationConflict');
+    }
+    // Journal unchanged and still authoritative.
+    const journal = await session.readJournal();
+    expect(journal.ok).toBe(true);
+    if (journal.ok) {
+      expect(journal.value.journal).toEqual({ generation: 1, activeSlot: 'slot-b' });
+    }
+    session.close();
+  });
 });
 
 describe('storage wrapper — transaction boundaries and error mapping', () => {

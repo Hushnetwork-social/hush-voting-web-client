@@ -48,6 +48,7 @@ describe('preflight — fail-closed and distinct classifications', () => {
 
   it('distinguishes temporary storage denial from unavailable storage', async () => {
     const temporary = await runCapabilityPreflight(env({ probeIndexedDb: async () => 'temporary' }));
+    expect(temporary.ok).toBe(false); // no secret collection while storage is temporarily denied
     expect(temporary.retryable).toBe(true);
     expect(preflightCode(temporary)).toBe('TEMPORARY_STORAGE_DENIED');
 
@@ -68,10 +69,14 @@ describe('preflight — fail-closed and distinct classifications', () => {
     expect(preflightCode(report)).toBe('COORDINATION_UNAVAILABLE');
   });
 
-  it('fails closed on unknown capability (cannot prove safety)', async () => {
-    const report = await runCapabilityPreflight(env({ storageEstimateAvailable: () => false }));
-    expect(report.ok).toBe(false);
+  it('treats advisory capability unknowns as non-blocking (reported only)', async () => {
+    // storageEstimate/storagePersisted are advisory per acceptance criterion 3;
+    // absence must not fail closed a healthy secret-capable environment.
+    const report = await runCapabilityPreflight(env({ storageEstimateAvailable: () => false, storagePersistedAvailable: () => false }));
+    expect(report.ok).toBe(true);
     expect(report.checks.find((c) => c.check === 'storageEstimate')?.status).toBe('unknown');
+    expect(report.checks.find((c) => c.check === 'storagePersisted')?.status).toBe('unknown');
+    expect(preflightCode(report)).toBe('PREFLIGHT_OK');
   });
 });
 
