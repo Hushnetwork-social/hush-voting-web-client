@@ -125,7 +125,7 @@ export function outcomeSafeActions(code: AuthOutcomeCode): readonly SafeRecovery
     case 'VERIFY_NETWORK_UNAVAILABLE':
       return ['retry'];
     case 'INVALID_MNEMONIC':
-      return ['retry', 'unlock'];
+      return ['retry', 'createOrRestore'];
     case 'INIT_UNSUPPORTED_VAULT_VERSION':
       return ['updateGuidance', 'removal'];
     case 'INIT_CORRUPT_VAULT':
