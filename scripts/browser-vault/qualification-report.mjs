@@ -12,6 +12,7 @@
  * Exit codes: 0 = evidence complete, 1 = gaps (missing matrix/security
  * evidence), 2 = internal error.
  */
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -51,10 +52,14 @@ function main() {
     gaps.push('security-finding-ledger.json missing (run security-qualification.mjs)');
   }
 
+  // Derive the corpus pin from the immutable manifest (never hardcode).
+  const corpusPin = createHash('sha256')
+    .update(readFileSync(join(REPO_ROOT, 'conformance', 'vault', 'v1', 'manifest.json')))
+    .digest('hex');
   const evidence = {
     schema: 'browser-qualification-summary-v1',
     generated: new Date().toISOString().slice(0, 10),
-    adapter: { protocolVersion: 1, corpusPin: 'e8dfdfa49b9e33cfc8a47b1266c5a14cb978c4be28f21d87cc2f034d435582e5' },
+    adapter: { protocolVersion: 1, corpusPin },
     scenarioFamilies: REQUIRED_FAMILIES.map((family) => ({ family, status: 'covered' })),
     matrix: existsSync(matrixPath) ? JSON.parse(readFileSync(matrixPath, 'utf8')) : null,
     securityLedger: existsSync(ledgerPath) ? JSON.parse(readFileSync(ledgerPath, 'utf8')) : null,
