@@ -13,10 +13,7 @@
  */
 
 import type { VaultResultCode } from '../../vault-core/contracts/results';
-
-/** Privacy-safe combined message (FEAT-002 convention). */
-export const COMBINED_CREDENTIAL_ERROR =
-  'The password is incorrect or the protected data is damaged.';
+import { COMBINED_CREDENTIAL_ERROR } from '../../auth/types';
 
 /** Closed mapping: every FEAT-003/browser result code -> one actionable surface. */
 export const VAULT_ERROR_COPY: Readonly<Record<VaultResultCode, { readonly message: string; readonly action: string }>> = {
