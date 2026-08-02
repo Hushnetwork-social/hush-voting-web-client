@@ -12,7 +12,8 @@ import { ROOT } from '../scripts/generate-manifest.mjs';
 const PROD_SOURCE_DIRS = [join(ROOT, '../../../src'), join(ROOT, '../../../scripts')];
 const ALLOWLIST_PREFIXES = ['conformance/vault/', 'conformance/identity/'];
 
-/** All production source files (ts/tsx/mjs/js/json). */
+/** All production source files (ts/tsx/mjs/js/json), excluding reference-only paths. */
+const REFERENCE_ONLY = ['src/lib/vault-core/canonical/suite-reference.ts', 'src/lib/vault-core/conformance/'];
 function productionFiles() {
   const out = [];
   const walk = (dir) => {
@@ -23,6 +24,8 @@ function productionFiles() {
         if (['node_modules', '.next', '.next-web', '.next-static', '.next-tauri', 'out', 'target', 'coverage'].includes(entry)) continue;
         walk(p);
       } else if (/\.(ts|tsx|mjs|js|json)$/.test(entry)) {
+        const rel = relative(join(ROOT, '../../..'), p).split('/').join('/');
+        if (REFERENCE_ONLY.some((r) => rel === r || rel.startsWith(r))) continue;
         out.push(p);
       }
     }

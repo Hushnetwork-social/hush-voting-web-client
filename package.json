@@ -34,6 +34,7 @@
     "vault:manifest": "node conformance/vault/v1/scripts/generate-manifest.mjs",
     "vault:integrity": "node conformance/vault/v1/scripts/generate-manifest.mjs --check && node conformance/vault/v1/scripts/validate.mjs",
     "vault:integrity:tests": "node --test conformance/vault/v1/tests/manifest-integrity.test.mjs conformance/vault/v1/tests/production-exclusion.test.mjs",
+    "vault:conformance": "vitest run --silent=true src/lib/vault-core/conformance",
     "test:browser": "playwright test",
     "test:browser:auth": "playwright test browser/",
     "auth:audit": "node scripts/auth/artifact-audit.mjs",

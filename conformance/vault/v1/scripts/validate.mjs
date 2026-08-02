@@ -11,7 +11,7 @@
  * Exit codes: 0 = ok, 1 = validation failure, 2 = internal error.
  */
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import { verifyManifestAgainstDisk, ROOT } from './generate-manifest.mjs';
 
 const SCHEMAS_DIR = join(ROOT, 'schemas');
@@ -58,6 +58,12 @@ function validateSchemas() {
 /** Deterministic selector scan across production source (src/, scripts/). */
 function productionExclusionScan() {
   const findings = [];
+  // The reference-only modules are the DEFINITION SITES of the test-only selectors;
+  // the scan verifies the markers never appear in any OTHER production source.
+  const referenceOnlyRelPaths = [
+    'src/lib/vault-core/canonical/suite-reference.ts',
+    'src/lib/vault-core/conformance/',
+  ];
   const walk = (dir) => {
     if (!existsSync(dir)) return;
     for (const entry of readdirSync(dir)) {
@@ -66,13 +72,14 @@ function productionExclusionScan() {
         if (entry === 'node_modules' || entry === '.next' || entry === '.next-web' || entry === '.next-static' || entry === '.next-tauri' || entry === 'out' || entry === 'target') continue;
         walk(p);
       } else if (/\.(ts|tsx|mjs|js|json)$/.test(entry)) {
-        const abs = join(ROOT, relative(ROOT, p));
-        const isAllowlisted = ALLOWLIST_PREFIXES.some((prefix) => abs.startsWith(prefix));
-        if (isAllowlisted) continue;
+        const rel = relative(join(ROOT, '../../..'), p).split(sep).join('/');
+        const isAllowlisted = ALLOWLIST_PREFIXES.some((prefix) => rel.startsWith(prefix));
+        const isReferenceOnly = referenceOnlyRelPaths.some((prefix) => rel === prefix || rel.startsWith(prefix));
+        if (isAllowlisted || isReferenceOnly) continue;
         const content = readFileSync(p, 'utf8');
         for (const token of PROHIBITED_IN_PRODUCTION) {
           if (content.includes(token)) {
-            findings.push(`${relative(process.cwd(), p)} contains selector '${token}' outside allowlist`);
+            findings.push(`${rel} contains selector '${token}' outside allowlist/reference-only paths`);
           }
         }
       }

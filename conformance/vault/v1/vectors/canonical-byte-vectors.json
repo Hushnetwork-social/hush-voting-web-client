@@ -1,0 +1,44 @@
+{
+  "version": "1.0.0",
+  "vectors": [
+    {
+      "id": "C-001",
+      "input": {
+        "b": 1,
+        "a": 2
+      },
+      "expectedCanonical": "{\"a\":2,\"b\":1}",
+      "expectedSha256": "d3626ac30a87e6f7a6428233b3c68299976865fa5508e4267c5415c76af7a772"
+    },
+    {
+      "id": "C-002",
+      "input": {
+        "z": {
+          "y": 1,
+          "x": 2
+        },
+        "a": 3
+      },
+      "expectedCanonical": "{\"a\":3,\"z\":{\"x\":2,\"y\":1}}",
+      "expectedSha256": "8d4ec158025ac90e3962f423d3201b8e960ee4280830656f6e536587a1f00fe9"
+    },
+    {
+      "id": "C-003",
+      "input": {
+        "s": "a\"b\\c\nd"
+      },
+      "expectedCanonical": "{\"s\":\"a\\\"b\\\\c\\nd\"}",
+      "expectedSha256": "088c4ef38857ab6773d12fb9e9fdeac64af46b4a1cef8f6e5e434be57ef35fdc"
+    },
+    {
+      "id": "C-004",
+      "input": {
+        "alias": "Alice",
+        "lifecycleStatus": "Active",
+        "signingAddressPrefix": "01234567"
+      },
+      "expectedCanonical": "{\"alias\":\"Alice\",\"lifecycleStatus\":\"Active\",\"signingAddressPrefix\":\"01234567\"}",
+      "expectedSha256": "02b8e03282f1252be90485d2b7bc2cdaa7a6801888b9b98a67eefe3f9a1d1e87"
+    }
+  ]
+}

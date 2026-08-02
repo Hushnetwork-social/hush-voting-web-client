@@ -1,0 +1,17 @@
+{
+  "version": "1.0.0",
+  "vectors": [
+    {
+      "id": "S-001",
+      "kind": "hkdf",
+      "label": "hush/vault/v1/credential-kek",
+      "outputSha256": "8222d5d542f8c968553cb0a768e8bd4a2dd2da568743db50f6b613e983c2f18a"
+    },
+    {
+      "id": "S-002",
+      "kind": "hkdf",
+      "label": "hush/vault/v1/mnemonic-kek",
+      "outputSha256": "6b21ea70a0bfc40f75ff242b407b6899e7b7418a1b86fec7fe94d3dc777670b9"
+    }
+  ]
+}
