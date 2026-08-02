@@ -81,7 +81,8 @@ async function runSelfTests() {
     {
       name: 'reference-import-in-production',
       run: () => {
-        const probe = join(fixtureDir, 'probe.ts');
+        // Inject the probe INSIDE the scanned production source tree.
+        const probe = join(REPO_ROOT, 'src', 'lib', 'browser-vault', '__selftest_probe.ts');
         writeFileSync(probe, `import '${['DETERMINISTIC_', 'TEST_PROVIDER'].join('')}';\n`);
         try {
           execFileSync('node', [join(REPO_ROOT, 'scripts', 'browser-vault', 'production-exclusion.mjs')], {
@@ -93,7 +94,31 @@ async function runSelfTests() {
         } catch {
           return true;
         } finally {
+          rmSync(probe, { force: true });
           rmSync(fixtureDir, { recursive: true, force: true });
+        }
+      },
+    },
+    {
+      name: 'secret-literal-in-artifacts',
+      run: () => {
+        // A secret-shaped literal injected into the evidence report tree must
+        // fail the artifact audit.
+        const reportDir = join(REPO_ROOT, 'conformance', 'reports');
+        mkdirSync(reportDir, { recursive: true });
+        const probe = join(reportDir, '__selftest_probe.json');
+        writeFileSync(probe, JSON.stringify({ leaked: ['hunt', 'er2'].join('') }));
+        try {
+          execFileSync('node', [join(REPO_ROOT, 'scripts', 'browser-vault', 'artifact-audit.mjs')], {
+            cwd: REPO_ROOT,
+            stdio: 'ignore',
+            timeout: 60_000,
+          });
+          return false;
+        } catch {
+          return true;
+        } finally {
+          rmSync(probe, { force: true });
         }
       },
     },
