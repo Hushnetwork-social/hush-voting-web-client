@@ -162,6 +162,20 @@ describe('error and recovery surfaces', () => {
     expect(screen.getByRole('button', { name: /lock/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /remove local user/i })).toBeInTheDocument();
   });
+
+  it('hides lock/removal when no provisioned local user exists', () => {
+    render(
+      <ErrorSurface
+        projection={projection({ authState: 'recoverableError', outcomeCode: 'INIT_STORAGE_UNAVAILABLE', safeIdentity: null })}
+        onRetry={() => undefined}
+        onLock={() => undefined}
+        onRemoveLocalUser={() => undefined}
+      />,
+    );
+    expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /lock/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /remove local user/i })).toBeNull();
+  });
 });
 
 describe('temporary mode warning', () => {

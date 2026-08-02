@@ -26,6 +26,9 @@ export function ErrorSurface({ projection, onRetry, onLock, onRemoveLocalUser }:
   const { outcomeCode } = projection;
   const copy = errorCopyForOutcome(outcomeCode);
   const blocked = projection.authState === 'blockedError';
+  // Removal is only meaningful when a provisioned local user exists (e.g., a
+  // storage-unavailable initialization error has no user to remove).
+  const canRemove = projection.safeIdentity !== null;
 
   return (
     <div className="error-surface" role="alert">
@@ -39,22 +42,19 @@ export function ErrorSurface({ projection, onRetry, onLock, onRemoveLocalUser }:
       )}
 
       <div className="error-actions">
-        {!blocked && (
-          <button type="button" className="button-primary" onClick={onRetry}>
-            Try again
+        <button type="button" className="button-primary" onClick={onRetry}>
+          {blocked ? 'Retry' : 'Try again'}
+        </button>
+        {canRemove && (
+          <button type="button" className="link-button" onClick={onLock}>
+            Lock
           </button>
         )}
-        {blocked && (
-          <button type="button" className="button-primary" onClick={onRetry}>
-            Retry
+        {canRemove && (
+          <button type="button" className="button-danger-ghost" onClick={onRemoveLocalUser}>
+            Remove local user
           </button>
         )}
-        <button type="button" className="link-button" onClick={onLock}>
-          Lock
-        </button>
-        <button type="button" className="button-danger-ghost" onClick={onRemoveLocalUser}>
-          Remove local user
-        </button>
       </div>
     </div>
   );
