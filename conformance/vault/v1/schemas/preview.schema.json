@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hush.network/vault/v1/schemas/preview.schema.json",
+  "title": "HushVault Cleartext Preview v1",
+  "description": "Minimal locked-screen metadata. Authenticated as AAD but display-only before unlock: it cannot drive authorization, identity matching, migration, or mutation. Deep-Dive decision: identity-only preview — normalized alias, first eight and last six signing-address characters, lifecycle status, and format versions. No full addresses, mnemonic availability details, avatars, or network identity.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["alias", "signingAddressPrefix", "signingAddressSuffix", "lifecycleStatus", "envelopeFormatVersion", "parameterSuiteVersion", "recordSchemaVersion"],
+  "properties": {
+    "alias": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[^\\u0000-\\u001F\\u007F\\u2028\\u2029\\u200E\\u200F\\u202A-\\u202E]*$"
+    },
+    "signingAddressPrefix": { "type": "string", "minLength": 8, "maxLength": 8, "pattern": "^[A-Za-z0-9]{8}$" },
+    "signingAddressSuffix": { "type": "string", "minLength": 6, "maxLength": 6, "pattern": "^[A-Za-z0-9]{6}$" },
+    "lifecycleStatus": { "enum": ["PendingRegistration", "Active"] },
+    "envelopeFormatVersion": { "const": 1 },
+    "parameterSuiteVersion": { "const": 1 },
+    "recordSchemaVersion": { "const": 1 }
+  }
+}

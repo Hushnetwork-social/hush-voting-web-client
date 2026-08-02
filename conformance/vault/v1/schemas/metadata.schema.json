@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hush.network/vault/v1/schemas/metadata.schema.json",
+  "title": "HushVault Corpus Metadata v1",
+  "description": "Canonical vault corpus metadata. Records pinned versions, immutable upstream pins, public-test-credential declaration, and parsing limits. Deterministic: contains no wall-clock inputs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["corpusVersion", "feature", "contractVersion", "vaultSuiteVersion", "parameterSuiteVersion", "recordSchemaVersion", "platformWrapperVersion", "unicodeVersion", "featiPin", "publicTestCredentials", "limits"],
+  "properties": {
+    "corpusVersion": { "const": "1.0.0" },
+    "feature": { "const": "FEAT-003" },
+    "contractVersion": { "const": "1.0.0" },
+    "vaultSuiteVersion": { "const": 1 },
+    "parameterSuiteVersion": { "const": 1 },
+    "recordSchemaVersion": { "const": 1 },
+    "platformWrapperVersion": { "const": 0 },
+    "unicodeVersion": { "const": "16.0.0" },
+    "featiPin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["revision", "manifestSha256", "contractVersion"],
+      "properties": {
+        "revision": { "const": "4d31de2c15a37ccf23c5c94df076a7b687eb5ebd" },
+        "manifestSha256": { "const": "f1bec7741de20efc3e488d0736ab61e745f3739032daaf50d955a83878d4f124" },
+        "contractVersion": { "const": "1.0.0" }
+      }
+    },
+    "publicTestCredentials": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["declaredPublicOnly", "note", "allowlistPaths"],
+      "properties": {
+        "declaredPublicOnly": { "const": true },
+        "note": { "const": "All synthetic mnemonic/private-key values in this corpus are declared public test credentials and confined to allowlisted corpus paths." },
+        "allowlistPaths": {
+          "type": "array",
+          "items": { "enum": ["schemas", "vectors", "tests", "scripts"] },
+          "uniqueItems": true,
+          "maxItems": 8
+        }
+      }
+    },
+    "limits": { "$ref": "suite.schema.json#/properties/limits" }
+  }
+}

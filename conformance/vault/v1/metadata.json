@@ -1,0 +1,28 @@
+{
+  "corpusVersion": "1.0.0",
+  "feature": "FEAT-003",
+  "contractVersion": "1.0.0",
+  "vaultSuiteVersion": 1,
+  "parameterSuiteVersion": 1,
+  "recordSchemaVersion": 1,
+  "platformWrapperVersion": 0,
+  "unicodeVersion": "16.0.0",
+  "featiPin": {
+    "revision": "4d31de2c15a37ccf23c5c94df076a7b687eb5ebd",
+    "manifestSha256": "f1bec7741de20efc3e488d0736ab61e745f3739032daaf50d955a83878d4f124",
+    "contractVersion": "1.0.0"
+  },
+  "publicTestCredentials": {
+    "declaredPublicOnly": true,
+    "note": "All synthetic mnemonic/private-key values in this corpus are declared public test credentials and confined to allowlisted corpus paths.",
+    "allowlistPaths": ["schemas", "vectors", "tests", "scripts"]
+  },
+  "limits": {
+    "maxEnvelopeBytes": 1048576,
+    "maxMetadataBytes": 65536,
+    "maxRecordBytes": 524288,
+    "maxExtensionDepth": 4,
+    "maxCollections": 64,
+    "maxNestingDepth": 16
+  }
+}

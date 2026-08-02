@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hush.network/vault/v1/schemas/sidecar.schema.json",
+  "title": "HushVault Operational Sidecar v1",
+  "description": "Non-secret active-pointer/journal/removal/cooldown data. Bounded and treated as mutable/untrusted: missing, corrupt, rolled-back, implausible, or extreme values reset safely with a sanitized local diagnostic. Sidecar values are never authentication or integrity evidence and cannot destroy the vault or create indefinite lockout. Browser-local throttling remains bypassable by a determined local attacker (documented limitation).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["activeGeneration", "failedPasswordCount", "cooldownDeadline", "removalTombstone"],
+  "properties": {
+    "activeGeneration": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+    "rollbackGeneration": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+    "failedPasswordCount": { "type": "integer", "minimum": 0, "maximum": 255 },
+    "cooldownDeadline": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+    "removalTombstone": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["inProgress", "startedAt", "stage"],
+          "properties": {
+            "inProgress": { "const": true },
+            "startedAt": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "stage": { "enum": ["revoking-session", "persisting-tombstone", "deleting-slots", "deleting-keys", "clearing-caches", "verifying-absence"] }
+          }
+        }
+      ]
+    },
+    "extensions": { "$ref": "extension.schema.json" }
+  }
+}

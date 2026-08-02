@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hush.network/vault/v1/schemas/suite.schema.json",
+  "title": "HushVault Parameter Suite v1",
+  "description": "Closed cryptographic parameter suite selected by parameterSuiteVersion=1. Callers and envelopes cannot select arbitrary algorithm names; a new construction requires a new parameter-suite version, review, migration path, and conformance vectors. Normative source: FEAT-003 FeatureDescription 'Cryptographic Suite'.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "kdf", "hkdf", "cipher", "limits"],
+  "properties": {
+    "id": { "const": "hush/vault/suite/v1" },
+    "kdf": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "minMemoryKiB", "iterations", "parallelism", "saltBytesMin", "outputBytes", "calibrationTargetMs", "calibrationWindowMsMin", "calibrationWindowMsMax", "hardTimeoutMs", "browserMemoryCapKiB", "ubuntuMemoryCapKiB"],
+      "properties": {
+        "algorithm": { "const": "Argon2id" },
+        "minMemoryKiB": { "const": 19456 },
+        "iterations": { "const": 2 },
+        "parallelism": { "const": 1 },
+        "saltBytesMin": { "const": 16 },
+        "outputBytes": { "const": 32 },
+        "calibrationTargetMs": { "const": 750 },
+        "calibrationWindowMsMin": { "const": 500 },
+        "calibrationWindowMsMax": { "const": 1000 },
+        "hardTimeoutMs": { "const": 1500 },
+        "browserMemoryCapKiB": { "const": 65536 },
+        "ubuntuMemoryCapKiB": { "const": 262144 }
+      }
+    },
+    "hkdf": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "hash", "outputBytes", "labels"],
+      "properties": {
+        "algorithm": { "const": "HKDF-SHA-256" },
+        "hash": { "const": "SHA-256" },
+        "outputBytes": { "const": 32 },
+        "labels": {
+          "type": "array",
+          "items": { "enum": ["hush/vault/v1/credential-kek", "hush/vault/v1/mnemonic-kek"] },
+          "uniqueItems": true,
+          "maxItems": 2
+        }
+      }
+    },
+    "cipher": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "keyBytes", "nonceBytes"],
+      "properties": {
+        "algorithm": { "const": "AES-256-GCM" },
+        "keyBytes": { "const": 32 },
+        "nonceBytes": { "const": 12 }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["maxEnvelopeBytes", "maxMetadataBytes", "maxRecordBytes", "maxExtensionDepth", "maxCollections", "maxNestingDepth"],
+      "properties": {
+        "maxEnvelopeBytes": { "const": 1048576 },
+        "maxMetadataBytes": { "const": 65536 },
+        "maxRecordBytes": { "const": 524288 },
+        "maxExtensionDepth": { "const": 4 },
+        "maxCollections": { "const": 64 },
+        "maxNestingDepth": { "const": 16 }
+      }
+    }
+  }
+}

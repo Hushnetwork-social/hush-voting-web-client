@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hush.network/vault/v1/schemas/report.schema.json",
+  "title": "HushVault Conformance Report v1",
+  "description": "Secret-safe conformance report shared by the TypeScript and Rust reference validators. Diagnostics contain identifiers and digests only — never passwords, mnemonics, keys, plaintext, ciphertext excerpts, aliases, or stable device/session values.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "generator", "corpusVersion", "manifestSha256", "passed", "total", "records"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "generator": { "enum": ["hush-vault-ts-reference", "hush-vault-rust-reference"] },
+    "corpusVersion": { "const": "1.0.0" },
+    "manifestSha256": { "type": "string", "minLength": 64, "maxLength": 64, "pattern": "^[0-9a-f]{64}$" },
+    "passed": { "type": "boolean" },
+    "total": { "type": "integer", "minimum": 0 },
+    "records": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "category"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1, "maxLength": 256 },
+          "category": { "enum": ["schema", "canonical", "algorithm", "password", "lifecycle", "session", "typed-result", "integrity", "extension", "migration", "performance"] },
+          "ok": { "type": "boolean" },
+          "expectedDigest": { "type": "string", "minLength": 64, "maxLength": 64, "pattern": "^[0-9a-f]{64}$" },
+          "actualDigest": { "type": "string", "minLength": 64, "maxLength": 64, "pattern": "^[0-9a-f]{64}$" },
+          "expectedCode": { "type": "string", "minLength": 1, "maxLength": 64 },
+          "actualCode": { "type": "string", "minLength": 1, "maxLength": 64 }
+        }
+      }
+    }
+  }
+}

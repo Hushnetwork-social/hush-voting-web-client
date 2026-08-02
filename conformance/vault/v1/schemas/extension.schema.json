@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hush.network/vault/v1/schemas/extension.schema.json",
+  "title": "HushVault Extension Container v1",
+  "description": "Bounded namespaced extension mechanism. Root and record schemas are closed; future data is allowed only inside a bounded namespaced `extensions` object. `criticalExtensions` identifies extensions required to interpret the vault safely: unknown critical extensions fail closed and preserve bytes; unknown non-critical extensions are preserved canonically through updates. Extensions cannot replace or weaken required fields, algorithms, limits, or lifecycle rules. Byte/depth bounds are enforced at parse time (Phase 3).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["extensions", "criticalExtensions"],
+  "properties": {
+    "extensions": {
+      "type": "object",
+      "maxProperties": 16,
+      "propertyNames": { "pattern": "^[a-z0-9-]+(\\.[a-z0-9-]+)*$", "maxLength": 128 },
+      "additionalProperties": true
+    },
+    "criticalExtensions": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-z0-9-]+(\\.[a-z0-9-]+)*$" },
+      "uniqueItems": true,
+      "maxItems": 16
+    }
+  }
+}

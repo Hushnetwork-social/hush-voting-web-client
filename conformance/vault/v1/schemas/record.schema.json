@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hush.network/vault/v1/schemas/record.schema.json",
+  "title": "HushVault Encrypted Record v1",
+  "description": "One encrypted record slot (ordinary identity record or optional mnemonic record). Every byte string is unpadded base64url. The record key (random AES-256-GCM DEK) encrypts ciphertext with encryptionNonce; the purpose-bound KEK wraps the DEK in keyPackage. Ordinary unlock never unwraps the mnemonic record. Normative source: FEAT-003 'Logical Vault Model', 'Cryptographic Suite'.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["purpose", "generation", "producerId", "producerVersion", "schemaVersion", "keyPackage", "ciphertext", "encryptionNonce"],
+  "properties": {
+    "purpose": { "enum": ["ordinary", "mnemonic"] },
+    "generation": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+    "producerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-z0-9][a-z0-9-]{0,127}$" },
+    "producerVersion": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "schemaVersion": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
+    "keyPackage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["wrappedDataKey", "wrappingNonce"],
+      "properties": {
+        "wrappedDataKey": { "type": "string", "minLength": 43, "maxLength": 64, "pattern": "^[A-Za-z0-9_-]+$" },
+        "wrappingNonce": { "type": "string", "minLength": 16, "maxLength": 16, "pattern": "^[A-Za-z0-9_-]{16}$" }
+      }
+    },
+    "ciphertext": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 699052,
+      "pattern": "^[A-Za-z0-9_-]+$"
+    },
+    "encryptionNonce": { "type": "string", "minLength": 16, "maxLength": 16, "pattern": "^[A-Za-z0-9_-]{16}$" }
+  }
+}

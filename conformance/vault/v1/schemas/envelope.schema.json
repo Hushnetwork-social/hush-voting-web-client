@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hush.network/vault/v1/schemas/envelope.schema.json",
+  "title": "HushVault Logical Inner Envelope v1",
+  "description": "One canonical logical inner envelope shared by browser, Ubuntu, and Android adapters. The envelope is the password-protected package (browser stores it directly; native adapters wrap it with an OS-backed key). Four independent monotonic version axes. v1 has NO canonical network identity field and NO network authorization semantics (Deep-Dive override). Authenticated metadata is bounded to 64 KiB; records to 512 KiB; envelope to 1 MiB (parse-time bounds).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "envelopeFormatVersion",
+    "parameterSuiteVersion",
+    "recordSchemaVersion",
+    "platformWrapperVersion",
+    "suite",
+    "preview",
+    "records",
+    "extensions",
+    "criticalExtensions"
+  ],
+  "properties": {
+    "envelopeFormatVersion": { "const": 1 },
+    "parameterSuiteVersion": { "const": 1 },
+    "recordSchemaVersion": { "const": 1 },
+    "platformWrapperVersion": { "const": 0 },
+    "suite": { "$ref": "suite.schema.json" },
+    "preview": { "$ref": "preview.schema.json" },
+    "records": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["generation", "ordinary", "mnemonic"],
+      "properties": {
+        "generation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["active"],
+          "properties": {
+            "active": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+            "rollback": { "type": "integer", "minimum": 0, "maximum": 2147483647 }
+          }
+        },
+        "ordinary": { "$ref": "record.schema.json" },
+        "mnemonic": { "oneOf": [{ "$ref": "record.schema.json" }, { "type": "null" }] }
+      }
+    },
+    "extensions": { "$ref": "extension.schema.json" },
+    "criticalExtensions": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-z0-9-]+(\\.[a-z0-9-]+)*$" },
+      "uniqueItems": true,
+      "maxItems": 16
+    }
+  }
+}
