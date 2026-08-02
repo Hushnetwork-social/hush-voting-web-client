@@ -1,0 +1,20 @@
+[package]
+name = "vault-reference-runner"
+version = "1.0.0"
+description = "Non-production independent Rust validator for the HushVault v1 conformance corpus (FEAT-003)"
+authors = ["HushNetwork"]
+license = "MIT"
+edition = "2021"
+rust-version = "1.77.2"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+hkdf = "0.12"
+aes-gcm = "0.10"
+argon2 = "0.5"
+unicode-normalization = "0.1"
+unicode-segmentation = "=1.12.0"
+
+[dev-dependencies]

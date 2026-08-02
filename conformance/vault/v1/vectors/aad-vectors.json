@@ -3,26 +3,208 @@
   "vectors": [
     {
       "id": "A-001",
+      "input": {
+        "envelopeFormatVersion": 1,
+        "parameterSuiteVersion": 1,
+        "recordSchemaVersion": 1,
+        "platformWrapperVersion": 0,
+        "suiteId": "hush/vault/suite/v1",
+        "kdfParameters": {
+          "algorithm": "Argon2id",
+          "memoryKiB": 19456,
+          "iterations": 2,
+          "parallelism": 1
+        },
+        "adapterBinding": "logical",
+        "preview": {
+          "alias": "Alice",
+          "signingAddressPrefix": "01234567",
+          "signingAddressSuffix": "89abcd",
+          "lifecycleStatus": "Active",
+          "envelopeFormatVersion": 1,
+          "parameterSuiteVersion": 1,
+          "recordSchemaVersion": 1
+        },
+        "vaultGeneration": 1,
+        "recordGeneration": 1,
+        "recordPurpose": "ordinary",
+        "producerId": "hush-voting-ts",
+        "producerVersion": "1.0.0",
+        "signingAddress": "0123456789abcdef",
+        "criticalExtensions": []
+      },
       "inputSha256": "7f9a6ca3317e8e0134b11fae6e9c39bf580aa07df1f16f849e29fb39c6a84a03"
     },
     {
       "id": "A-002",
+      "input": {
+        "envelopeFormatVersion": 1,
+        "parameterSuiteVersion": 1,
+        "recordSchemaVersion": 1,
+        "platformWrapperVersion": 0,
+        "suiteId": "hush/vault/suite/v1",
+        "kdfParameters": {
+          "algorithm": "Argon2id",
+          "memoryKiB": 19456,
+          "iterations": 2,
+          "parallelism": 1
+        },
+        "adapterBinding": "logical",
+        "preview": {
+          "alias": "Alice",
+          "signingAddressPrefix": "01234567",
+          "signingAddressSuffix": "89abcd",
+          "lifecycleStatus": "Active",
+          "envelopeFormatVersion": 1,
+          "parameterSuiteVersion": 1,
+          "recordSchemaVersion": 1
+        },
+        "vaultGeneration": 1,
+        "recordGeneration": 1,
+        "recordPurpose": "mnemonic",
+        "producerId": "hush-voting-ts",
+        "producerVersion": "1.0.0",
+        "signingAddress": "0123456789abcdef",
+        "criticalExtensions": []
+      },
       "inputSha256": "6dc951d1ed188d8c0639774975b8055c607142251dd88ad41f78490e97a71f51"
     },
     {
       "id": "A-003",
+      "input": {
+        "envelopeFormatVersion": 1,
+        "parameterSuiteVersion": 1,
+        "recordSchemaVersion": 1,
+        "platformWrapperVersion": 0,
+        "suiteId": "hush/vault/suite/v1",
+        "kdfParameters": {
+          "algorithm": "Argon2id",
+          "memoryKiB": 19456,
+          "iterations": 2,
+          "parallelism": 1
+        },
+        "adapterBinding": "logical",
+        "preview": {
+          "alias": "Alice",
+          "signingAddressPrefix": "01234567",
+          "signingAddressSuffix": "89abcd",
+          "lifecycleStatus": "Active",
+          "envelopeFormatVersion": 1,
+          "parameterSuiteVersion": 1,
+          "recordSchemaVersion": 1
+        },
+        "vaultGeneration": 2,
+        "recordGeneration": 2,
+        "recordPurpose": "ordinary",
+        "producerId": "hush-voting-ts",
+        "producerVersion": "1.0.0",
+        "signingAddress": "0123456789abcdef",
+        "criticalExtensions": []
+      },
       "inputSha256": "60d70f0661609d755c3504f79680b16210a06c0639224eee625c29ae5a06f612"
     },
     {
       "id": "A-004",
+      "input": {
+        "envelopeFormatVersion": 1,
+        "parameterSuiteVersion": 1,
+        "recordSchemaVersion": 1,
+        "platformWrapperVersion": 0,
+        "suiteId": "hush/vault/suite/v1",
+        "kdfParameters": {
+          "algorithm": "Argon2id",
+          "memoryKiB": 19456,
+          "iterations": 2,
+          "parallelism": 1
+        },
+        "adapterBinding": "ubuntu",
+        "preview": {
+          "alias": "Alice",
+          "signingAddressPrefix": "01234567",
+          "signingAddressSuffix": "89abcd",
+          "lifecycleStatus": "Active",
+          "envelopeFormatVersion": 1,
+          "parameterSuiteVersion": 1,
+          "recordSchemaVersion": 1
+        },
+        "vaultGeneration": 1,
+        "recordGeneration": 1,
+        "recordPurpose": "ordinary",
+        "producerId": "hush-voting-ts",
+        "producerVersion": "1.0.0",
+        "signingAddress": "0123456789abcdef",
+        "criticalExtensions": []
+      },
       "inputSha256": "ef345c700176fe8a7ad6c0d533204b6d7802993e9540de3992c8d9ff4e09d5ec"
     },
     {
       "id": "A-005",
+      "input": {
+        "envelopeFormatVersion": 1,
+        "parameterSuiteVersion": 1,
+        "recordSchemaVersion": 1,
+        "platformWrapperVersion": 0,
+        "suiteId": "hush/vault/suite/v1",
+        "kdfParameters": {
+          "algorithm": "Argon2id",
+          "memoryKiB": 19456,
+          "iterations": 2,
+          "parallelism": 1
+        },
+        "adapterBinding": "logical",
+        "preview": {
+          "alias": "Bob",
+          "signingAddressPrefix": "01234567",
+          "signingAddressSuffix": "89abcd",
+          "lifecycleStatus": "Active",
+          "envelopeFormatVersion": 1,
+          "parameterSuiteVersion": 1,
+          "recordSchemaVersion": 1
+        },
+        "vaultGeneration": 1,
+        "recordGeneration": 1,
+        "recordPurpose": "ordinary",
+        "producerId": "hush-voting-ts",
+        "producerVersion": "1.0.0",
+        "signingAddress": "0123456789abcdef",
+        "criticalExtensions": []
+      },
       "inputSha256": "6f429e99f1f57f76a0572eddd89542ae95bfb8d24a66c46569a0225c8c35be42"
     },
     {
       "id": "A-006",
+      "input": {
+        "envelopeFormatVersion": 1,
+        "parameterSuiteVersion": 1,
+        "recordSchemaVersion": 1,
+        "platformWrapperVersion": 0,
+        "suiteId": "hush/vault/suite/v1",
+        "kdfParameters": {
+          "algorithm": "Argon2id",
+          "memoryKiB": 19456,
+          "iterations": 2,
+          "parallelism": 1
+        },
+        "adapterBinding": "logical",
+        "preview": {
+          "alias": "Alice",
+          "signingAddressPrefix": "01234567",
+          "signingAddressSuffix": "89abcd",
+          "lifecycleStatus": "Active",
+          "envelopeFormatVersion": 1,
+          "parameterSuiteVersion": 1,
+          "recordSchemaVersion": 1
+        },
+        "vaultGeneration": 1,
+        "recordGeneration": 1,
+        "recordPurpose": "ordinary",
+        "producerId": "hush-voting-ts",
+        "producerVersion": "1.0.0",
+        "signingAddress": "0123456789abcdef",
+        "criticalExtensions": [
+          "hush.vault.telemetry"
+        ]
+      },
       "inputSha256": "240af8d1754a4235c79f495f4911df8c8e8398618e7999c995489b30a6248aad"
     }
   ]
