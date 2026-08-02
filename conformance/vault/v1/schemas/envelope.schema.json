@@ -13,8 +13,7 @@
     "suite",
     "preview",
     "records",
-    "extensions",
-    "criticalExtensions"
+    "extensions"
   ],
   "properties": {
     "envelopeFormatVersion": { "const": 1 },
@@ -41,12 +40,6 @@
         "mnemonic": { "oneOf": [{ "$ref": "record.schema.json" }, { "type": "null" }] }
       }
     },
-    "extensions": { "$ref": "extension.schema.json" },
-    "criticalExtensions": {
-      "type": "array",
-      "items": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-z0-9-]+(\\.[a-z0-9-]+)*$" },
-      "uniqueItems": true,
-      "maxItems": 16
-    }
+    "extensions": { "$ref": "extension.schema.json" }
   }
 }

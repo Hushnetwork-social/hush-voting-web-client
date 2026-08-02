@@ -154,9 +154,16 @@ describe('wrong-password throttling schedule', () => {
   it('applies the exact escalation after failure 4', () => {
     expect(THROTTLE_SCHEDULE.slice(0, 4)).toEqual([null, null, null, null]);
     expect(THROTTLE_SCHEDULE.slice(4)).toEqual([5, 10, 20, 40, 80, 160, 300]);
+    // Attempts 1-4 pay only the Argon2id cost: no added cooldown.
+    expect(cooldownSecondsForAttempt(1)).toBe(0);
+    expect(cooldownSecondsForAttempt(2)).toBe(0);
+    expect(cooldownSecondsForAttempt(3)).toBe(0);
+    expect(cooldownSecondsForAttempt(4)).toBe(0);
     expect(cooldownSecondsForAttempt(5)).toBe(5);
+    expect(cooldownSecondsForAttempt(10)).toBe(160);
     expect(cooldownSecondsForAttempt(11)).toBe(300);
     expect(cooldownSecondsForAttempt(12)).toBe(300);
     expect(cooldownSecondsForAttempt(99)).toBe(300);
+    expect(cooldownSecondsForAttempt(0)).toBe(0);
   });
 });

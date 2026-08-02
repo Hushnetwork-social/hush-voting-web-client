@@ -9,8 +9,8 @@
     },
     {
       "path": "schemas/envelope.schema.json",
-      "bytes": 2167,
-      "sha256": "b928c8ae0078a56ab64e4c4249032ac2797b8c1c4d3fdb6e1e4fbb8f5dc27198"
+      "bytes": 1921,
+      "sha256": "fd42818f066344a87c3a914dc6cca091cde104886c0a9698d904c0d6646ebe76"
     },
     {
       "path": "schemas/extension.schema.json",

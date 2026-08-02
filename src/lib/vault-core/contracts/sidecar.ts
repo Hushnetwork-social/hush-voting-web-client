@@ -70,8 +70,9 @@ export interface VaultSidecarV1 {
 /** Deterministic cooldown seconds for a failed-attempt count (after the 11th attempt). */
 export function cooldownSecondsForAttempt(attemptNumber: number): number {
   if (attemptNumber < 1) return 0;
-  if (attemptNumber - 1 < THROTTLE_SCHEDULE.length) {
-    return THROTTLE_SCHEDULE[attemptNumber - 1] ?? THROTTLE_MAX_SECONDS;
-  }
+  // Attempts 1-4 pay only the Argon2id computation cost: no added cooldown.
+  if (attemptNumber <= 4) return 0;
+  const entry = THROTTLE_SCHEDULE[attemptNumber - 1];
+  if (entry !== undefined && entry !== null) return entry;
   return THROTTLE_MAX_SECONDS;
 }

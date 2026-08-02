@@ -40,8 +40,8 @@ export interface VaultEnvelopeV1 {
   readonly suite: ParameterSuiteV1;
   readonly preview: VaultPreviewV1;
   readonly records: VaultRecordsV1;
+  /** Container carries both `extensions` and `criticalExtensions`. */
   readonly extensions: ExtensionContainerV1;
-  readonly criticalExtensions: readonly string[];
 }
 
 /** Version axes in serialized order (canonical key order for AAD). */
