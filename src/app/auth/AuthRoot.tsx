@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AuthAdapter, useAuthProjection, synchronouslyPermitsProtectedContent } from '../../lib/auth/react/adapter';
 import { createProductionComposition } from '../../lib/auth/composition';
+import { registerCapability } from '../../lib/auth/registry';
+import { VAULT_CAPABILITY_SLOTS } from '../../lib/vault-core/integration';
 import { emitTelemetry } from '../../lib/auth/telemetry';
 import type { AllowlistedTelemetryEvent } from '../../lib/auth/ports';
 import type { AuthIntent, CapabilityId } from '../../lib/auth/types';
@@ -45,7 +47,11 @@ async function buildMachineInput(): Promise<AuthMachineInput> {
       safeCoordination: true,
     };
   }
-  const composition = createProductionComposition([], () => null);
+  // Vault core slots (FEAT-003) are declared explicitly; while no production storage
+  // adapter (FEAT-004/005/006) is registered they stay `unavailable`, so the
+  // composition fails closed with explicit diagnostics — never a reference actor.
+  const vaultRegistrations = VAULT_CAPABILITY_SLOTS.map((slot) => registerCapability(slot.capability, slot.availability));
+  const composition = createProductionComposition(vaultRegistrations, () => null);
   return {
     actors: composition.actors,
     registeredCapabilities: new Set<CapabilityId>(),
