@@ -45,6 +45,8 @@ export interface VaultStorageSession {
   clearStore(store: VaultStoreName): Promise<VaultResult<{ readonly ok: true }>>;
   /** Compare-and-swap the journal pointer under one bounded transaction. */
   casJournal(expected: VaultJournalRecord, next: VaultJournalRecord): Promise<VaultResult<{ readonly ok: true }>>;
+  /** Generic compare-and-swap over an allowlisted key (used by coordination leases). */
+  casRecord(store: VaultStoreName, key: string, expected: unknown, next: unknown, equal?: (a: unknown, b: unknown) => boolean): Promise<VaultResult<{ readonly ok: true }>>;
   readJournal(): Promise<VaultResult<{ readonly journal: VaultJournalRecord | null }>>;
   close(): void;
 }
@@ -152,6 +154,46 @@ function createSession(db: IDBDatabase): VaultStorageSession {
     return outcome.ok ? success({ ok: true as const }) : outcome;
   };
 
+  /** Generic CAS over an allowlisted key; `equal` defaults to deep JSON equality. */
+  const casRecord: VaultStorageSession['casRecord'] = async (store, key, expected, next, equal) => {
+    try {
+      assertAllowedStorageKey(store, key);
+    } catch {
+      return failure('OperationForbidden');
+    }
+    const matches = equal ?? ((a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b));
+    return new Promise((resolve) => {
+      let conflict = false;
+      let transaction: IDBTransaction;
+      try {
+        transaction = db.transaction(store, 'readwrite');
+      } catch (error) {
+        resolve(storageFailureToVaultResult(classifyStorageError(error)));
+        return;
+      }
+      const objectStore = transaction.objectStore(store);
+      const getRequest = objectStore.get(key);
+      getRequest.onsuccess = () => {
+        const current = getRequest.result;
+        if (!matches(current, expected)) {
+          conflict = true;
+          transaction.abort();
+          return;
+        }
+        objectStore.put(next, key);
+      };
+      transaction.oncomplete = () => resolve(success({ ok: true as const }));
+      transaction.onerror = () => resolve(storageFailureToVaultResult(classifyStorageError(transaction.error)));
+      transaction.onabort = () => {
+        resolve(
+          conflict
+            ? failure('GenerationConflict')
+            : storageFailureToVaultResult(classifyStorageError(transaction.error ?? new DOMException('aborted', 'AbortError'))),
+        );
+      };
+    });
+  };
+
   const readJournal = async (): Promise<VaultResult<{ readonly journal: VaultJournalRecord | null }>> => {
     const outcome = await runTransaction<unknown>(db, 'vaultJournal', 'readonly', (objectStore) =>
       objectStore.get(VAULT_JOURNAL_KEY),
@@ -222,6 +264,7 @@ function createSession(db: IDBDatabase): VaultStorageSession {
     deleteRecord,
     clearStore,
     casJournal,
+    casRecord,
     readJournal,
     close() {
       db.close();
