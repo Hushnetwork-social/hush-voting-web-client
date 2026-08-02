@@ -41,17 +41,8 @@ function nextOperationId(): OperationId {
   return `test-op-${operationSeq}` as OperationId;
 }
 
-/** Deterministic scriptable result queue for each port. */
-export interface ScriptedResults {
-  initialize: InitializationResult[];
-  unlock: UnlockResult[];
-  verify: VerificationResult[];
-  onboarding: OnboardingResult[];
-  removal: RemovalResult[];
-  coordination: CoordinationResult[];
-}
-
-function shift<T>(queue: T[], fallback: T): T {  if (queue.length > 0) {
+function shift<T>(queue: T[], fallback: T): T {
+  if (queue.length > 0) {
     return queue.shift() as T;
   }
   return fallback;
@@ -63,17 +54,37 @@ export type TestActorOperation<TResult> = ActorOperation<TResult> & {
   complete(): void;
 };
 
+/** Registry of pending deferred operations so tests can drive machine invokes. */
+const pendingOperations = new Set<TestActorOperation<unknown>>();
+
+/** Complete every currently pending test operation (used to flush machine invokes). */
+export function completeAllPendingOperations(): void {
+  for (const op of [...pendingOperations]) {
+    op.complete();
+  }
+}
+
+/** Number of pending (unresolved) test operations. */
+export function pendingOperationCount(): number {
+  return pendingOperations.size;
+}
+
 function deferred<T>(resolveWith: () => T): TestActorOperation<T> {
   const operationId = nextOperationId();
   let resolve!: (value: T) => void;
   const result = new Promise<T>((r) => {
     resolve = r;
   });
-  return {
+  const op: TestActorOperation<T> = {
     operationId,
     result,
-    complete: () => resolve(resolveWith()),
+    complete: () => {
+      pendingOperations.delete(op);
+      resolve(resolveWith());
+    },
   };
+  pendingOperations.add(op);
+  return op;
 }
 
 /** In-memory local-user authority test actor. */
