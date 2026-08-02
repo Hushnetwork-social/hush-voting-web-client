@@ -10,6 +10,7 @@ revision and manifest digest; no editable fixture copy exists in platform reposi
 ```text
 conformance/vault/v1/
 ├── README.md
+├── HANDOFF.md             downstream consumer matrix, version rules, pin procedure
 ├── metadata.json            corpus metadata: pins, limits, public-test-credential declaration
 ├── manifest.json            generated: sorted SHA-256 manifest (check mode supported)
 ├── schemas/                 JSON Schema draft 2020-12 (closed, bounded)
