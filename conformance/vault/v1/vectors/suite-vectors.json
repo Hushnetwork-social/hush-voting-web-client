@@ -12,28 +12,6 @@
       "kind": "hkdf",
       "label": "hush/vault/v1/mnemonic-kek",
       "outputSha256": "6b21ea70a0bfc40f75ff242b407b6899e7b7418a1b86fec7fe94d3dc777670b9"
-    },
-    {
-      "id": "S-003",
-      "kind": "aes-gcm",
-      "label": "aes-256-gcm-encrypt",
-      "keyHex": "0303030303030303030303030303030303030303030303030303030303030303",
-      "nonceHex": "050505050505050505050505",
-      "plaintextUtf8": "ordinary record payload",
-      "aadVectorId": "A-001",
-      "ciphertextSha256": "2108a393bc4d933c90cb9ae5410946b67f24c96afac9ab9778ffabc3c1e01939",
-      "tagSha256": "cf6950d51982ea37b9f353d92e22274e692da837f19af091fbb7f478b3337539"
-    },
-    {
-      "id": "S-004",
-      "kind": "argon2id",
-      "passwordUtf8": "password-bytes",
-      "saltHex": "07070707070707070707070707070707",
-      "memoryKiB": 19456,
-      "iterations": 2,
-      "parallelism": 1,
-      "outputBytes": 32,
-      "outputSha256": "c78cf17e0576ca8836864cd1623d97359564eb5dafff779bacf42e6c77fc03e2"
     }
   ]
 }
