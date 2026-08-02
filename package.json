@@ -39,6 +39,7 @@
     "vault:production-exclusion": "node scripts/vault/production-exclusion.mjs",
     "vault:ci": "node scripts/vault/ci-vault.mjs",
     "vault:ci:replay": "node scripts/vault/replay-prior-versions.mjs",
+    "vault:ci:selftest": "node scripts/vault/ci-self-test.mjs",
     "test:browser": "playwright test",
     "test:browser:auth": "playwright test browser/",
     "auth:audit": "node scripts/auth/artifact-audit.mjs",
