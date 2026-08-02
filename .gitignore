@@ -14,6 +14,7 @@ build/
 # Optional desktop/mobile build output if this client later reuses Tauri tooling
 .next-tauri/
 src-tauri/target/
+tools/**/target/
 
 # Test and coverage output
 coverage/

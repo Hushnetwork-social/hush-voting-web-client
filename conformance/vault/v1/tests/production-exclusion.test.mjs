@@ -13,7 +13,11 @@ const PROD_SOURCE_DIRS = [join(ROOT, '../../../src'), join(ROOT, '../../../scrip
 const ALLOWLIST_PREFIXES = ['conformance/vault/', 'conformance/identity/'];
 
 /** All production source files (ts/tsx/mjs/js/json), excluding reference-only paths. */
-const REFERENCE_ONLY = ['src/lib/vault-core/canonical/suite-reference.ts', 'src/lib/vault-core/conformance/'];
+const REFERENCE_ONLY = [
+  'src/lib/vault-core/canonical/suite-reference.ts',
+  'src/lib/vault-core/conformance/',
+  'scripts/vault/',
+];
 function productionFiles() {
   const out = [];
   const walk = (dir) => {
