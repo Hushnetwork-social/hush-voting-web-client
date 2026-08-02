@@ -15,9 +15,10 @@ import { consumeFreshCapability, FRESH_CAPABILITY_MAX_AGE_MS, issueFreshCapabili
 
 function makeEnv(overrides: Partial<AuthorityEnvironment> = {}): AuthorityEnvironment {
   const events: Array<{ channel: string; event: unknown }> = [];
-  return {
+  const defaults: AuthorityEnvironment = {
     nowMs: () => 1_000_000,
     randomId: (prefix) => `${prefix}${Math.random().toString(36).slice(2, 8)}`,
+    appIdentity: { appVersion: '0.1.0', buildDigest: 'a1b2c3d4e5f6' },
     executeOperation: async () => ({ outcome: 'SUCCESS', retryable: false, allowedActions: [] }),
     deliver: (channel, event) => {
       events.push({ channel, event });
@@ -26,7 +27,11 @@ function makeEnv(overrides: Partial<AuthorityEnvironment> = {}): AuthorityEnviro
       events.push({ channel: '*', event });
     },
     onForceCleanup: () => undefined,
+  };
+  return {
+    ...defaults,
     ...overrides,
+    appIdentity: overrides.appIdentity ?? defaults.appIdentity,
   };
 }
 
@@ -165,5 +170,30 @@ describe('worker authority — invalidation and lifecycle', () => {
     expect(authority.snapshot().acceptedChannels).toContain('chan-1');
     authority.handle({ kind: 'lifecycle', signal: 'disconnect', clientChannel: 'chan-1', authorityEpoch: 1 });
     expect(authority.snapshot().acceptedChannels).not.toContain('chan-1');
+  });
+
+  it('drops operation outcomes when the epoch was invalidated mid-flight', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const delivered: Array<{ kind: string }> = [];
+    const env = makeEnv({
+      executeOperation: async () => {
+        await gate;
+        return { outcome: 'SUCCESS', retryable: false, allowedActions: [] };
+      },
+      deliver: (_channel, event) => {
+        delivered.push(event as { kind: string });
+      },
+    });
+    const authority = new WorkerAuthority(env, 'locked', 1);
+    authority.handle(validHandshake());
+    authority.handle(validOperation('chan-1', 1, 'unlockPassword', 'op-1'));
+    authority.invalidate('lock'); // epoch advances while the operation is running
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    // The stale outcome must never be delivered.
+    expect(delivered.some((event) => event.kind === 'operation-outcome')).toBe(false);
   });
 });

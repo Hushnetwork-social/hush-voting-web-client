@@ -38,6 +38,8 @@ import {
 export interface AuthorityEnvironment {
   readonly nowMs: () => number;
   readonly randomId: (prefix: string) => string;
+  /** The authority's own exact build identity (bound by every handshake). */
+  readonly appIdentity: { readonly appVersion: string; readonly buildDigest: string };
   /** Execute one approved operation inside the secret boundary. */
   readonly executeOperation: (request: OperationRequest, epoch: number) => Promise<{ readonly outcome: string; readonly retryable: boolean; readonly allowedActions: readonly string[]; readonly retryDeadlineMs?: number; readonly supportCode?: string }>;
   /** Deliver one event to one client channel. */
@@ -115,6 +117,12 @@ export class WorkerAuthority {
       this.env.deliver(request.clientChannel, { kind: 'handshake-rejected', protocolVersion: BROWSER_PROTOCOL_VERSION, reason: 'version-mismatch' });
       return { accepted: false, outcome: 'HANDSHAKE_VERSION_MISMATCH' };
     }
+    // Exact application build compatibility (acceptance criterion 25): a mixed
+    // page/worker build must never interop.
+    if (request.appVersion !== this.env.appIdentity.appVersion || request.buildDigest !== this.env.appIdentity.buildDigest) {
+      this.env.deliver(request.clientChannel, { kind: 'handshake-rejected', protocolVersion: BROWSER_PROTOCOL_VERSION, reason: 'build-mismatch' });
+      return { accepted: false, outcome: 'HANDSHAKE_BUILD_MISMATCH' };
+    }
     if (this.acceptedChannels.has(request.clientChannel)) {
       // Duplicate handshake on the same channel fails closed.
       this.env.deliver(request.clientChannel, { kind: 'handshake-rejected', protocolVersion: BROWSER_PROTOCOL_VERSION, reason: 'malformed' });
@@ -165,8 +173,14 @@ export class WorkerAuthority {
   }
 
   private async runOperation(request: OperationRequest): Promise<void> {
+    // Stale/preempted operations (epoch advanced mid-flight) must not deliver
+    // their outcome: the client already received a global invalidation.
+    const startEpoch = this.epoch;
     try {
       const result = await this.env.executeOperation(request, this.epoch);
+      if (this.epoch !== startEpoch) {
+        return; // invalidated while running; outcome dropped
+      }
       this.env.deliver(request.clientChannel, {
         kind: 'operation-outcome',
         operationId: request.operationId,
