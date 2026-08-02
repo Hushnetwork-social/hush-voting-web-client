@@ -399,7 +399,7 @@ export const authMachine = setup({
                     target: '#auth.verifyingIdentityOnline',
                     guard: ({ context, event }) =>
                       machineGuards.isCurrentOperation(context, event) && event.result.code === 'ONBOARDING_COMPLETED',
-                    actions: ['clearActiveOperation', 'assignOutcome'],
+                    actions: ['clearActiveOperation', 'assignOutcome', 'assignLocalUserRef'],
                   },
                   {
                     target: '#auth.recoverableError',
@@ -545,13 +545,47 @@ export const authMachine = setup({
         },
         missingProfileConfirmation: {
           entry: 'clearOutcome',
+          invoke: {
+            id: 'confirmMissingProfile',
+            src: 'confirmMissingProfileActor',
+            input: ({ context }) => ({
+              actor: context.actors.onboarding[context.onboardingKind ?? 'createUser'],
+              epoch: context.sessionEpoch,
+            }),
+          },
           on: {
-            'INTENT.CONFIRM_MISSING_PROFILE': [
+            'OPERATION.STARTED': {
+              guard: ({ context, event }) =>
+                context.activeOperationId === null && !isStaleEpoch(event.epoch, context.sessionEpoch),
+              actions: 'assignActiveOperation',
+            },
+            'ACTOR.VERIFY_RESULT': [
               {
-                target: 'verifyingIdentityOnline',
-                guard: 'hasIdentityVerification',
+                target: 'authenticated',
+                guard: ({ context, event }) =>
+                  machineGuards.isCurrentOperation(context, event) && event.result.code === 'VERIFY_SUCCESS',
+                actions: ['clearActiveOperation', 'assignOutcome', 'assignLocalUserRef'],
               },
-              { target: 'blockedError' },
+              {
+                target: 'blockedError',
+                guard: ({ context, event }) =>
+                  machineGuards.isCurrentOperation(context, event) &&
+                  (event.result.code === 'VERIFY_SIGNING_KEY_MISMATCH' || event.result.code === 'VERIFY_ENCRYPTION_KEY_MISMATCH'),
+                actions: ['clearActiveOperation', 'assignOutcome'],
+              },
+              {
+                target: 'recoverableError',
+                guard: ({ context, event }) =>
+                  machineGuards.isCurrentOperation(context, event) && event.result.code === 'UNKNOWN_FAILURE',
+                actions: ['clearActiveOperation', 'assignOutcome', 'assignSupportCode'],
+              },
+              {
+                // Still missing after confirmation attempt — stay for another explicit action.
+                target: '.',
+                guard: ({ context, event }) =>
+                  machineGuards.isCurrentOperation(context, event) && event.result.code === 'VERIFY_PROFILE_MISSING',
+                actions: ['clearActiveOperation', 'assignOutcome'],
+              },
             ],
             'INTENT.BACK_FROM_ONBOARDING': { target: 'noLocalUser' },
           },
@@ -574,12 +608,13 @@ export const authMachine = setup({
             'INTENT.RETRY': [
               {
                 target: 'initializing',
-                guard: ({ context }) => context.outcomeCode === 'INIT_STORAGE_UNAVAILABLE',
+                guard: ({ context }) =>
+                  context.outcomeCode === 'INIT_STORAGE_UNAVAILABLE' ||
+                  context.outcomeCode === 'UNKNOWN_FAILURE',
               },
               {
                 target: 'unlocking',
-                guard: ({ context }) =>
-                  context.outcomeCode === 'UNLOCK_THROTTLED' || context.outcomeCode === 'UNKNOWN_FAILURE',
+                guard: ({ context }) => context.outcomeCode === 'UNLOCK_THROTTLED',
               },
               {
                 target: 'verifyingIdentityOnline',

@@ -44,9 +44,9 @@ function makeActors(overrides: Partial<AuthActors> = {}): AuthActors {
       { code: 'VERIFY_SUCCESS' },
     ]),
     onboarding: {
-      createUser: createOnboardingTestActor([{ code: 'ONBOARDING_COMPLETED' }]),
+      createUser: createOnboardingTestActor([{ code: 'ONBOARDING_COMPLETED', localUserRef: 'test-local-user-1' }]),
       restoreCredentialFile: createOnboardingTestActor([{ code: 'ONBOARDING_BACK' }]),
-      restoreRecoveryWords: createOnboardingTestActor([{ code: 'ONBOARDING_COMPLETED' }]),
+      restoreRecoveryWords: createOnboardingTestActor([{ code: 'ONBOARDING_COMPLETED', localUserRef: 'test-local-user-1' }]),
     },
     removal: createRemovalTestActor([{ code: 'REMOVAL_COMPLETE' }]),
     browserCoordination: createBrowserCoordinationTestActor([{ code: 'COORDINATION_SAFE' }]),
