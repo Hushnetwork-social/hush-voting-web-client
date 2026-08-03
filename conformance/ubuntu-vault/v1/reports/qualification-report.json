@@ -1,11 +1,11 @@
 {
   "contractVersion": 1,
-  "generatedAt": "2026-08-03T11:44:01.722Z",
-  "gitRevision": "82f5f74eb531caa50a6bceb55644b9685d37caa2",
+  "generatedAt": "2026-08-03T11:49:54.205Z",
+  "gitRevision": "d770be71f84979e4bf3ac2eee0ab627eb5ff425b",
   "adapterId": "ubuntu-secret-service-v1",
   "harness": {
     "name": "ubuntu-vault-qualification",
-    "isolatedAcknowledged": true,
+    "isolatedAcknowledged": false,
     "realProviderStages": [
       "provider-available-unlocked",
       "provider-available-locked-prompt",
@@ -88,7 +88,7 @@
     {
       "gate": "isolation",
       "status": "pass",
-      "isolatedAcknowledged": true,
+      "isolatedAcknowledged": false,
       "realProviderStages": "deferred to physical release qualification in an isolated synthetic account (--isolated)",
       "findings": []
     }

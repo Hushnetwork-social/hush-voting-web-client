@@ -53,6 +53,7 @@ const GATES = [
   { name: 'protocol-integrity', fn: checkProtocolIntegrity, timeoutMs: 60_000 },
   { name: 'secret-scan', fn: checkSecretScan, timeoutMs: 120_000 },
   { name: 'release-evidence', fn: writeReleaseEvidence, timeoutMs: 60_000 },
+  { name: 'qualification', fn: runQualification, timeoutMs: 600_000 },
   { name: 'handoff-integrity', fn: checkHandoff, timeoutMs: 60_000 },
 ];
 
@@ -182,7 +183,11 @@ function collectPackageDigests() {
   return out;
 }
 
-/** Gate 14: downstream handoff exists and names the closed operation seams. */
+/** Gate 14: deterministic qualification evidence (see qualification-harness). */
+function runQualification() {
+  runCommand(['node', 'scripts/ubuntu-vault/qualification-harness.mjs'], 600_000);
+}
+/** Gate 15: downstream handoff exists and names the closed operation seams. */
 function checkHandoff() {
   const handoff = readFileSync(join(REPO_ROOT, 'conformance', 'ubuntu-vault', 'v1', 'HANDOFF.md'), 'utf8');
   const required = ['createProvision', 'recoverWordsProvision', 'recoverFileProvision', 'unlock', 'lock', 'changeDevicePassword', 'removeLocalUser', 'verifyOnline', 'revealMnemonic', 'exportEncryptedFile'];

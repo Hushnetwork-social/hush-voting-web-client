@@ -16,8 +16,7 @@ use std::time::Instant;
 
 use hush_voting_app_lib::ubuntu_vault::crypto::argon2id_derive;
 use hush_voting_app_lib::ubuntu_vault::crypto::{
-    KDF_HARD_TIMEOUT_MS, KDF_ITERATIONS, KDF_MIN_MEMORY_KIB, KDF_OUTPUT_BYTES,
-    KDF_PARALLELISM,
+    KDF_HARD_TIMEOUT_MS, KDF_ITERATIONS, KDF_MIN_MEMORY_KIB, KDF_OUTPUT_BYTES, KDF_PARALLELISM,
 };
 
 fn main() {
@@ -60,7 +59,12 @@ fn main() {
     // Digest-only evidence line (no secrets; coarse machine class only).
     println!(
         "KDF_BENCH machine={} samples={} medianMs={} p95Ms={} hardLimitMs={} pass={}",
-        machine, samples.len(), median, p95, KDF_HARD_TIMEOUT_MS, pass
+        machine,
+        samples.len(),
+        median,
+        p95,
+        KDF_HARD_TIMEOUT_MS,
+        pass
     );
     std::process::exit(if pass { 0 } else { 1 });
 }
@@ -75,6 +79,9 @@ fn machine_name() -> String {
         .unwrap_or("unknown")
         .trim()
         .to_string();
-    let cores = cpuinfo.lines().filter(|l| l.starts_with("processor")).count();
+    let cores = cpuinfo
+        .lines()
+        .filter(|l| l.starts_with("processor"))
+        .count();
     format!("{model} ({cores} cores)")
 }

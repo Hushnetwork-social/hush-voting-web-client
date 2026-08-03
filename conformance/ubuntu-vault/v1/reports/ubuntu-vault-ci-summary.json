@@ -1,57 +1,57 @@
 {
   "contractVersion": 1,
-  "generatedAt": "2026-08-03T11:37:00.325Z",
-  "gitRevision": "bdaa0f866a2b4cfa6e4249412ceb79de350ce383",
+  "generatedAt": "2026-08-03T11:50:08.755Z",
+  "gitRevision": "d770be71f84979e4bf3ac2eee0ab627eb5ff425b",
   "stages": [
     {
       "stage": "lint",
       "ok": true,
-      "ms": 2867
+      "ms": 2862
     },
     {
       "stage": "typecheck",
       "ok": true,
-      "ms": 1246
+      "ms": 1288
     },
     {
       "stage": "unit-tests",
       "ok": true,
-      "ms": 4677
+      "ms": 5248
     },
     {
       "stage": "identity-conformance",
       "ok": true,
-      "ms": 1429
+      "ms": 1436
     },
     {
       "stage": "vault-core-ci",
       "ok": true,
-      "ms": 30214
+      "ms": 30204
     },
     {
       "stage": "browser-vault-ci",
       "ok": true,
-      "ms": 45031
+      "ms": 45714
     },
     {
       "stage": "rust-format",
       "ok": true,
-      "ms": 65
+      "ms": 73
     },
     {
       "stage": "rust-clippy",
       "ok": true,
-      "ms": 1012
+      "ms": 1120
     },
     {
       "stage": "rust-tests",
       "ok": true,
-      "ms": 2341
+      "ms": 2562
     },
     {
       "stage": "audit",
       "ok": true,
-      "ms": 1362
+      "ms": 1419
     },
     {
       "stage": "protocol-integrity",
@@ -66,7 +66,12 @@
     {
       "stage": "release-evidence",
       "ok": true,
-      "ms": 66
+      "ms": 74
+    },
+    {
+      "stage": "qualification",
+      "ok": true,
+      "ms": 14613
     },
     {
       "stage": "handoff-integrity",
