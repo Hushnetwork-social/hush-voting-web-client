@@ -61,7 +61,12 @@
     "browser-vault:qualification-report": "node scripts/browser-vault/qualification-report.mjs",
     "ubuntu-vault:ci": "node scripts/ubuntu-vault/ci-ubuntu-vault.mjs",
     "ubuntu-vault:ci:selftest": "node scripts/ubuntu-vault/ci-ubuntu-vault.mjs --selftest",
-    "ubuntu-vault:qualification": "node scripts/ubuntu-vault/qualification-harness.mjs"
+    "ubuntu-vault:qualification": "node scripts/ubuntu-vault/qualification-harness.mjs",
+    "android-vault:test": "node --test scripts/android-vault/android-vault.test.mjs",
+    "android-vault:ci": "node scripts/android-vault/ci-android-vault.mjs",
+    "android-vault:ci:selftest": "node scripts/android-vault/ci-android-vault.mjs --selftest",
+    "android-vault:policy": "node scripts/android-vault/policy-check.mjs --manifest src-tauri/gen/android/app/src/main/AndroidManifest.xml",
+    "android-vault:customize": "node scripts/android-vault/customize-project.mjs --project src-tauri/gen/android"
   },
   "dependencies": {
     "@noble/hashes": "2.2.0",

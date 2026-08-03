@@ -206,6 +206,15 @@ jobs:
           echo "aab=${AAB}" >> "${GITHUB_OUTPUT}"
           echo "digest=${DIGEST}" >> "${GITHUB_OUTPUT}"
 
+      - name: FEAT-006 Android vault security inspection
+        run: |
+          set -euo pipefail
+          # FEAT-006 release gates: seeded-defect self-tests + scripted policy/
+          # handoff integrity + scheme/vector validation (no signing material).
+          npm run android-vault:ci:selftest
+          node scripts/android-vault/android-vault.test.mjs
+          node scripts/android-vault/policy-check.mjs --manifest src-tauri/gen/android/app/src/main/AndroidManifest.xml
+
       - name: Upload signed Android release artifacts
         uses: actions/upload-artifact@v4
         with:

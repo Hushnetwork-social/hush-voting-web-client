@@ -1,14 +1,13 @@
 # Android Vault Conformance Handoff (v1) — FEAT-006
 
 **Adapter**: `android-keystore` | **Feature**: FEAT-006
-**Status**: Phase 2 — closed contracts, wrapper v1 canonical vectors, storage
-model, and evidence schemas published. Final contract published at Phase 8
-after native qualification evidence lands.
+**Status**: Phase 6 — production composition integrated; contract sealed for
+FEAT-007–011 consumption. Final qualification evidence (physical TEE/API,
+APK/AAB, security review) is published at Phase 8 and is release-blocking.
 **Consumers**: FEAT-007 (create), FEAT-008 (recovery words), FEAT-009 (`.dat`
-import), FEAT-010 (unlock/lifecycle), FEAT-011 (`.dat` export), future
-operation-specific voting/messaging features.
+import), FEAT-010 (unlock/lifecycle), FEAT-011 (`.dat` export).
 
-## Closed seams (final at Phase 8)
+## Closed seams (sealed)
 
 Downstream features consume only the closed operation registry of the native
 boundary. No generic signer, decryptor, private-key return, vault decrypt,
@@ -16,52 +15,70 @@ filesystem, path, URI, or intent command exists. The native dispatcher
 validates epoch, operation version, capability phase, input bounds, public
 identity binding, and user-confirmation context before any secret work.
 
-| Seam | Operation (draft) | Capability phase | Notes |
+| Seam | Operation | Capability phase | Consumer |
 |---|---|---|---|
-| FEAT-007 create | `createProvision` (`createFullIdentitySign`) | provisioning / verificationOnly | TypeScript canonical bytes signed natively only after parse/context validation |
-| FEAT-008 restore | `recoverWordsProvision` | provisioning | One-shot bounded word submission; native validate/derive/provision atomically |
-| FEAT-009 import | `recoverFileProvision` (`importDatV1`) | provisioning | Native Storage Access Framework import; no broad storage permission; no URI/path to TypeScript |
-| FEAT-010 unlock | `unlock` | locked | Android Keystore unwrap → device-password KDF → exact online both-key verification before `Authenticated` |
-| FEAT-010 lock / password change / removal / reveal | `lock`, `changeDevicePassword`, `removeLocalUser`, `revealMnemonic` | any / authenticated | Tombstone-backed resumable removal; bounded reveal ≤60 s |
-| FEAT-011 export | `exportEncryptedFile` (`exportDatV1`) | authenticated | Ciphertext-only SAF export; fresh-purpose gate |
-| Future voting/messaging | TBD | TBD | New operation-specific contract; never a generic signer |
+| FEAT-007 create | `createProvision` (`createFullIdentitySign`) | provisioning / verificationOnly | FEAT-007 |
+| FEAT-008 restore | `recoverWordsProvision` | provisioning | FEAT-008 |
+| FEAT-009 import | `recoverFileProvision` (`importDatV1`) | provisioning | FEAT-009 |
+| FEAT-010 unlock | `unlock` | locked | FEAT-010 |
+| FEAT-010 lock / password change / removal / reveal | `lock`, `changeDevicePassword`, `removeLocalUser`, `revealMnemonic` | any / authenticated | FEAT-010 |
+| FEAT-011 export | `exportEncryptedFile` (`exportDatV1`) | authenticated | FEAT-011 |
 
-## Phase 2 published artifacts
+Future voting/messaging operations require a separately reviewed,
+operation-specific contract; no generic signer/decryptor is ever reused.
 
-- **Closed contract vocabulary** (Rust `src-tauri/src/android_vault/contracts/`,
-  TS `src/lib/android-vault/contracts.ts`): capability status, security level,
-  key state, 14 bridge operations, 15 result codes + recovery actions,
-  lifecycle evidence, sensitive states, document operations, sanitized
-  diagnostics.
-- **Wrapper v1** (Rust `src-tauri/src/android_vault/wrapper.rs`, TS
-  `src/lib/android-vault/wrapper.ts`): RFC 8785 canonical AAD, 1 MiB inner /
-  1.5 MiB wrapper bounds, identity-free metadata, bounded fields.
-- **Fixed storage model** (Rust `src-tauri/src/android_vault/storage/`):
-  `<noBackupFilesDir>/vault/v1/` layout, journal CAS + key cardinality,
-  throttle sidecar, removal tombstone, non-decrypting startup inspection.
-- **Evidence schemas** (Rust `src-tauri/src/android_vault/evidence.rs`, TS
-  `src/lib/android-vault/evidence.ts`): sanitized qualification reports +
-  required-profile matrix (physical TEE/oldest/current API mandatory;
-  StrongBox release-gated; emulator cannot claim hardware).
+## Versioned pins (immutable)
+
+| Pin | Value |
+|---|---|
+| Android wrapper version | `1` (independent `platformWrapperVersion`) |
+| Adapter ID | `android-keystore` |
+| WebView↔Rust IPC protocol | `1.0` (shared, platform-neutral) |
+| Rust↔Kotlin mobile-plugin protocol | `1.0` |
+| Production application ID | `com.hushvoting.client` (variants `.debug`/`.test`/`.internal`) |
+| minSdk / targetSdk / compileSdk | 28 / 36 / 36 |
+| Inner envelope max / wrapper max | 1 MiB / 1.5 MiB |
+| Identity corpus manifest | `f1bec774…d4f124` (unchanged, replayed) |
+| Vault corpus manifest | `e8dfdfa4…582e5` (unchanged, replayed) |
+| AW-001 canonical AAD sha256 | `706f5a9dcf9c8ccc4484e3c5099835bae1894d204886165f65dafe94059edd76` |
+
+## Published artifacts (Phase 2–6)
+
+- **Contracts** (Rust `src-tauri/src/android_vault/contracts/`, TS
+  `src/lib/android-vault/contracts.ts`): capability, security level, key
+  state, 14 bridge operations, 17 result codes + recovery actions, lifecycle
+  evidence, sensitive states, document operations, sanitized diagnostics.
+- **Wrapper v1** (Rust/TS `wrapper.ts`): RFC 8785 canonical AAD, bounds,
+  identity-free metadata.
+- **Storage model** (Rust `storage/`): fixed `<noBackupFilesDir>/vault/v1/`
+  layout, journal CAS + key cardinality, throttle sidecar, tombstone,
+  non-decrypting startup inspection.
+- **Keystore policy** (Rust `keystore/`, Kotlin `src-tauri/mobile-plugin/`):
+  exact AES-256-GCM policy, StrongBox/TEE selection, capability qualification.
+- **Session/bridge/lifecycle** (Rust `session/`, `bridge/`, `navigation/`,
+  `platform_controls/`): opaque epochs, handshake-gated dispatch, timing,
+  Back authority, shielding/clipboard/SAF policy.
+- **Evidence schemas** (Rust/TS `evidence.*`): sanitized qualification
+  reports + mandatory profile matrix (physical TEE/oldest/current API,
+  package, accessibility, security; StrongBox release-gated).
 - **JSON schemas**: `schemas/` (wrapper metadata v1, result, evidence,
   vectors).
-- **Public synthetic vectors**: `vectors/android-wrapper-vectors.json`
-  (AW-001 pinned canonical bytes + SHA-256, replayed byte-identically by Rust
-  and TypeScript).
+- **Vectors**: `vectors/android-wrapper-vectors.json` (AW-001) replayed
+  byte-identically by Rust and TypeScript.
 
-## Replay obligations (evidence at Phases 3–8)
+## Consumer obligations
 
-- FEAT-001 identity corpus v1 replayed unchanged by native derivation/signing.
-- FEAT-003 vault corpus v1 replayed unchanged by native crypto (suite S,
-  AAD A vectors) under the Android 64 MiB KDF cap.
-- AW-001 (and later mutation vectors) replayed by Rust and TypeScript
-  independently; physical Keystore tests assert properties/tamper behavior,
-  never fixed ciphertext.
+- FEAT-007–011 must consume ONLY the sealed seams above; no generic
+  signer/decryptor/file/URI/private-key capability exists.
+- Consumers must replay the unchanged FEAT-001/FEAT-003 corpora and AW-001 in
+  their own flows (additive platform reports; never edited fixtures).
+- StrongBox support claims are release-disabled until a qualified StrongBox
+  physical protocol passes (Phase 7/8); consumers must not assume StrongBox.
 
 ## Integrity
 
 - Production keys and real wrapped vault ciphertext never enter reports or
-  artifacts. The deterministic fake provider is compiled only in test
+  artifacts; the deterministic fake provider is compiled only in test
   variants and is provably absent from release builds (Phase 6 gate).
-- This handoff is finalized at Phase 8; draft seams above are versioned and
-  must not be consumed as final by downstream features before then.
+- This handoff is validated by `android-vault:ci` (handoff-integrity stage)
+  and finalized with qualification evidence at Phase 8.
