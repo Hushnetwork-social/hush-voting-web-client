@@ -1,7 +1,12 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Minimal HushVoting shell capabilities",
-  "windows": ["main"],
-  "permissions": ["core:default"]
+  "description": "HushVoting main-window least-privilege capabilities (FEAT-005 Phase 6). App commands (handshake, submitSecret) need no permission entries; only reviewed core window/event defaults are granted. No shell/process/filesystem/environment/HTTP/clipboard/opener/arbitrary-invoke permission exists.",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:window:default",
+    "core:event:default"
+  ]
 }

@@ -13,6 +13,7 @@
 import { getRuntimeTarget } from '../runtime/runtime-target';
 import type { RuntimeTarget } from '../runtime/runtime-target';
 
+export * from './composition';
 export * from './contracts';
 export * from './operations';
 export * from './projections';
