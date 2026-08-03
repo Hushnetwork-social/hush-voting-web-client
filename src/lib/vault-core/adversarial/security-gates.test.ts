@@ -22,10 +22,25 @@ const ARCHIVE_SCRIPT = join(ROOT, 'scripts', 'vault', 'archive.mjs');
 // Negative fixtures live OUTSIDE the scanned default trees (tmp/) so parallel
 // vitest workers and tsc never observe them; the scan targets them explicitly.
 const FIXTURE_DIR = join(ROOT, 'tmp', 'vault-security-negative-fixture');
+const ARCHIVE_FIXTURE_DIR = join(ROOT, 'tmp', 'vault-archive-fixture');
+const ARCHIVE_REPORTS = join(ARCHIVE_FIXTURE_DIR, 'reports');
+const ARCHIVE_OUTPUT = join(ARCHIVE_FIXTURE_DIR, 'archive');
+const ARCHIVE_ENV = {
+  HUSH_VAULT_REPORTS_DIR: ARCHIVE_REPORTS,
+  HUSH_VAULT_ARCHIVE_DIR: ARCHIVE_OUTPUT,
+};
 
-function runScript(script: string, args: string[] = []): { status: number; stdout: string; stderr: string } {
+function runScript(
+  script: string,
+  args: string[] = [],
+  env: Record<string, string> = {},
+): { status: number; stdout: string; stderr: string } {
   try {
-    const stdout = execFileSync(process.execPath, [script, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    const stdout = execFileSync(process.execPath, [script, ...args], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env, ...env },
+    });
     return { status: 0, stdout, stderr: '' };
   } catch (err) {
     const e = err as { status?: number; stdout?: string; stderr?: string };
@@ -33,8 +48,18 @@ function runScript(script: string, args: string[] = []): { status: number; stdou
   }
 }
 
-beforeAll(() => rmSync(FIXTURE_DIR, { recursive: true, force: true }));
-afterAll(() => rmSync(FIXTURE_DIR, { recursive: true, force: true }));
+beforeAll(() => {
+  rmSync(FIXTURE_DIR, { recursive: true, force: true });
+  rmSync(ARCHIVE_FIXTURE_DIR, { recursive: true, force: true });
+  mkdirSync(ARCHIVE_REPORTS, { recursive: true });
+  const report = JSON.stringify({ schemaVersion: 1, passed: true, records: [] }, null, 2) + '\n';
+  writeFileSync(join(ARCHIVE_REPORTS, 'vault-ts-reference.json'), report);
+  writeFileSync(join(ARCHIVE_REPORTS, 'vault-ts-isolated.json'), report);
+});
+afterAll(() => {
+  rmSync(FIXTURE_DIR, { recursive: true, force: true });
+  rmSync(ARCHIVE_FIXTURE_DIR, { recursive: true, force: true });
+});
 
 describe('FEAT-003 security gates verification', () => {
   it('clean tree passes the security gate', () => {
@@ -67,25 +92,25 @@ describe('FEAT-003 security gates verification', () => {
 
 describe('FEAT-003 deterministic archive verification', () => {
   it('archive builds reproducibly and --check passes', () => {
-    const build1 = runScript(ARCHIVE_SCRIPT, ['--clean']);
+    const build1 = runScript(ARCHIVE_SCRIPT, ['--clean'], ARCHIVE_ENV);
     expect(build1.status).toBe(0);
     expect(build1.stdout).toContain('reproducible');
-    const check = runScript(ARCHIVE_SCRIPT, ['--check']);
+    const check = runScript(ARCHIVE_SCRIPT, ['--check'], ARCHIVE_ENV);
     expect(check.status).toBe(0);
     // Rebuild after check must be byte-identical (membership + ordering + digests).
-    const build2 = runScript(ARCHIVE_SCRIPT);
+    const build2 = runScript(ARCHIVE_SCRIPT, [], ARCHIVE_ENV);
     expect(build2.status).toBe(0);
-    const dirs = readdirSync(join(ROOT, 'conformance', 'archive')).filter((d) => d.startsWith('vault-'));
+    const dirs = readdirSync(ARCHIVE_OUTPUT).filter((d) => d.startsWith('vault-'));
     expect(dirs.length).toBe(1);
-    const manifestPath = join(ROOT, 'conformance', 'archive', dirs[0], 'archive-manifest.json');
+    const manifestPath = join(ARCHIVE_OUTPUT, dirs[0], 'archive-manifest.json');
     const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
     expect(manifest.files.map((f: { path: string }) => f.path)).toEqual([...manifest.files.map((f: { path: string }) => f.path)].sort());
     expect(manifest.corpusManifestSha256).toMatch(/^[0-9a-f]{64}$/);
   });
 
   it('archive contains no secret material and only declared reports', () => {
-    const dirs = readdirSync(join(ROOT, 'conformance', 'archive')).filter((d) => d.startsWith('vault-'));
-    const manifest = JSON.parse(readFileSync(join(ROOT, 'conformance', 'archive', dirs[0], 'archive-manifest.json'), 'utf8'));
+    const dirs = readdirSync(ARCHIVE_OUTPUT).filter((d) => d.startsWith('vault-'));
+    const manifest = JSON.parse(readFileSync(join(ARCHIVE_OUTPUT, dirs[0], 'archive-manifest.json'), 'utf8'));
     // The declared public-test-credential allowlist (vectors/) is the sanctioned
     // home of synthetic credential vectors; other paths must not look secret.
     const allowlist = ['schemas/', 'vectors/', 'reports/', 'manifest.json', 'metadata.json', 'HANDOFF.md', 'README.md', 'archive-manifest.json'];

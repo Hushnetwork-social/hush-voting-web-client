@@ -17,7 +17,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { createCipheriv, createHash, hkdfSync } from 'node:crypto';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { argon2id } from '@noble/hashes/argon2.js';
 import { canonicalizeJson } from '../canonical/jcs';
@@ -520,6 +520,8 @@ function buildPrimaryReport(
 }
 
 function writeReport(records: ReportRecord[]): void {
+  const reportsDir = join(process.cwd(), 'conformance', 'reports');
+  mkdirSync(reportsDir, { recursive: true });
   const report = {
     schemaVersion: 1,
     generator: 'hush-vault-ts-reference',
@@ -529,7 +531,7 @@ function writeReport(records: ReportRecord[]): void {
     total: records.length,
     records,
   };
-  writeFileSync(join(process.cwd(), 'conformance', 'reports', 'vault-ts-reference.json'), JSON.stringify(report, null, 2) + '\n');
+  writeFileSync(join(reportsDir, 'vault-ts-reference.json'), JSON.stringify(report, null, 2) + '\n');
 }
 
 describe('vault conformance vectors (primary derivation)', () => {

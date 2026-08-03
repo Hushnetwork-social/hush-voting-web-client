@@ -12,12 +12,20 @@
  */
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 const REPO_ROOT = join(import.meta.dirname, '..', '..');
 const CORPUS = join(REPO_ROOT, 'conformance', 'vault', 'v1');
-const REPORTS = join(REPO_ROOT, 'conformance', 'reports');
-const ARCHIVE_ROOT = join(REPO_ROOT, 'conformance', 'archive');
+
+function configuredPath(envName, fallback) {
+  const configured = process.env[envName];
+  return configured ? resolve(REPO_ROOT, configured) : fallback;
+}
+
+// Tests isolate generated reports/archives from the ignored release-evidence paths.
+// Normal CLI invocations use the canonical defaults without setting these variables.
+const REPORTS = configuredPath('HUSH_VAULT_REPORTS_DIR', join(REPO_ROOT, 'conformance', 'reports'));
+const ARCHIVE_ROOT = configuredPath('HUSH_VAULT_ARCHIVE_DIR', join(REPO_ROOT, 'conformance', 'archive'));
 
 const ARCHIVE_FILES = [
   'metadata.json',
