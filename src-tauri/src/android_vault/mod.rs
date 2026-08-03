@@ -19,11 +19,15 @@
 //!   StrongBox-to-TEE fallback is permitted in production.
 //! - Fixed no-backup storage only; caller-controlled paths never exist.
 
+pub mod bridge;
 pub mod contracts;
 pub mod crypto;
 pub mod evidence;
 pub mod keystore;
 pub mod lifecycle;
+pub mod navigation;
+pub mod platform_controls;
+pub mod session;
 pub mod storage;
 pub mod wrapper;
 
