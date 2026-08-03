@@ -145,11 +145,12 @@ fn advance(
     store: &VaultStore,
     tombstone: &mut RemovalTombstoneV1,
     stage: RemovalStage,
-    now_ms: u64,
+    _now_ms: u64,
 ) -> Result<RemovalStage, StoreError> {
     let next = next_stage(stage).ok_or(StoreError(NativeErrorCode::RemovalIncomplete))?;
+    // `started_at_ms` stays fixed at the removal start (diagnostics anchor);
+    // only the stage advances.
     tombstone.stage = next;
-    tombstone.started_at_ms = tombstone.started_at_ms.max(now_ms);
     store.write_tombstone(tombstone)?;
     Ok(next)
 }

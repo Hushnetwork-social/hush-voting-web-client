@@ -807,13 +807,29 @@ impl VaultStore {
     /// the schema/mode/generation level (full envelope authentication happens
     /// at unlock). An unreferenced inactive slot is obsolete (a commit that
     /// never switched) and is removed; a lost staged package during
-    /// `PendingRotation` fails closed to portable recovery.
+    /// `PendingRotation` fails closed to portable recovery. A missing journal
+    /// means "no vault": any orphan slot is an uncommitted provision and is
+    /// removed deterministically so provisioning can be retried. Removal in
+    /// progress owns its own state (slots may already be deleted).
     pub fn reconcile(&self) -> Result<(), StoreError> {
         let journal = match self.read_journal() {
             Ok(j) => j,
-            Err(StoreError(NativeErrorCode::NoVault)) => return Ok(()),
+            Err(StoreError(NativeErrorCode::NoVault)) => {
+                // No journal → no vault. Orphan slot files are uncommitted
+                // provision garbage (never journaled, never authoritative).
+                for artifact in [VaultArtifact::SlotA, VaultArtifact::SlotB] {
+                    let _ = self.remove_artifact(artifact);
+                }
+                let _ = self.fsync_dir();
+                return Ok(());
+            }
             Err(e) => return Err(e),
         };
+        if journal.state == JournalState::RemovalInProgress {
+            // Removal resumes through the tombstone path; the active slot may
+            // already be deleted and must not block resumption.
+            return Ok(());
+        }
         let active = self.read_slot(journal.active_slot)?;
         self.validate_slot(&active, active.mode(), journal.active_generation, None)?;
         let inactive = inactive_of(journal.active_slot);
@@ -841,9 +857,7 @@ impl VaultStore {
                     None,
                 )?;
             }
-            JournalState::RemovalInProgress => {
-                // Removal resumes through the tombstone path (see lifecycle).
-            }
+            JournalState::RemovalInProgress => unreachable!(), // handled above
             JournalState::Migration => {
                 // Migration is a committed Active state; nothing extra.
             }
@@ -1577,6 +1591,57 @@ mod tests {
         assert!(!store.slot_exists(VaultArtifact::SlotB));
         let journal = store.read_journal().unwrap();
         assert_eq!(journal.active_generation, 1);
+    }
+
+    #[test]
+    fn reconcile_cleans_orphan_slot_after_crashed_provision() {
+        let store = open_store("reconcile-provision");
+        // Simulate a crash after the slot write but before the journal write
+        // during first provisioning: an orphan slot with no journal.
+        store
+            .write_slot_checked(
+                VaultArtifact::SlotA,
+                &build_slot(b"half-provision", ProtectionMode::OsBacked, Some(&key()), 1).unwrap(),
+            )
+            .unwrap();
+        assert_eq!(
+            store.read_journal().err().unwrap().0,
+            NativeErrorCode::NoVault
+        );
+        // Reconcile treats "no journal" as "no vault" and removes the
+        // uncommitted slot so provisioning can be retried.
+        store.reconcile().unwrap();
+        assert!(!store.slot_exists(VaultArtifact::SlotA));
+        assert!(!store.slot_exists(VaultArtifact::SlotB));
+        let k = key();
+        store
+            .provision(b"pkg", ProtectionMode::OsBacked, Some(&k), false, 1_000)
+            .unwrap();
+        assert_eq!(store.read_journal().unwrap().active_generation, 1);
+    }
+
+    #[test]
+    fn reconcile_tolerates_removal_in_progress_with_deleted_active_slot() {
+        let store = open_store("reconcile-removal");
+        let k = key();
+        store
+            .provision(b"pkg", ProtectionMode::OsBacked, Some(&k), false, 1_000)
+            .unwrap();
+        // Removal deleted the active slot and marked the journal.
+        std::fs::remove_file(store.artifact_path(VaultArtifact::SlotA).unwrap()).unwrap();
+        let journal = store.read_journal().unwrap();
+        store
+            .write_journal(&JournalRecord {
+                state: JournalState::RemovalInProgress,
+                ..journal
+            })
+            .unwrap();
+        // Reconcile must not block removal resumption on the deleted slot.
+        store.reconcile().unwrap();
+        assert_eq!(
+            store.read_journal().unwrap().state,
+            JournalState::RemovalInProgress
+        );
     }
 
     #[test]
