@@ -139,6 +139,7 @@ function writeReleaseEvidence() {
     applicationId: 'com.hushvoting.client',
     adapterId: 'ubuntu-secret-service-v1',
     packageFormats: ['deb', 'appimage'],
+    packages: collectPackageDigests(),
     protocol: {
       revision: 'fb789bd1c2b353387183300a370de2960bc71795',
       hushIdentitySha256: PINNED_PROTO_DIGESTS['hushIdentity.proto'],
@@ -161,6 +162,24 @@ function writeReleaseEvidence() {
   };
   mkdirSync(REPORT_DIR, { recursive: true });
   writeFileSync(join(REPORT_DIR, 'release-evidence.json'), `${JSON.stringify(evidence, null, 2)}\n`);
+}
+
+/** Package artifacts and their SHA-256 digests (missing packages -> []). */
+function collectPackageDigests() {
+  const bundleRoot = join(REPO_ROOT, 'src-tauri', 'target', 'release', 'bundle');
+  const candidates = [
+    ['deb', join(bundleRoot, 'deb', 'HushVoting_0.1.0_amd64.deb')],
+    ['appimage', join(bundleRoot, 'appimage', 'HushVoting_0.1.0_amd64.AppImage')],
+  ];
+  const out = {};
+  for (const [format, file] of candidates) {
+    try {
+      out[format] = { file: file.split('/').pop(), sha256: sha256Bytes(readFileSync(file)) };
+    } catch {
+      out[format] = null; // not built in this checkout yet
+    }
+  }
+  return out;
 }
 
 /** Gate 14: downstream handoff exists and names the closed operation seams. */

@@ -1,0 +1,78 @@
+{
+  "contractVersion": 1,
+  "generatedAt": "2026-08-03T11:37:00.325Z",
+  "gitRevision": "bdaa0f866a2b4cfa6e4249412ceb79de350ce383",
+  "stages": [
+    {
+      "stage": "lint",
+      "ok": true,
+      "ms": 2867
+    },
+    {
+      "stage": "typecheck",
+      "ok": true,
+      "ms": 1246
+    },
+    {
+      "stage": "unit-tests",
+      "ok": true,
+      "ms": 4677
+    },
+    {
+      "stage": "identity-conformance",
+      "ok": true,
+      "ms": 1429
+    },
+    {
+      "stage": "vault-core-ci",
+      "ok": true,
+      "ms": 30214
+    },
+    {
+      "stage": "browser-vault-ci",
+      "ok": true,
+      "ms": 45031
+    },
+    {
+      "stage": "rust-format",
+      "ok": true,
+      "ms": 65
+    },
+    {
+      "stage": "rust-clippy",
+      "ok": true,
+      "ms": 1012
+    },
+    {
+      "stage": "rust-tests",
+      "ok": true,
+      "ms": 2341
+    },
+    {
+      "stage": "audit",
+      "ok": true,
+      "ms": 1362
+    },
+    {
+      "stage": "protocol-integrity",
+      "ok": true,
+      "ms": 0
+    },
+    {
+      "stage": "secret-scan",
+      "ok": true,
+      "ms": 2
+    },
+    {
+      "stage": "release-evidence",
+      "ok": true,
+      "ms": 66
+    },
+    {
+      "stage": "handoff-integrity",
+      "ok": true,
+      "ms": 0
+    }
+  ],
+  "allPassed": true
+}

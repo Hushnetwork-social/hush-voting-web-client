@@ -1,0 +1,40 @@
+{
+  "contractVersion": 1,
+  "generatedAt": "2026-08-03",
+  "gitRevision": "bdaa0f866a2b4cfa6e4249412ceb79de350ce383",
+  "applicationId": "com.hushvoting.client",
+  "adapterId": "ubuntu-secret-service-v1",
+  "packageFormats": [
+    "deb",
+    "appimage"
+  ],
+  "packages": {
+    "deb": {
+      "file": "HushVoting_0.1.0_amd64.deb",
+      "sha256": "796534313b58b427a6c54ec0c0c3258bf81f7e5009ee03c199031fbad40ab0a3"
+    },
+    "appimage": {
+      "file": "HushVoting_0.1.0_amd64.AppImage",
+      "sha256": "18bf71ea5443b8254d71231afc61533dd614428937977c50d904b7c09b8e1851"
+    }
+  },
+  "protocol": {
+    "revision": "fb789bd1c2b353387183300a370de2960bc71795",
+    "hushIdentitySha256": "df3a2d9b128335dc3c92f0ef2b246655ed4c95f53f7ce058d438d945724f8ffa",
+    "hushBlockchainSha256": "e0625d52e4227ed77b6eb0e7d74b2990b7a8d3e8ecd77bd308371797275dc04b"
+  },
+  "corpora": {
+    "vaultManifestSha256": "e8dfdfa49b9e33cfc8a47b1266c5a14cb978c4be28f21d87cc2f034d435582e5",
+    "identityManifestSha256": "f1bec7741de20efc3e488d0736ab61e745f3739032daaf50d955a83878d4f124"
+  },
+  "dependencyPins": {
+    "oo7": "0.3.3",
+    "tonic": "0.13.1",
+    "prost": "0.13.5",
+    "k256": "0.13.4",
+    "serde": "1.0.220",
+    "tauri": "2.11.x",
+    "tauriPluginSingleInstance": "2.4.3"
+  },
+  "noSecretMarkers": 0
+}
