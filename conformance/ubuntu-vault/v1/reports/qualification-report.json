@@ -1,7 +1,7 @@
 {
   "contractVersion": 1,
-  "generatedAt": "2026-08-03T11:54:30.370Z",
-  "gitRevision": "b2bc81ed4ba41ba662ccb24e419176121c48b728",
+  "generatedAt": "2026-08-03T11:58:40.344Z",
+  "gitRevision": "9403e107c625c189cf9b061eb50ed5ec4171aa7e",
   "adapterId": "ubuntu-secret-service-v1",
   "harness": {
     "name": "ubuntu-vault-qualification",
@@ -48,11 +48,11 @@
       "packages": {
         "deb": {
           "file": "HushVoting_0.1.0_amd64.deb",
-          "sha256": "796534313b58b427a6c54ec0c0c3258bf81f7e5009ee03c199031fbad40ab0a3"
+          "sha256": "78ab618e60488a6915f866baf7e9d602bec8c26efa9c2cee3c07be361a98d86a"
         },
         "appimage": {
           "file": "HushVoting_0.1.0_amd64.AppImage",
-          "sha256": "18bf71ea5443b8254d71231afc61533dd614428937977c50d904b7c09b8e1851"
+          "sha256": "00bf32e429ea78defb256ff46bfc16c4821527e27176311afcaa740584fdbd89"
         }
       },
       "missing": []
