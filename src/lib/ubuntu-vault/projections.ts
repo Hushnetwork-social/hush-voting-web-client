@@ -42,7 +42,8 @@ export const PROVIDER_PREDICATES = {
 
 /** Safe UI decision derived from one native outcome (never raw detail). */
 export type OutcomeDecision =
-  | { readonly action: 'continue'; readonly kind: 'unlocked' | 'verified' | 'provisioned' | 'removed' }
+  | { readonly action: 'continue'; readonly kind: 'unlocked' | 'verified' | 'provisioned' | 'removed' | 'preview' }
+  | { readonly action: 'operationComplete'; readonly kind: 'revealPrepared' | 'signed' | 'datImported' | 'datExported' }
   | { readonly action: 'locked' }
   | { readonly action: 'retry'; readonly code: string }
   | { readonly action: 'recover'; readonly code: string }
@@ -51,13 +52,30 @@ export type OutcomeDecision =
 /**
  * Map a closed native outcome to a safe FEAT-002 decision.
  * Unknown/unsupported codes fail closed to `blocked` — never a blank screen.
+ * Non-auth operation completions are distinguished from unlock transitions so
+ * a signed/import/export outcome is never mistaken for an unlocked session.
  */
 export function projectNativeOutcome(outcome: NativeOutcome): OutcomeDecision {
   if (outcome.outcome === 'ok') {
-    if (outcome.kind === 'locked') {
-      return { action: 'locked' };
+    switch (outcome.kind) {
+      case 'locked':
+        return { action: 'locked' };
+      case 'unlocked':
+        return { action: 'continue', kind: 'unlocked' };
+      case 'verified':
+        return { action: 'continue', kind: 'verified' };
+      case 'provisioned':
+        return { action: 'continue', kind: 'provisioned' };
+      case 'removed':
+        return { action: 'continue', kind: 'removed' };
+      case 'preview':
+        return { action: 'continue', kind: 'preview' };
+      case 'revealPrepared':
+      case 'signed':
+      case 'datImported':
+      case 'datExported':
+        return { action: 'operationComplete', kind: outcome.kind };
     }
-    return { action: 'continue', kind: outcome.kind === 'removed' ? 'removed' : outcome.kind === 'provisioned' ? 'provisioned' : outcome.kind === 'verified' ? 'verified' : 'unlocked' };
   }
   const code = outcome.code;
   switch (code) {

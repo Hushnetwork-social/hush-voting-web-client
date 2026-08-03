@@ -82,6 +82,29 @@ describe('ubuntu-vault projections — native outcome decisions', () => {
       kind: 'unlocked',
     });
     expect(projectNativeOutcome({ outcome: 'ok', kind: 'locked' })).toEqual({ action: 'locked' });
+    expect(projectNativeOutcome({ outcome: 'ok', kind: 'preview' })).toEqual({
+      action: 'continue',
+      kind: 'preview',
+    });
+  });
+
+  it('non-auth operation completions are never mistaken for unlock', () => {
+    expect(projectNativeOutcome({ outcome: 'ok', kind: 'signed' })).toEqual({
+      action: 'operationComplete',
+      kind: 'signed',
+    });
+    expect(projectNativeOutcome({ outcome: 'ok', kind: 'datImported' })).toEqual({
+      action: 'operationComplete',
+      kind: 'datImported',
+    });
+    expect(projectNativeOutcome({ outcome: 'ok', kind: 'datExported' })).toEqual({
+      action: 'operationComplete',
+      kind: 'datExported',
+    });
+    expect(projectNativeOutcome({ outcome: 'ok', kind: 'revealPrepared' })).toEqual({
+      action: 'operationComplete',
+      kind: 'revealPrepared',
+    });
   });
 
   it('retryable failures map to retry without raw detail', () => {
