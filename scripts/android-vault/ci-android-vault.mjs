@@ -162,7 +162,7 @@ function runSelftests() {
     {
       name: 'secret scan detects a seeded key material file',
       check: () => {
-        const { existsSync: has } = { existsSync: (p) => false };
+        const { existsSync: has } = { existsSync: () => false };
         void has;
         // A fixture file named .jks in a scanned root must be flagged.
         return true; // filename check is unit-tested in android-vault.test.mjs

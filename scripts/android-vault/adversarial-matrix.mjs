@@ -62,7 +62,6 @@ function mutations(meta) {
 }
 
 function main() {
-  const args = process.argv.slice(2);
   const matrix = [
     { name: 'rust-android-vault-tests', cmd: 'cargo', args: ['test', '--manifest-path', 'src-tauri/Cargo.toml', '--lib', 'android_vault', '--locked'] },
     { name: 'ts-android-vault-tests', cmd: 'npm', args: ['run', 'test:unit', '--silent', '--', 'src/lib/android-vault', 'src/app/auth/android'] },
@@ -111,7 +110,6 @@ function main() {
     process.exit(1);
   }
   console.log('ANDROID ADVERSARIAL MATRIX OK (corpora + AW-001 replay, mutation sweep)');
-  const _ = args; // args accepted for future flags
 }
 
 if (process.argv[1] && process.argv[1].endsWith('adversarial-matrix.mjs')) {

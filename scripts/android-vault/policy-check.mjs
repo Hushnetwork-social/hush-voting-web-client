@@ -15,9 +15,6 @@
  */
 
 import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-
-const SCRIPT_DIR = dirname(new URL(import.meta.url).pathname);
 
 /** Permissions allowed in production (narrowly justified). */
 export const ALLOWED_PERMISSIONS = [
