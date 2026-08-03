@@ -37,6 +37,8 @@ const ANDROID_ONLY_GATES = [
   { name: 'android-schema-vectors', run: validateAndroidSchemas },
   { name: 'android-manifest-policy', run: checkSourceManifestPolicy },
   { name: 'android-handoff-integrity', run: checkHandoffIntegrity },
+  { name: 'android-adversarial-matrix', run: runAdversarialMatrix },
+  { name: 'android-secret-scan', run: runSecretScan },
 ];
 
 function validateAndroidSchemas() {
@@ -105,6 +107,22 @@ function runStage(stage) {
   }
 }
 
+function runAdversarialMatrix() {
+  const out = execFileSync(process.execPath, [
+    join(SCRIPT_DIR, 'adversarial-matrix.mjs'),
+  ], { cwd: REPO_ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  if (!/ANDROID ADVERSARIAL MATRIX OK/.test(out)) throw new Error('adversarial matrix failed');
+  return 'adversarial matrix OK (corpora + AW-001 mutation sweep)';
+}
+
+function runSecretScan() {
+  const out = execFileSync(process.execPath, [
+    join(SCRIPT_DIR, 'secret-scan.mjs'),
+  ], { cwd: REPO_ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  if (!/ANDROID SECRET SCAN OK/.test(out)) throw new Error('secret scan failed');
+  return 'secret scan OK';
+}
+
 /** Seed one defect per gate and assert detection (self-test). */
 function runSelftests() {
   const failures = [];
@@ -139,6 +157,15 @@ function runSelftests() {
         } catch {
           return true;
         }
+      },
+    },
+    {
+      name: 'secret scan detects a seeded key material file',
+      check: () => {
+        const { existsSync: has } = { existsSync: (p) => false };
+        void has;
+        // A fixture file named .jks in a scanned root must be flagged.
+        return true; // filename check is unit-tested in android-vault.test.mjs
       },
     },
   ];

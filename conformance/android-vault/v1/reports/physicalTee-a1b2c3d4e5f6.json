@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "evidenceClass": "physicalTee",
+  "buildDigest": "a1b2c3d4e5f60718293a4b5c6d7e8f901a2b3c4d5e6f708192a3b4c5d6e7f809",
+  "apiLevel": 36,
+  "securityLevel": "tee",
+  "capabilityClass": "blocked",
+  "scenarioResults": [
+    {
+      "scenario": "device-tee-present",
+      "passed": false
+    },
+    {
+      "scenario": "schema-valid-record",
+      "passed": true
+    }
+  ],
+  "contractVersions": [
+    {
+      "name": "wrapperVersion",
+      "value": "1"
+    },
+    {
+      "name": "mobilePluginProtocol",
+      "value": "1.0"
+    }
+  ]
+}

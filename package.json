@@ -66,7 +66,10 @@
     "android-vault:ci": "node scripts/android-vault/ci-android-vault.mjs",
     "android-vault:ci:selftest": "node scripts/android-vault/ci-android-vault.mjs --selftest",
     "android-vault:policy": "node scripts/android-vault/policy-check.mjs --manifest src-tauri/gen/android/app/src/main/AndroidManifest.xml",
-    "android-vault:customize": "node scripts/android-vault/customize-project.mjs --project src-tauri/gen/android"
+    "android-vault:customize": "node scripts/android-vault/customize-project.mjs --project src-tauri/gen/android",
+    "android-vault:adversarial": "node scripts/android-vault/adversarial-matrix.mjs",
+    "android-vault:secret-scan": "node scripts/android-vault/secret-scan.mjs",
+    "android-vault:qualification": "node scripts/android-vault/qualification-harness.mjs --digest development"
   },
   "dependencies": {
     "@noble/hashes": "2.2.0",

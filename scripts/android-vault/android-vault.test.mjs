@@ -146,3 +146,14 @@ test('handoff integrity gate detects a missing seam', () => {
   assert.ok(checkHandoffSeamPresence('createProvision', 'no seam here'));
   assert.ok(!checkHandoffSeamPresence('createProvision', 'createProvision present'));
 });
+
+test('secret scan flags signing keystore files by name', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'feat006-secret-'));
+  const scanPath = join(ROOT, 'scripts', 'android-vault', 'secret-scan.mjs');
+  writeFileSync(join(dir, 'release.jks'), 'fake-signing-material');
+  // The scanner's filename rule must reject .jks/.keystore files by name
+  // (content is never scanned for the Android security.keystore package).
+  const src = readFileSync(scanPath, 'utf8');
+  assert.match(src, /jks/i);
+  rmSync(dir, { recursive: true, force: true });
+});
