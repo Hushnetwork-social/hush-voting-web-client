@@ -153,6 +153,23 @@ describe('describeCanonicalTransaction — FEAT-001 corpus fidelity', () => {
     expect(describeCanonicalTransaction({ ...base, transactionId: createUuidV4(), timestamp: '2026-08-04' }).ok).toBe(false);
     expect(describeCanonicalTransaction({ ...base, transactionId: createUuidV4(), timestamp: '2026-08-04T01:00:00Z' }).ok).toBe(false);
   });
+
+  it('produces digest bytes byte-exact to the FEAT-001 canonical serializer', async () => {
+    const tx = describeCanonicalTransaction({
+      normalizedAlias: 'Voter',
+      publicSigningAddress: SIGNING,
+      publicEncryptAddress: ENCRYPT,
+      visibility: 'private',
+      transactionId: '00000000-0000-4000-8000-000000000000',
+      timestamp: '2026-08-04T01:00:00.000Z',
+    });
+    expect(tx.ok).toBe(true);
+    if (!tx.ok) return;
+    // Re-serialize through the canonical API and compare bytes exactly.
+    const { canonicalBytes, serializeUnsignedTransaction } = await import('../identity-compatibility/canonical.js');
+    const expected = canonicalBytes(serializeUnsignedTransaction(tx.value.unsignedTransaction));
+    expect(Buffer.from(tx.value.canonicalBytes).equals(Buffer.from(expected))).toBe(true);
+  });
 });
 
 describe('createUuidV4 / corpusTimestamp', () => {

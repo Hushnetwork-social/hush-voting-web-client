@@ -15,7 +15,7 @@
  * Normative source: FEAT-007 FeatureDescription "Profile Contract",
  * "Canonical Transaction Construction"; FEAT-001 corpus timestamp/UUID rules.
  */
-import { payloadSizeBytes, type CanonicalPayload, type CanonicalUnsignedTransaction } from '../identity-compatibility/canonical.js';
+import { canonicalBytes, payloadSizeBytes, serializeUnsignedTransaction, type CanonicalPayload, type CanonicalUnsignedTransaction } from '../identity-compatibility/canonical.js';
 
 /** Pinned Unicode data version (matches FEAT-003 v1). */
 export const UNICODE_VERSION = '16.0.0' as const;
@@ -201,7 +201,9 @@ export function describeCanonicalTransaction(input: TransactionDescriptionInput)
       payloadSize,
       signatory: input.publicSigningAddress,
       signatoryBindsToPayload: true,
-      canonicalBytes: new TextEncoder().encode(JSON.stringify(unsignedTransaction)),
+      // Digest must be byte-exact to the FEAT-001 canonical serializer (not a
+      // parallel stringify), so exact-byte retention and retry reuse match.
+      canonicalBytes: canonicalBytes(serializeUnsignedTransaction(unsignedTransaction)),
     },
   };
 }
