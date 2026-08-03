@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Hushnetwork-social/hush-voting-web-client/conformance/android-vault/v1/schemas/android-wrapper-vectors.schema.json",
+  "title": "Android Wrapper Vectors",
+  "description": "Public synthetic wrapper vectors for FEAT-006. Deterministic canonical metadata/AAD bytes only; production Keystore keys are non-exportable and GCM randomized, so no fixed ciphertext ever appears.",
+  "type": "object",
+  "required": ["schemaVersion", "vectors"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "note": { "type": "string" },
+    "vectors": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "description", "metadata", "canonicalJson", "canonicalSha256"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^AW-[0-9]{3}$" },
+          "description": { "type": "string" },
+          "metadata": { "$ref": "android-wrapper-metadata-v1.schema.json" },
+          "canonicalJson": { "type": "string" },
+          "canonicalSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+        }
+      }
+    }
+  }
+}

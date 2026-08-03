@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Hushnetwork-social/hush-voting-web-client/conformance/android-vault/v1/schemas/android-result.schema.json",
+  "title": "Android Typed Result",
+  "description": "Closed Android platform outcome (FEAT-006). WebView receives only a stable category, retryability, allowed actions, bounded retry deadline, and optional random non-correlating support code. Outer Keystore/AAD authentication failure is never wrong-password; inner password decryption uses FEAT-003's combined result.",
+  "type": "object",
+  "required": ["outcome"],
+  "properties": {
+    "outcome": { "enum": ["ok", "err"] }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "outcome": { "const": "ok" },
+        "kind": {
+          "enum": [
+            "capabilityStatus",
+            "keyInspection",
+            "wrappedSlot",
+            "unwrappedSlot",
+            "secureLockState",
+            "lifecycleEvidence",
+            "shieldState",
+            "clipboardCleared",
+            "documentHandle"
+          ]
+        }
+      },
+      "required": ["outcome", "kind"],
+      "additionalProperties": false
+    },
+    {
+      "properties": {
+        "outcome": { "const": "err" },
+        "code": {
+          "enum": [
+            "ok",
+            "secureLockRequired",
+            "deviceLocked",
+            "hardwareBackedKeystoreUnavailable",
+            "unsupportedKnownBadBuild",
+            "temporaryKeystoreFailure",
+            "platformProtectionInvalidated",
+            "wrapperIntegrityFailure",
+            "buildProtocolMismatch",
+            "storageUnavailable",
+            "storageQuotaExceeded",
+            "unsupportedWrapperVersion",
+            "staleSession",
+            "cleanupRemovalIncomplete",
+            "wrongPasswordOrDamagedData"
+          ]
+        },
+        "retryable": { "type": "boolean" },
+        "retryDeadlineSecs": { "type": "integer", "minimum": 0, "maximum": 3600 },
+        "supportCode": { "type": ["string", "null"], "maxLength": 8 }
+      },
+      "required": ["outcome", "code", "retryable", "retryDeadlineSecs", "supportCode"],
+      "additionalProperties": false
+    }
+  ]
+}

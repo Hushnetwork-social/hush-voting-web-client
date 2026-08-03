@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Hushnetwork-social/hush-voting-web-client/conformance/android-vault/v1/schemas/android-wrapper-metadata-v1.schema.json",
+  "title": "Android Wrapper Metadata v1",
+  "description": "Authenticated Android wrapper metadata (FEAT-006). Canonicalized to RFC 8785 bytes for AAD. Binds wrapper version, adapter id android-keystore, application id, release channel, opaque vault key reference, FEAT-003 versions, slot, generation, purpose, and bounded critical extensions. Never binds Android username/account, device model, hostname, URL, time, biometric identity, or Hush alias/address.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "wrapperVersion",
+    "adapterId",
+    "applicationId",
+    "releaseChannel",
+    "vaultKeyReference",
+    "envelopeFormatVersion",
+    "parameterSuiteVersion",
+    "recordSchemaVersion",
+    "slot",
+    "vaultGeneration",
+    "recordPurpose",
+    "criticalExtensions"
+  ],
+  "properties": {
+    "wrapperVersion": { "const": 1 },
+    "adapterId": { "const": "android-keystore" },
+    "applicationId": { "const": "com.hushvoting.client" },
+    "releaseChannel": { "enum": ["production", "debug", "test", "internal"] },
+    "vaultKeyReference": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[a-zA-Z0-9-]+$" },
+    "envelopeFormatVersion": { "type": "integer", "minimum": 1 },
+    "parameterSuiteVersion": { "type": "integer", "minimum": 1 },
+    "recordSchemaVersion": { "type": "integer", "minimum": 1 },
+    "slot": { "enum": ["a", "b"] },
+    "vaultGeneration": { "type": "integer", "minimum": 0 },
+    "recordPurpose": { "const": "vault-package" },
+    "criticalExtensions": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["key", "value"],
+        "properties": {
+          "key": { "type": "string", "minLength": 1, "maxLength": 64 },
+          "value": { "type": "string", "minLength": 1, "maxLength": 64 }
+        }
+      }
+    }
+  }
+}

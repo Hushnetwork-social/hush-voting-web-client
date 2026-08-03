@@ -1,0 +1,27 @@
+{
+  "$schema": "../schemas/android-wrapper-vectors.schema.json",
+  "schemaVersion": 1,
+  "note": "FEAT-006 Android wrapper v1 public synthetic vectors. Production Keystore keys are non-exportable and GCM randomized, so public vectors cover the canonical metadata/AAD contract only (never fixed ciphertext). Replayed byte-identically by Rust and TypeScript. Generated 2026-08-03.",
+  "vectors": [
+    {
+      "id": "AW-001",
+      "description": "Production single-slot canonical wrapper metadata (RFC 8785 JCS canonical bytes + SHA-256).",
+      "metadata": {
+        "wrapperVersion": 1,
+        "adapterId": "android-keystore",
+        "applicationId": "com.hushvoting.client",
+        "releaseChannel": "production",
+        "vaultKeyReference": "hvk-9f3e1a02b8c4",
+        "envelopeFormatVersion": 1,
+        "parameterSuiteVersion": 1,
+        "recordSchemaVersion": 1,
+        "slot": "a",
+        "vaultGeneration": 7,
+        "recordPurpose": "vault-package",
+        "criticalExtensions": []
+      },
+      "canonicalJson": "{\"adapterId\":\"android-keystore\",\"applicationId\":\"com.hushvoting.client\",\"criticalExtensions\":[],\"envelopeFormatVersion\":1,\"parameterSuiteVersion\":1,\"recordPurpose\":\"vault-package\",\"recordSchemaVersion\":1,\"releaseChannel\":\"production\",\"slot\":\"a\",\"vaultGeneration\":7,\"vaultKeyReference\":\"hvk-9f3e1a02b8c4\",\"wrapperVersion\":1}",
+      "canonicalSha256": "706f5a9dcf9c8ccc4484e3c5099835bae1894d204886165f65dafe94059edd76"
+    }
+  ]
+}
