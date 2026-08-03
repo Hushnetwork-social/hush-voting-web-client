@@ -6,6 +6,12 @@ use tauri::{image::Image, Manager};
 /// single-instance Phase 4; composition hardening Phase 6).
 pub mod ubuntu_vault;
 
+/// FEAT-006 Android vault adapter (contracts/wrapper/storage/evidence model
+/// Phase 2; Keystore capability/key policy + crash-safe lifecycle Phase 3;
+/// Rust-internal mobile bridge + native session + lifecycle/timing/Back +
+/// shielding/clipboard/SAF Phase 4; composition/packaging/handoff Phase 6).
+pub mod android_vault;
+
 use ubuntu_vault::commands::{hush_vault_handshake, hush_vault_submit_secret, VaultState};
 use ubuntu_vault::lifecycle::ownership::VaultOwnership;
 
