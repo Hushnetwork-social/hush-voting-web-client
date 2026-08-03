@@ -83,36 +83,51 @@ impl BridgeRequest {
 
 /// The Rust-internal bridge dispatcher. `platform` is the Kotlin plugin
 /// invocation boundary (Phase 6 wiring); the dispatch rules are fully tested
-/// here.
+/// here. Dispatch is gated on a successful exact handshake: a build/protocol
+/// mismatch grants no capability and performs no wrap/unwrap.
 pub struct MobileBridge {
     session: SessionAuthority,
+    handshake_ok: bool,
 }
 
 impl MobileBridge {
     pub fn new(session: SessionAuthority) -> Self {
-        Self { session }
+        Self {
+            session,
+            handshake_ok: false,
+        }
     }
 
-    /// Exact handshake before any secret input.
+    /// Exact handshake before any secret input. No capability is granted
+    /// until this succeeds.
     pub fn handshake(
         &mut self,
         build: VersionPair,
         ipc: VersionPair,
         plugin: VersionPair,
     ) -> Result<(), BridgeError> {
-        self.session
+        let result = self
+            .session
             .handshake(build, ipc, plugin)
             .map_err(|e| match e {
                 SessionError::BuildMismatch => BridgeError::BuildMismatch,
                 SessionError::ProtocolMismatch => BridgeError::ProtocolMismatch,
                 _ => BridgeError::NotAndroidRuntime,
-            })
+            });
+        if result.is_ok() {
+            self.handshake_ok = true;
+        }
+        result
     }
 
     /// Dispatch one bounded request. Rejects unknown operations, out-of-bounds
-    /// payloads, and session-less calls; maps platform failures to closed
-    /// outcomes. No raw exception, alias, path, URI, or identity crosses.
+    /// payloads, session-less calls, and any call before a successful exact
+    /// handshake; maps platform failures to closed outcomes. No raw exception,
+    /// alias, path, URI, or identity crosses.
     pub fn dispatch(&self, request: BridgeRequest) -> AndroidOutcome {
+        if !self.handshake_ok {
+            return BridgeError::ProtocolMismatch.to_outcome();
+        }
         if !request.is_bounded() {
             return BridgeError::BoundsExceeded.to_outcome();
         }
@@ -195,19 +210,43 @@ mod tests {
                 MOBILE_PLUGIN_PROTOCOL_VERSION
             )
             .is_err());
-        // Even if dispatch were attempted, mismatched builds accept nothing.
+        // A mismatched build accepts nothing: dispatch performs no wrap/unwrap
+        // and returns the closed BuildProtocolMismatch outcome.
+        assert_eq!(
+            b.dispatch(req(BridgeOperation::WrapSlot)),
+            AndroidOutcome::err(AndroidResultCode::BuildProtocolMismatch)
+        );
+        assert!(!b.exposes_webview_capability());
+    }
+
+    #[test]
+    fn successful_handshake_enables_dispatch() {
+        let mut b = bridge();
+        assert!(b
+            .handshake(
+                APP_BUILD_VERSION,
+                IPC_PROTOCOL_VERSION,
+                MOBILE_PLUGIN_PROTOCOL_VERSION
+            )
+            .is_ok());
         assert_eq!(
             b.dispatch(req(BridgeOperation::WrapSlot)),
             AndroidOutcome::Ok {
                 kind: OutcomeKind::WrappedSlot
             }
         );
-        assert!(!b.exposes_webview_capability());
     }
 
     #[test]
     fn every_declared_operation_dispatchs_to_closed_outcome() {
-        let b = bridge();
+        let mut b = bridge();
+        assert!(b
+            .handshake(
+                APP_BUILD_VERSION,
+                IPC_PROTOCOL_VERSION,
+                MOBILE_PLUGIN_PROTOCOL_VERSION
+            )
+            .is_ok());
         for op in BridgeOperation::ALL {
             let outcome = b.dispatch(req(*op));
             assert!(matches!(outcome, AndroidOutcome::Ok { .. }), "op {op:?}");
@@ -216,7 +255,14 @@ mod tests {
 
     #[test]
     fn oversized_payload_is_rejected_before_platform_call() {
-        let b = bridge();
+        let mut b = bridge();
+        assert!(b
+            .handshake(
+                APP_BUILD_VERSION,
+                IPC_PROTOCOL_VERSION,
+                MOBILE_PLUGIN_PROTOCOL_VERSION
+            )
+            .is_ok());
         let mut r = req(BridgeOperation::WrapSlot);
         r.payload_descriptor = Some(PayloadDescriptor {
             kind: "vault-package".to_string(),
