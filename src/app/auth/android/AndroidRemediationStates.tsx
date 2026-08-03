@@ -7,6 +7,10 @@
  * model, alias, path, identity, raw exception, or support-code echo is ever
  * rendered. Unknown values fail closed to generic safe guidance. This is an
  * additive component; FEAT-002 remains the sole navigation/UI authority.
+ *
+ * Styling uses the shared `voting` theme tokens (tailwind.config.ts);
+ * borders are used for warning/error emphasis only, never as the default
+ * layout tool (HushVoting visual rules).
  */
 
 import type { SafeStateView } from '../../../lib/android-vault/safe-states';
@@ -31,33 +35,20 @@ export interface AndroidRemediationStatesProps {
 export function AndroidRemediationStates({ code, onAction }: AndroidRemediationStatesProps) {
   const view = safeStateViewFromUnknown(code);
 
-  if (view.informational && view.actions.length === 0) {
-    return (
-      <section
-        role="alert"
-        aria-live="polite"
-        className="rounded-xl bg-surface-raised p-6 shadow-sm focus:outline-none"
-        data-testid="android-remediation-informational"
-      >
-        <h2 className="mb-2 text-lg font-semibold text-on-surface">{view.heading}</h2>
-        <p className="mb-4 text-sm text-on-surface-muted">{view.body}</p>
-        {view.actions.length > 0 ? (
-          <div className="flex flex-wrap gap-3">{renderActions(view, onAction)}</div>
-        ) : null}
-      </section>
-    );
-  }
-
   return (
     <section
       role="alert"
       aria-live="polite"
-      className="rounded-xl bg-surface-raised p-6 shadow-sm"
-      data-testid="android-remediation"
+      data-testid={view.informational ? 'android-remediation-informational' : 'android-remediation'}
+      className={`rounded-lg bg-voting-container p-6 shadow-sm ${
+        view.informational ? '' : 'border border-voting-error/60'
+      }`}
     >
-      <h2 className="mb-2 text-lg font-semibold text-on-surface">{view.heading}</h2>
-      <p className="mb-4 text-sm text-on-surface-muted">{view.body}</p>
-      <div className="flex flex-wrap gap-3">{renderActions(view, onAction)}</div>
+      <h2 className="mb-2 text-lg font-semibold text-voting-text">{view.heading}</h2>
+      <p className="mb-4 text-sm text-voting-muted">{view.body}</p>
+      {view.actions.length > 0 ? (
+        <div className="flex flex-wrap gap-3">{renderActions(view, onAction)}</div>
+      ) : null}
     </section>
   );
 }
@@ -71,7 +62,7 @@ function renderActions(
       key={action.kind}
       type="button"
       onClick={() => onAction?.(action.kind)}
-      className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent transition-colors hover:bg-accent-strong focus:outline-none focus:ring-2 focus:ring-accent"
+      className="rounded-md bg-voting-primary px-4 py-2 text-sm font-medium text-voting-on-primary transition-colors hover:bg-voting-primary-container focus:outline-none focus:ring-2 focus:ring-voting-primary"
     >
       {ACTION_LABELS[action.kind]}
     </button>
