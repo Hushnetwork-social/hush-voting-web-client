@@ -45,9 +45,27 @@ function isAllowed(rel) {
 function scanDir(dir, includeCaches) {
   if (!existsSync(dir)) return;
   const walk = (current) => {
-    for (const entry of readdirSync(current)) {
+    let entries;
+    try {
+      entries = readdirSync(current);
+    } catch {
+      // Transient race: the scanned directory itself vanished between the
+      // parent walk and this readdir. Nothing to scan, so return instead of
+      // aborting the gate with an internal error (exit 2).
+      return;
+    }
+    for (const entry of entries) {
       const p = join(current, entry);
-      const st = statSync(p);
+      let st;
+      try {
+        st = statSync(p);
+      } catch {
+        // Transient race: a parallel vitest worker or build process may remove
+        // a scanned cache/tmp entry between readdir and stat. A file that no
+        // longer exists cannot produce a finding, so skip it rather than abort
+        // the whole gate with an internal error (exit 2).
+        continue;
+      }
       if (st.isDirectory()) {
         if (!includeCaches && CACHE_DIRS.includes(entry)) continue;
         if (entry === 'node_modules' || entry === 'src-tauri' || entry === 'target') continue;
@@ -55,7 +73,14 @@ function scanDir(dir, includeCaches) {
       } else if (FILE_RE.test(entry)) {
         const rel = relative(REPO_ROOT, p).split(sep).join('/');
         if (isAllowed(rel)) continue;
-        const content = readFileSync(p, 'utf8');
+        let content;
+        try {
+          content = readFileSync(p, 'utf8');
+        } catch {
+          // Same transient-race guard as above: skip entries removed between
+          // stat and read instead of failing the gate with an internal error.
+          continue;
+        }
         // Unit tests legitimately carry negative-pattern fixtures; SELECTORS still
         // apply everywhere (they identify production test controls).
         const isTestFile = /\.test\.(ts|tsx|mjs|js)$/.test(entry);
