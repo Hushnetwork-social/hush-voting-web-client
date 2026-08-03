@@ -217,6 +217,47 @@ mod tests {
     }
 
     #[test]
+    fn explicit_forbidden_vocabulary_never_appears() {
+        // Strengthened mirror of the FEAT-004 review recommendation: an
+        // explicit forbidden-name list scanned over every purpose, kind, and
+        // input bound so a future mislabeled operation is caught.
+        const FORBIDDEN: &[&str] = &[
+            "sign-bytes",
+            "signbytes",
+            "sign(bytes)",
+            "sign-any",
+            "generic-sign",
+            "decrypt",
+            "encrypt-any",
+            "private-key",
+            "privatekey",
+            "getPrivateKey",
+            "decryptVault",
+            "filesystem",
+            "fs-read",
+            "fs-write",
+            "generic",
+            "arbitrary",
+            "all-credentials",
+            "keyring",
+            "dbus",
+            "vault-dump",
+        ];
+        for spec in OPERATION_REGISTRY {
+            let kind_lower = format!("{:?}", spec.kind).to_lowercase();
+            let haystacks = [spec.purpose, kind_lower.as_str()];
+            for needle in FORBIDDEN {
+                for haystack in haystacks {
+                    assert!(
+                        !haystack.contains(needle),
+                        "forbidden vocabulary {needle:?} in {haystack}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
     fn every_secret_owned_operation_is_capability_scoped() {
         assert_eq!(
             operation_spec(OperationKind::RevealMnemonic)

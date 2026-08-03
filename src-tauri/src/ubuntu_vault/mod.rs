@@ -12,7 +12,10 @@
 //! - No browser-vault persistence, bundled provider, daemon, or helper process.
 
 pub mod contracts;
+pub mod crypto;
 pub mod item_model;
+pub mod lifecycle;
+pub mod secret_service;
 pub mod storage;
 
 /// Fixed production application identity shared by `.deb` and AppImage.

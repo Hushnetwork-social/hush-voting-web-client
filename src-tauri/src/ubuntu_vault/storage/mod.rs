@@ -6,6 +6,8 @@
 //! writer implements these rules against the real filesystem.
 
 pub mod commit;
+pub mod envelope;
 pub mod journal;
 pub mod layout;
 pub mod security;
+pub mod writer;
