@@ -1,62 +1,62 @@
 {
   "contractVersion": 1,
-  "generatedAt": "2026-08-03T11:50:08.755Z",
-  "gitRevision": "d770be71f84979e4bf3ac2eee0ab627eb5ff425b",
+  "generatedAt": "2026-08-03T11:54:45.024Z",
+  "gitRevision": "b2bc81ed4ba41ba662ccb24e419176121c48b728",
   "stages": [
     {
       "stage": "lint",
       "ok": true,
-      "ms": 2862
+      "ms": 2863
     },
     {
       "stage": "typecheck",
       "ok": true,
-      "ms": 1288
+      "ms": 1246
     },
     {
       "stage": "unit-tests",
       "ok": true,
-      "ms": 5248
+      "ms": 5092
     },
     {
       "stage": "identity-conformance",
       "ok": true,
-      "ms": 1436
+      "ms": 1320
     },
     {
       "stage": "vault-core-ci",
       "ok": true,
-      "ms": 30204
+      "ms": 30015
     },
     {
       "stage": "browser-vault-ci",
       "ok": true,
-      "ms": 45714
+      "ms": 45176
     },
     {
       "stage": "rust-format",
       "ok": true,
-      "ms": 73
+      "ms": 64
     },
     {
       "stage": "rust-clippy",
       "ok": true,
-      "ms": 1120
+      "ms": 991
     },
     {
       "stage": "rust-tests",
       "ok": true,
-      "ms": 2562
+      "ms": 2402
     },
     {
       "stage": "audit",
       "ok": true,
-      "ms": 1419
+      "ms": 1412
     },
     {
       "stage": "protocol-integrity",
       "ok": true,
-      "ms": 0
+      "ms": 1
     },
     {
       "stage": "secret-scan",
@@ -66,17 +66,17 @@
     {
       "stage": "release-evidence",
       "ok": true,
-      "ms": 74
+      "ms": 66
     },
     {
       "stage": "qualification",
       "ok": true,
-      "ms": 14613
+      "ms": 14722
     },
     {
       "stage": "handoff-integrity",
       "ok": true,
-      "ms": 0
+      "ms": 1
     }
   ],
   "allPassed": true
