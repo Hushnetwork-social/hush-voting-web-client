@@ -60,7 +60,8 @@
     "browser-vault:security-qualification": "node scripts/browser-vault/security-qualification.mjs",
     "browser-vault:qualification-report": "node scripts/browser-vault/qualification-report.mjs",
     "ubuntu-vault:ci": "node scripts/ubuntu-vault/ci-ubuntu-vault.mjs",
-    "ubuntu-vault:ci:selftest": "node scripts/ubuntu-vault/ci-ubuntu-vault.mjs --selftest"
+    "ubuntu-vault:ci:selftest": "node scripts/ubuntu-vault/ci-ubuntu-vault.mjs --selftest",
+    "ubuntu-vault:qualification": "node scripts/ubuntu-vault/qualification-harness.mjs"
   },
   "dependencies": {
     "@noble/hashes": "2.2.0",

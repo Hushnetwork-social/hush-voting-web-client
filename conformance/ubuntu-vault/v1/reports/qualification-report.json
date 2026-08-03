@@ -1,0 +1,96 @@
+{
+  "contractVersion": 1,
+  "generatedAt": "2026-08-03T11:44:01.722Z",
+  "gitRevision": "82f5f74eb531caa50a6bceb55644b9685d37caa2",
+  "adapterId": "ubuntu-secret-service-v1",
+  "harness": {
+    "name": "ubuntu-vault-qualification",
+    "isolatedAcknowledged": true,
+    "realProviderStages": [
+      "provider-available-unlocked",
+      "provider-available-locked-prompt",
+      "provider-prompt-cancelled",
+      "provider-prompt-timeout",
+      "provider-temporarily-unavailable",
+      "provider-absent-fallback",
+      "provider-unqualified-block",
+      "provider-restart",
+      "provider-duplicate-repair",
+      "provider-rotation-crash",
+      "provider-invalidated-recovery",
+      "fallback-upgrade",
+      "provider-account-change"
+    ],
+    "realProviderNote": "Executed on physical Ubuntu 24.04+ hosts inside an isolated synthetic account during release qualification; this harness refuses to run them without --isolated.",
+    "physicalEvidenceNote": "Orca/accessibility and declared-hardware performance evidence is produced on physical LTS hosts per the documented procedures; CI supplements, never replaces, physical evidence."
+  },
+  "gates": [
+    {
+      "gate": "crypto-replay",
+      "status": "covered-by-unit-gates",
+      "vaultManifestSha256": "e8dfdfa49b9e33cfc8a47b1266c5a14cb978c4be28f21d87cc2f034d435582e5",
+      "expectedVaultManifest": "e8dfdfa49b9e33cfc8a47b1266c5a14cb978c4be28f21d87cc2f034d435582e5"
+    },
+    {
+      "gate": "fault-matrix",
+      "status": "covered-by-unit-gates",
+      "note": "storage commit/journal/removal/rotation fault matrix green (213 Rust tests)"
+    },
+    {
+      "gate": "generic-access",
+      "status": "pass",
+      "findings": []
+    },
+    {
+      "gate": "package-identity",
+      "status": "pass",
+      "applicationId": "com.hushvoting.client",
+      "packages": {
+        "deb": {
+          "file": "HushVoting_0.1.0_amd64.deb",
+          "sha256": "796534313b58b427a6c54ec0c0c3258bf81f7e5009ee03c199031fbad40ab0a3"
+        },
+        "appimage": {
+          "file": "HushVoting_0.1.0_amd64.AppImage",
+          "sha256": "18bf71ea5443b8254d71231afc61533dd614428937977c50d904b7c09b8e1851"
+        }
+      },
+      "missing": []
+    },
+    {
+      "gate": "lifecycle-boundary",
+      "status": "covered-by-unit-gates",
+      "note": "single-instance, lifecycle, downstream seam tests green (ownership/lifecycle/command suites)"
+    },
+    {
+      "gate": "accessibility",
+      "status": "covered-by-unit-gates",
+      "note": "a11y-first component tests green (keyboard/focus/live-region/reflow/reduced-motion assertions)"
+    },
+    {
+      "gate": "performance",
+      "status": "pass",
+      "detail": "KDF_BENCH machine=Intel(R) Core(TM) i7-14700F (28 cores) samples=11 medianMs=9 p95Ms=12 hardLimitMs=1500 pass=true"
+    },
+    {
+      "gate": "supply-chain",
+      "status": "pass",
+      "findings": [
+        "cargo-audit: pass (no vulnerabilities)",
+        "npm-audit: pass (no high/critical)"
+      ]
+    },
+    {
+      "gate": "secret-scan",
+      "status": "pass",
+      "hits": 0
+    },
+    {
+      "gate": "isolation",
+      "status": "pass",
+      "isolatedAcknowledged": true,
+      "realProviderStages": "deferred to physical release qualification in an isolated synthetic account (--isolated)",
+      "findings": []
+    }
+  ]
+}
