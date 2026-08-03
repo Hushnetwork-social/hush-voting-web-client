@@ -11,7 +11,7 @@
 import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import { canonicalizeJson } from '../canonical/jcs';
-import { parseBoundedJson, DEFAULT_PARSE_LIMITS, isUnpaddedBase64Url } from '../canonical/parse';
+import { parseBoundedJson } from '../canonical/parse';
 import { buildAadBytes, aadInputsFor } from '../canonical/aad';
 import { PARAMETER_SUITE_V1 } from '../contracts/suite';
 import { validateDevicePassword, comparisonRepresentation } from '../password/unicode';
@@ -19,13 +19,6 @@ import { evaluatePasswordPolicy } from '../password/policy';
 import { checkSupportedVersion } from '../contracts/versions';
 import { validateExtensionContainer, EXTENSION_NAMESPACE_PATTERN } from '../contracts/extensions';
 import { journalCommit, type JournalState } from '../lifecycle/journal';
-import {
-  stagePendingRegistration,
-  beginSubmission,
-  reconcileToActive,
-  completeRemoval,
-  type LifecycleState,
-} from '../lifecycle/transitions';
 import { onLocalUnlock, onExactOnlineVerification, onFreshPassword, consumeFreshPassword, invalidateSession, INITIAL_KERNEL_STATE, type SessionKernelState } from '../session/kernel';
 import { VAULT_RESULT_CODES, VAULT_RESULT_REGISTRY, failure } from '../contracts/results';
 import { mulberry32, intInRange, pick, randomString, randomBase64Url, randomJsonValue } from './prng';
@@ -78,7 +71,6 @@ describe('FEAT-003 deterministic property suite (10,000+ seeded cases)', () => {
       runCase('bounds', seed, (rand) => {
         const size = intInRange(rand, 0, 4096);
         const depth = intInRange(rand, 1, 64);
-        const collections = intInRange(rand, 1, 200);
         const body = `{"x":${'['.repeat(depth)}${'1'.repeat(Math.max(1, size))}${']'.repeat(depth)}}`;
         const out = parseBoundedJson(enc(body), { limits: { maxBytes: 1024, maxNestingDepth: 16, maxCollections: 64 } });
         if (out.ok === false && !['OVERSIZED_INPUT', 'TOO_DEEP', 'TOO_MANY_COLLECTIONS', 'MALFORMED_JSON', 'NON_FINITE_NUMBER'].includes(out.code)) {

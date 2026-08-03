@@ -23,8 +23,10 @@ const nextConfig: NextConfig = {
     root: process.cwd(),
   },
   // FEAT-004: restrictive security headers on the production web build only
-  // (dev/HMR and test harnesses are unaffected).
-  headers: productionSecurityHeaderConfig(),
+  // (dev/HMR and test harnesses are unaffected). Static export cannot apply
+  // Next.js headers, so the config is omitted there to avoid the
+  // export-no-custom-routes warning (headers are never applied in export mode).
+  ...(isStaticExport ? {} : { headers: productionSecurityHeaderConfig() }),
 };
 
 export default nextConfig;

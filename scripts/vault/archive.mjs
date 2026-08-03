@@ -11,8 +11,8 @@
  * Exit codes: 0 = archive ok, 1 = archive/check failure, 2 = internal error.
  */
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { join, relative, sep } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 const REPO_ROOT = join(import.meta.dirname, '..', '..');
 const CORPUS = join(REPO_ROOT, 'conformance', 'vault', 'v1');

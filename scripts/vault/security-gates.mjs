@@ -30,7 +30,6 @@ const PROHIBITED_PATTERNS = [
 /** Conformance-only selectors (same vocabulary as production-exclusion). */
 const SELECTORS = ['DETERMINISTIC_TEST_PROVIDER', 'vault-reference-runner', 'PUBLIC_TEST_CREDENTIAL', 'hush-vault-ts-isolated'];
 
-const SCAN_DIRS = ['src', 'scripts', 'conformance'];
 const CACHE_DIRS = ['.next', '.next-web', '.next-static', '.next-tauri', 'out', 'coverage'];
 const FILE_RE = /\.(ts|tsx|mjs|js|json|md|html|map)$/;
 
@@ -82,7 +81,7 @@ function dependencyAudit(args) {
   try {
     execFileSync('npm', ['audit', '--omit=dev', '--audit-level=high'], { cwd: REPO_ROOT, stdio: 'ignore' });
     process.stdout.write('DEPENDENCY AUDIT OK (no high/critical findings)\n');
-  } catch (err) {
+  } catch {
     // npm audit exits non-zero on findings OR network failure; distinguish.
     let out = '';
     try {
