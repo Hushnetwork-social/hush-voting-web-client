@@ -367,12 +367,21 @@ mod tests {
 
     #[test]
     fn canonical_sha_is_stable_pinned_value() {
-        // Pinned cross-runtime vector: TypeScript must produce the identical
-        // digest for the same sample (see conformance/android-vault/v1/vectors).
+        // Pinned cross-runtime vector AW-001 (conformance/android-vault/v1/
+        // vectors/android-wrapper-vectors.json). TypeScript produces the same
+        // digest; replay must stay byte-identical.
         let meta = sample();
         let sha = meta.canonical_sha256().unwrap();
-        assert_eq!(sha.len(), 64);
-        assert!(sha.chars().all(|c| c.is_ascii_hexdigit()));
+        assert_eq!(
+            sha,
+            "706f5a9dcf9c8ccc4484e3c5099835bae1894d204886165f65dafe94059edd76"
+        );
+        // The canonical JSON itself must match the pinned vector bytes.
+        let bytes = meta.canonical_bytes().unwrap();
+        assert_eq!(
+            String::from_utf8(bytes).unwrap(),
+            "{\"adapterId\":\"android-keystore\",\"applicationId\":\"com.hushvoting.client\",\"criticalExtensions\":[],\"envelopeFormatVersion\":1,\"parameterSuiteVersion\":1,\"recordPurpose\":\"vault-package\",\"recordSchemaVersion\":1,\"releaseChannel\":\"production\",\"slot\":\"a\",\"vaultGeneration\":7,\"vaultKeyReference\":\"hvk-9f3e1a02b8c4\",\"wrapperVersion\":1}"
+        );
     }
 
     #[test]

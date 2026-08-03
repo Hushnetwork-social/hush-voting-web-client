@@ -210,6 +210,8 @@ impl From<VaultFile> for VaultFileName {
 /// Bounded sensitive-state signal (re-exported for downstream phases).
 pub use crate::android_vault::contracts::lifecycle::SensitiveState as LifecycleSensitiveState;
 
+pub mod commit;
+
 #[cfg(test)]
 mod tests {
     use super::*;

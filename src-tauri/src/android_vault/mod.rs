@@ -20,7 +20,10 @@
 //! - Fixed no-backup storage only; caller-controlled paths never exist.
 
 pub mod contracts;
+pub mod crypto;
 pub mod evidence;
+pub mod keystore;
+pub mod lifecycle;
 pub mod storage;
 pub mod wrapper;
 

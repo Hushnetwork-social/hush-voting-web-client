@@ -282,7 +282,7 @@ mod tests {
         QualificationReport {
             schema_version: 1,
             evidence_class: class,
-            build_digest: "a1b2c3d4e5f60718293a4b5c6d7e8f901a2b3c4d5e6f708192a3b4c5d6e7f8091"
+            build_digest: "a1b2c3d4e5f60718293a4b5c6d7e8f901a2b3c4d5e6f708192a3b4c5d6e7f809"
                 .to_string(),
             api_level: 36,
             security_level: BroadSecurityLevel::Tee,
@@ -318,7 +318,7 @@ mod tests {
         assert!(r.provenance_is_consistent());
         let matrix = ProfileMatrixResult::evaluate(
             &[r],
-            "a1b2c3d4e5f60718293a4b5c6d7e8f901a2b3c4d5e6f708192a3b4c5d6e7f8091",
+            "a1b2c3d4e5f60718293a4b5c6d7e8f901a2b3c4d5e6f708192a3b4c5d6e7f809",
         );
         assert!(!matrix.all_mandatory_present); // only one class present
         assert!(matrix
