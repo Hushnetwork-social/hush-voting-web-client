@@ -16,6 +16,8 @@ import {
   FALLBACK_EXPLANATION,
   providerStatusDetail,
   providerStatusTitle,
+  UPGRADE_OFFER_DETAIL,
+  UPGRADE_OFFER_TITLE,
 } from './copy';
 
 /** Shared panel surface (complementary dark surface; no white outlines). */
@@ -170,12 +172,8 @@ export function UpgradeOffer({
   onNotNow: () => void;
 }) {
   return (
-    <SurfacePanel title="Ubuntu keyring protection is now available" role="region" ariaLive="polite">
-      <p className="mb-3 text-sm text-[var(--muted)]">
-        Your vault will be protected by a fresh Ubuntu keyring wrapping key and
-        your device password. The change is atomic: the password-only copy is
-        removed only after the new protection unlocks successfully once.
-      </p>
+    <SurfacePanel title={UPGRADE_OFFER_TITLE} role="region" ariaLive="polite">
+      <p className="mb-3 text-sm text-[var(--muted)]">{UPGRADE_OFFER_DETAIL}</p>
       <div className="flex flex-wrap gap-2">
         <ActionButton onClick={onAddProtection}>Add Ubuntu keyring protection</ActionButton>
         <ActionButton variant="secondary" onClick={onNotNow}>Not now</ActionButton>
