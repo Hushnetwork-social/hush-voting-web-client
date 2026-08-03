@@ -45,7 +45,8 @@ pub fn validate_dispatch(
 
     // 1. Session epoch + main-window handle. `InspectPreview` is the ONLY
     // operation that may run without a live session handle (safe public
-    // projection of the locked state); every other operation requires one.
+    // projection of the locked state — the UI has no handle on first
+    // launch); every other operation requires one.
     if req.kind != OperationKind::InspectPreview {
         authority
             .validate(req.handle, spec.required_capability_phase)
@@ -53,11 +54,6 @@ pub fn validate_dispatch(
                 SessionError::StaleSession => NativeErrorCode::StaleSession,
                 _ => NativeErrorCode::OperationForbidden,
             })?;
-    } else if authority.phase() != CapabilityPhase::Locked
-        && authority.phase() != CapabilityPhase::Provisioning
-    {
-        // Preview is safe in every non-secret state; a locked/provisioning
-        // session simply has no live handle to present.
     }
 
     // 2. Input size bound.
