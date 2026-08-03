@@ -163,7 +163,9 @@ impl MobileBridge {
 mod tests {
     use super::*;
     use crate::android_vault::contracts::operation::BridgeOperation;
-    use crate::android_vault::session::{SessionAuthority, IPC_PROTOCOL_VERSION};
+    use crate::android_vault::session::{
+        SessionAuthority, IPC_PROTOCOL_VERSION, MOBILE_PLUGIN_PROTOCOL_VERSION,
+    };
 
     fn bridge() -> MobileBridge {
         MobileBridge::new(SessionAuthority::new(APP_BUILD_VERSION, true))
