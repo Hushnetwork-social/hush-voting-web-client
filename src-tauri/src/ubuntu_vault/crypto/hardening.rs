@@ -77,10 +77,9 @@ pub fn memory_lock_capability() -> bool {
     MemoryLocked::try_lock(&mut probe).is_some()
 }
 
-/// Disable core dumps in addition to zeroization (crash-hardening). Also
-/// guards against `core` file creation with a bounded fd-close of the cwd
-/// core pattern? No — only the documented RLIMIT_CORE control is applied.
-/// This function exists so the hardening contract has one explicit call site.
+/// Disable core dumps in addition to zeroization (crash-hardening).
+/// Single explicit call site for the hardening contract (Phase 4 composition
+/// calls this at startup).
 pub fn apply_process_hardening() -> bool {
     disable_core_dumps()
 }
@@ -91,12 +90,6 @@ pub fn apply_process_hardening() -> bool {
 pub fn clear_buffer(bytes: &mut [u8]) {
     use zeroize::Zeroize;
     bytes.zeroize();
-}
-
-/// Secret-memory crash hardening: prevent accidental core capture for the
-/// current process. Sanitized bool result only (no rlimit detail).
-pub fn crash_capture_hardening() -> bool {
-    apply_process_hardening()
 }
 
 /// Sanitized path byte length guard: crash reports never include command
@@ -117,7 +110,6 @@ mod tests {
         let _ = disable_core_dumps();
         let _ = apply_process_hardening();
     }
-
     #[test]
     fn memory_lock_is_best_effort_and_releases() {
         let mut small = vec![0x42u8; 256];
