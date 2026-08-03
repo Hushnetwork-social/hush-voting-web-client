@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+option csharp_namespace = "HushNetwork.proto";
+
+package rpcHush;
+
+service HushIdentity {
+    rpc GetIdentity (GetIdentityRequest) returns (GetIdentityReply);
+    rpc SearchByDisplayName (SearchByDisplayNameRequest) returns (SearchByDisplayNameReply);
+}
+
+message GetIdentityRequest {
+  string PublicSigningAddress = 1;
+}
+
+message GetIdentityReply {
+  bool Successfull = 1;
+  string Message = 2;
+  string ProfileName = 3; 
+  string PublicSigningAddress = 4; 
+  string PublicEncryptAddress = 5; 
+  bool IsPublic = 6;
+}
+
+message SearchByDisplayNameRequest {
+  string PartialDisplayName = 1;
+}
+
+message SearchByDisplayNameReply {
+
+  message Identity {
+    string DisplayName = 1;
+    string PublicSigningAddress = 2;
+    string PublicEncryptAddress = 3;
+  }
+
+  repeated Identity Identities = 1;
+}

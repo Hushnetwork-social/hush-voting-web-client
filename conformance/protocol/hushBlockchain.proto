@@ -1,0 +1,71 @@
+syntax = "proto3";
+
+option csharp_namespace = "HushNetwork.proto";
+
+package rpcHush;
+
+service HushBlockchain {
+  rpc GetBlockchainHeight (GetBlockchainHeightRequest) returns (GetBlockchainHeightReply);
+  rpc GetElectionEnvelopeContext (GetElectionEnvelopeContextRequest) returns (GetElectionEnvelopeContextReply);
+  rpc SubmitSignedTransaction(SubmitSignedTransactionRequest) returns (SubmitSignedTransactionReply);
+}
+
+// The request message for the blockchain height.
+message GetBlockchainHeightRequest { }
+
+// The response message containing the last BlockIndex.
+message GetBlockchainHeightReply {
+  int64 Index = 1;
+}
+
+message GetElectionEnvelopeContextRequest { }
+
+message GetElectionEnvelopeContextReply {
+  string NodePublicEncryptAddress = 1;
+  string ElectionEnvelopeVersion = 2;
+}
+
+message SubmitSignedTransactionRequest {
+  string SignedTransaction = 1;
+  repeated AttachmentBlob Attachments = 2;  // FEAT-066: Encrypted attachment blobs (side-channel, not part of signed payload)
+  WebClientDeploymentProofObservation WebClientDeploymentProof = 3; // FEAT-144: Browser-bundle proof metadata side-channel
+}
+
+message WebClientDeploymentProofObservation {
+  string SchemaVersion = 1;
+  string ComponentId = 2;
+  string DeploymentProofId = 3;
+  string DeploymentTarget = 4;
+  string SourceRef = 5;
+  string WebArtifactHash = 6;
+  string ClientBundleHash = 7;
+  string PackageHash = 8;
+  string PublicPackageRef = 9;
+  string DeploymentProtocolVersion = 10;
+  string EvidenceStatus = 11;
+  string ObservationScope = 12;
+  string GeneratedAtUtc = 13;
+}
+
+// FEAT-066: Encrypted attachment binary data sent alongside transaction
+message AttachmentBlob {
+  string AttachmentId = 1;        // Client-generated UUID matching metadata in signed payload
+  bytes EncryptedOriginal = 2;    // AES-256-GCM encrypted original file bytes
+  bytes EncryptedThumbnail = 3;   // AES-256-GCM encrypted thumbnail bytes (empty if no thumbnail)
+}
+
+// Transaction status enum for idempotency responses
+enum TransactionStatus {
+  TRANSACTION_STATUS_UNSPECIFIED = 0;  // Default for backward compatibility
+  TRANSACTION_STATUS_ACCEPTED = 1;      // New transaction accepted
+  TRANSACTION_STATUS_ALREADY_EXISTS = 2; // Duplicate found in database (already confirmed)
+  TRANSACTION_STATUS_PENDING = 3;       // Duplicate found in MemPool (still pending)
+  TRANSACTION_STATUS_REJECTED = 4;      // Transaction validation failed
+}
+
+message SubmitSignedTransactionReply {
+  bool Successfull = 1;
+  string Message = 2;
+  TransactionStatus status = 3;  // NEW: Idempotency status for FEAT-057
+  string ValidationCode = 4;
+}

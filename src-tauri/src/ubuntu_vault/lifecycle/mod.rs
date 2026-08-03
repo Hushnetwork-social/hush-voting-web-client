@@ -3,5 +3,6 @@
 //! this module owns the persisted operational state and its deterministic
 //! transitions.
 
+pub mod ownership;
 pub mod removal;
 pub mod throttle;

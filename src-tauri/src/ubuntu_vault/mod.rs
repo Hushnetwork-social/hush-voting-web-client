@@ -11,12 +11,17 @@
 //! - No generic signer/decryptor/private-key/filesystem operation exists.
 //! - No browser-vault persistence, bundled provider, daemon, or helper process.
 
+pub mod commands;
 pub mod contracts;
 pub mod crypto;
 pub mod item_model;
 pub mod lifecycle;
 pub mod secret_service;
+pub mod secrets;
+pub mod session;
+pub mod signing;
 pub mod storage;
+pub mod transport;
 
 /// Fixed production application identity shared by `.deb` and AppImage.
 pub const APPLICATION_ID: &str = "com.hushvoting.client";

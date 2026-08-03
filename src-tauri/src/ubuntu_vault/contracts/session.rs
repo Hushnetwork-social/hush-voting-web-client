@@ -22,7 +22,7 @@ impl SessionEpoch {
 
 /// Opaque session handle: unpredictable random bytes bound to an epoch and the
 /// main window. Not persisted; not logged; no secret material inside.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SessionHandle {
     pub epoch: SessionEpoch,
@@ -32,6 +32,18 @@ pub struct SessionHandle {
     pub opaque: [u8; 16],
     /// Caller identity: only the main window is an allowed runtime target.
     pub main_window_only: bool,
+}
+
+/// Redacted `Debug`: logs only the epoch and the window binding — never the
+/// opaque value, so handles cannot leak into dev logs/traces.
+impl std::fmt::Debug for SessionHandle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SessionHandle")
+            .field("epoch", &self.epoch)
+            .field("opaque", &"[redacted]")
+            .field("main_window_only", &self.main_window_only)
+            .finish()
+    }
 }
 
 mod bytes_hex {
@@ -114,5 +126,17 @@ mod tests {
     fn unknown_handle_fields_are_rejected() {
         let json = r#"{"epoch":1,"opaque":"abababababababababababababababab","mainWindowOnly":true,"persist":true}"#;
         assert!(serde_json::from_str::<SessionHandle>(json).is_err());
+    }
+
+    #[test]
+    fn debug_is_redacted() {
+        let handle = SessionHandle {
+            epoch: SessionEpoch(3),
+            opaque: [0xAB; 16],
+            main_window_only: true,
+        };
+        let rendered = format!("{handle:?}");
+        assert!(rendered.contains("redacted"));
+        assert!(!rendered.contains("abababab"));
     }
 }
