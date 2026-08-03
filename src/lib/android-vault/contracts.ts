@@ -152,6 +152,8 @@ export type AndroidResultCode =
   | 'unsupportedWrapperVersion'
   | 'staleSession'
   | 'cleanupRemovalIncomplete'
+  | 'kdfResourceLimit'
+  | 'networkTimeout'
   | 'wrongPasswordOrDamagedData';
 
 export const ANDROID_RESULT_CODES: readonly AndroidResultCode[] = [
@@ -169,6 +171,8 @@ export const ANDROID_RESULT_CODES: readonly AndroidResultCode[] = [
   'unsupportedWrapperVersion',
   'staleSession',
   'cleanupRemovalIncomplete',
+  'kdfResourceLimit',
+  'networkTimeout',
   'wrongPasswordOrDamagedData',
 ] as const;
 
@@ -188,6 +192,8 @@ export const RECOVERY_ACTIONS_BY_CODE: Readonly<Record<AndroidResultCode, readon
   unsupportedWrapperVersion: ['updateApp', 'cancel'],
   staleSession: ['retry'],
   cleanupRemovalIncomplete: ['retry', 'resumeRemoval'],
+  kdfResourceLimit: ['updateApp', 'retry'],
+  networkTimeout: ['retry'],
   wrongPasswordOrDamagedData: ['retry', 'portableRecovery'],
 } as const;
 
@@ -200,6 +206,8 @@ export function isRetryableCode(code: AndroidResultCode): boolean {
     code === 'storageQuotaExceeded' ||
     code === 'staleSession' ||
     code === 'cleanupRemovalIncomplete' ||
+    code === 'kdfResourceLimit' ||
+    code === 'networkTimeout' ||
     code === 'wrongPasswordOrDamagedData'
   );
 }

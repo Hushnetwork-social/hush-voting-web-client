@@ -245,13 +245,11 @@ pub fn inner_unlock_to_result(outcome: InnerUnlockOutcome) -> AndroidResultCode 
         InnerUnlockOutcome::DeviceLocked => AndroidResultCode::DeviceLocked,
         InnerUnlockOutcome::PlatformIntegrityFailure => AndroidResultCode::WrapperIntegrityFailure,
         InnerUnlockOutcome::TemporaryKeystoreFailure => AndroidResultCode::TemporaryKeystoreFailure,
-        InnerUnlockOutcome::KdfResourceLimit => {
-            AndroidResultCode::HardwareBackedKeystoreUnavailable
-        }
+        InnerUnlockOutcome::KdfResourceLimit => AndroidResultCode::KdfResourceLimit,
         InnerUnlockOutcome::StaleResult | InnerUnlockOutcome::Cancelled => {
             AndroidResultCode::StaleSession
         }
-        InnerUnlockOutcome::NetworkFailure => AndroidResultCode::StorageUnavailable,
+        InnerUnlockOutcome::NetworkFailure => AndroidResultCode::NetworkTimeout,
         InnerUnlockOutcome::PlatformInvalidated => AndroidResultCode::PlatformProtectionInvalidated,
     }
 }
@@ -415,6 +413,28 @@ mod tests {
         assert_ne!(
             inner_unlock_to_result(InnerUnlockOutcome::PlatformIntegrityFailure),
             AndroidResultCode::WrongPasswordOrDamagedData
+        );
+    }
+
+    #[test]
+    fn kdf_and_network_failures_map_to_distinct_closed_codes() {
+        // KDF resource limits and network timeouts must never be conflated
+        // with hardware or storage failures (misleading UI remediation).
+        assert_eq!(
+            inner_unlock_to_result(InnerUnlockOutcome::KdfResourceLimit),
+            AndroidResultCode::KdfResourceLimit
+        );
+        assert_ne!(
+            inner_unlock_to_result(InnerUnlockOutcome::KdfResourceLimit),
+            AndroidResultCode::HardwareBackedKeystoreUnavailable
+        );
+        assert_eq!(
+            inner_unlock_to_result(InnerUnlockOutcome::NetworkFailure),
+            AndroidResultCode::NetworkTimeout
+        );
+        assert_ne!(
+            inner_unlock_to_result(InnerUnlockOutcome::NetworkFailure),
+            AndroidResultCode::StorageUnavailable
         );
     }
 }

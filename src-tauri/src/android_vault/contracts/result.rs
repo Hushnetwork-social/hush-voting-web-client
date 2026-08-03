@@ -64,6 +64,10 @@ pub enum AndroidResultCode {
     StaleSession,
     /// Removal or cleanup incomplete; resume offered.
     CleanupRemovalIncomplete,
+    /// KDF cannot execute the minimum safe parameters (Android 64 MiB cap).
+    KdfResourceLimit,
+    /// Online identity verification timed out or connectivity failed.
+    NetworkTimeout,
     /// Inner password-authenticated decryption failed (FEAT-003 combined
     /// result; avoids a wrong-password oracle across the platform boundary).
     WrongPasswordOrDamagedData,
@@ -100,6 +104,8 @@ impl AndroidResultCode {
             Self::CleanupRemovalIncomplete => {
                 &[RecoveryAction::Retry, RecoveryAction::ResumeRemoval]
             }
+            Self::KdfResourceLimit => &[RecoveryAction::UpdateApp, RecoveryAction::Retry],
+            Self::NetworkTimeout => &[RecoveryAction::Retry],
             Self::WrongPasswordOrDamagedData => {
                 &[RecoveryAction::Retry, RecoveryAction::PortableRecovery]
             }
@@ -116,6 +122,8 @@ impl AndroidResultCode {
                 | Self::StorageQuotaExceeded
                 | Self::StaleSession
                 | Self::CleanupRemovalIncomplete
+                | Self::KdfResourceLimit
+                | Self::NetworkTimeout
                 | Self::WrongPasswordOrDamagedData
         )
     }
@@ -187,6 +195,8 @@ mod tests {
             AndroidResultCode::UnsupportedWrapperVersion,
             AndroidResultCode::StaleSession,
             AndroidResultCode::CleanupRemovalIncomplete,
+            AndroidResultCode::KdfResourceLimit,
+            AndroidResultCode::NetworkTimeout,
             AndroidResultCode::WrongPasswordOrDamagedData,
         ];
         for code in codes {
