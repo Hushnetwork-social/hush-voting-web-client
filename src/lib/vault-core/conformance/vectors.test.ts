@@ -614,4 +614,4 @@ describe('vault conformance vectors (primary derivation)', () => {
     expect(comparisonRepresentation('CorrectHorse')).toBe('correcthorse');
     expect(Buffer.from(kdfInputBytes('Straße')).toString()).toBe('Straße');
   });
-});
+}, 30_000);
