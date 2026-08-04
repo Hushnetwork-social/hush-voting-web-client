@@ -60,6 +60,8 @@ export function decidePaste(pasted: string, selectedCount: '12' | '24' | null, a
 export function WordEntryScreen({ grid, onSelectCount, onPastePhrase, onConfirmPasteReplacement, onClearAll, onVerify, onBack }: WordEntryProps) {
   const [draft, setDraft] = useState<ReadonlyArray<string>>([]);
   const [concealed, setConcealed] = useState(grid.allConcealed);
+  const [replacementPrompt, setReplacementPrompt] = useState(false);
+  const pendingPasteRef = useRef<{ phrase: string; count: number } | null>(null);
   const count = grid.selectedWordCount;
 
   const inputs = useMemo(() => {
@@ -80,20 +82,14 @@ export function WordEntryScreen({ grid, onSelectCount, onPastePhrase, onConfirmP
       onPastePhrase(decision.phrase);
       setConcealed(true);
     } else if (decision.kind === 'replacementRequired') {
-      // The parent (authority-driven grid state) shows the replacement prompt;
-      // we keep the draft until the user confirms or cancels.
-      setDraft((current) => current); // no-op; prompt handled by grid state
-      // Defer: the paste phrase is delivered only on confirmation.
+      // Explicit whole-grid replacement confirmation; existing values preserved
+      // until the user decides.
       pendingPasteRef.current = { phrase: decision.phrase, count: decision.count };
-    } else if (decision.kind === 'countMismatch') {
-      // Reject the entire paste; preserve all existing fields.
-      setDraft((current) => current);
+      setReplacementPrompt(true);
     }
-    // emptyPaste: no-op
+    // countMismatch/emptyPaste: reject entirely; existing fields preserved.
     void position;
   };
-
-  const pendingPasteRef = useRef<{ phrase: string; count: number } | null>(null);
 
   const confirmReplacement = (confirm: boolean) => {
     const pending = pendingPasteRef.current;
@@ -104,6 +100,7 @@ export function WordEntryScreen({ grid, onSelectCount, onPastePhrase, onConfirmP
       setConcealed(true);
     }
     pendingPasteRef.current = null;
+    setReplacementPrompt(false);
     onConfirmPasteReplacement(confirm);
   };
 
@@ -173,7 +170,7 @@ export function WordEntryScreen({ grid, onSelectCount, onPastePhrase, onConfirmP
         </>
       )}
 
-      {grid.pasteReplacementPending && (
+      {(grid.pasteReplacementPending || replacementPrompt) && (
         <div role="alertdialog" aria-label="Replace words" className="mt-4 rounded-xl bg-[var(--surface-strong)] p-4">
           <p className="text-sm text-[var(--text)]">{WORD_ENTRY.replacePrompt}</p>
           <div className="mt-3 flex gap-3">
