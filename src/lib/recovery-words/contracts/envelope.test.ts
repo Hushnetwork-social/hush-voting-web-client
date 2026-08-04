@@ -144,6 +144,12 @@ describe('RecoveryEnvelopeRecord no-mnemonic enforcement', () => {
       expect(parsed.code).toBe('UNSUPPORTED_PROTECTION_VERSION');
     }
   });
+
+  it('fails closed on malformed profile/lifecycle/reconciliation metadata unions', () => {
+    expect(parseRecoveryEnvelopeRecord(validEnvelope({ profile: { kind: 'mystery' } as never })).ok).toBe(false);
+    expect(parseRecoveryEnvelopeRecord(validEnvelope({ lifecycle: { stage: 'bogus' } as never })).ok).toBe(false);
+    expect(parseRecoveryEnvelopeRecord(validEnvelope({ reconciliation: { requiresProfileRecreate: 'yes' } as never })).ok).toBe(false);
+  });
 });
 
 describe('checkLegalProtectionCombination', () => {

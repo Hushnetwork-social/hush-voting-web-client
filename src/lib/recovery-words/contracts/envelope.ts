@@ -212,6 +212,26 @@ export function parseRecoveryEnvelopeRecord(value: unknown): RecoveryResult<Reco
     return failure('ENVELOPE_MALFORMED', 'Recovery record producer metadata is malformed.');
   }
 
+  // Bounded metadata unions must also fail closed (never inferred).
+  const profile = record['profile'];
+  const profileKind = (profile as Record<string, unknown> | null)?.['kind'];
+  if (profileKind !== 'existing' && profileKind !== 'pendingRecreate') {
+    return failure('ENVELOPE_MALFORMED', 'Recovery record profile metadata is malformed.');
+  }
+  const lifecycle = record['lifecycle'];
+  const lifecycleStage = (lifecycle as Record<string, unknown> | null)?.['stage'];
+  if (lifecycleStage !== 'staged' && lifecycleStage !== 'active') {
+    return failure('ENVELOPE_MALFORMED', 'Recovery record lifecycle stage is malformed.');
+  }
+  const reconciliation = record['reconciliation'];
+  if (
+    reconciliation === null ||
+    typeof reconciliation !== 'object' ||
+    typeof (reconciliation as Record<string, unknown>)['requiresProfileRecreate'] !== 'boolean'
+  ) {
+    return failure('ENVELOPE_MALFORMED', 'Recovery record reconciliation metadata is malformed.');
+  }
+
   return { ok: true, value: value as RecoveryEnvelopeRecord };
 }
 
