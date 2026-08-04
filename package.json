@@ -69,7 +69,10 @@
     "android-vault:customize": "node scripts/android-vault/customize-project.mjs --project src-tauri/gen/android",
     "android-vault:adversarial": "node scripts/android-vault/adversarial-matrix.mjs",
     "android-vault:secret-scan": "node scripts/android-vault/secret-scan.mjs",
-    "android-vault:qualification": "node scripts/android-vault/qualification-harness.mjs --digest development"
+    "android-vault:qualification": "node scripts/android-vault/qualification-harness.mjs --digest development",
+    "identity-create:coverage": "node scripts/identity-create/validate-coverage-manifest.mjs ../hush-voting-memory-bank/Features/03_IN_PROGRESS/FEAT-007-blockchain-identity-creation-flow/acceptance-coverage-manifest.json",
+    "test:identity-create:bdd": "playwright test --config playwright.identity-create.config.ts",
+    "identity-create:secret-scan": "node scripts/identity-create/secret-scan.mjs"
   },
   "dependencies": {
     "@noble/hashes": "2.2.0",
@@ -98,6 +101,7 @@
     "eslint-config-next": "^16.2.12",
     "fake-indexeddb": "^6.2.5",
     "jsdom": "^27.3.0",
+    "playwright-bdd": "9.2.0",
     "postcss": "^8.5.15",
     "rimraf": "^6.1.2",
     "tailwindcss": "^3.4.17",
