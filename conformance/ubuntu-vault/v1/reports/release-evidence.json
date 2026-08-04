@@ -1,7 +1,7 @@
 {
   "contractVersion": 1,
-  "generatedAt": "2026-08-03",
-  "gitRevision": "212b91e1fd11f30271f8503c6875cd5f2ecd8857",
+  "generatedAt": "2026-08-04",
+  "gitRevision": "0f5cabee8e2c7706c835685c94fea7869b8b91bc",
   "applicationId": "com.hushvoting.client",
   "adapterId": "ubuntu-secret-service-v1",
   "packageFormats": [

@@ -1,7 +1,7 @@
 {
   "contractVersion": 1,
-  "generatedAt": "2026-08-03T23:38:37.457Z",
-  "gitRevision": "212b91e1fd11f30271f8503c6875cd5f2ecd8857",
+  "generatedAt": "2026-08-04T08:38:45.364Z",
+  "gitRevision": "0f5cabee8e2c7706c835685c94fea7869b8b91bc",
   "adapterId": "ubuntu-secret-service-v1",
   "harness": {
     "name": "ubuntu-vault-qualification",
@@ -70,7 +70,7 @@
     {
       "gate": "performance",
       "status": "pass",
-      "detail": "KDF_BENCH machine=Intel(R) Core(TM) i7-14700F (28 cores) samples=11 medianMs=9 p95Ms=12 hardLimitMs=1500 pass=true"
+      "detail": "KDF_BENCH machine=Intel(R) Core(TM) i7-14700F (28 cores) samples=11 medianMs=10 p95Ms=14 hardLimitMs=1500 pass=true"
     },
     {
       "gate": "supply-chain",
