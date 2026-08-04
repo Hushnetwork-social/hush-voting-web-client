@@ -12,7 +12,7 @@
 import { useRef, useState } from 'react';
 import type { CreationReviewProjection } from '../../../lib/identity-creation/contracts.js';
 import { PROTECT, REVIEW } from './copy';
-import { ActionButton, BackButton, FieldError, StatusRegion, SurfacePanel } from './surfaces';
+import { ActionButton, BackButton, FieldError, SurfacePanel } from './surfaces';
 
 export interface ProtectProps {
   readonly onProtect: (password: string) => void;
