@@ -41,9 +41,9 @@ describe('unifiedBack — browser/Android/in-app Back share one authority', () =
   });
 
   it('never reopens creation from the waiting gate (Back → lock path)', () => {
-    expect(unifiedBack('createWaiting', 3)).toBe('createCancelling');
-    expect(unifiedBack('createDelay', 3)).toBe('createCancelling');
-    expect(unifiedBack('createConnection', 3)).toBe('createCancelling');
+    expect(unifiedBack('createWaiting', 3)).toBe('locked');
+    expect(unifiedBack('createDelay', 3)).toBe('locked');
+    expect(unifiedBack('createConnection', 3)).toBe('locked');
   });
 });
 

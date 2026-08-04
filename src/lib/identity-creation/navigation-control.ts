@@ -63,7 +63,7 @@ export function decideHistoryEntry(destination: CreationDestinationKind, minor: 
 }
 
 /** Unified Back transition across browser/Android/in-app Back. */
-export function unifiedBack(current: CreationDestinationKind, historyDepth: number): CreationDestinationKind | 'root' {
+export function unifiedBack(current: CreationDestinationKind, historyDepth: number): CreationDestinationKind | 'root' | 'locked' {
   if (historyDepth <= 1) {
     // Safe first-run root: no Back at the root.
     return 'root';
@@ -74,7 +74,7 @@ export function unifiedBack(current: CreationDestinationKind, historyDepth: numb
     case 'createConnection':
       // After provisional persistence, Back locks the saved local identity
       // and shows returning-user unlock — never reopens creation history.
-      return 'createCancelling'; // resolved by caller to locked/unlock per lifecycle
+      return 'locked';
     case 'createReview':
       return 'createProtect';
     case 'createProtect':
