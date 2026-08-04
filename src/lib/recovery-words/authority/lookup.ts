@@ -22,6 +22,7 @@ import type { PublicCandidateDescriptor } from '../../identity-compatibility/typ
 import type { NetworkIdentifier, RecoveryEpoch, RecoveryResult } from '../contracts/lifecycle';
 import type { CandidateLookupOutcome } from '../contracts/candidates';
 import { recordLookupOutcome, resolveLookup, type CandidateLookupState } from '../contracts/candidates';
+import { RECOVERY_EPOCH_MAX_MS } from './word';
 
 /** Per-candidate request timeout (shared 10-second bound). */
 export const LOOKUP_REQUEST_TIMEOUT_MS = 10_000 as const;
@@ -43,6 +44,11 @@ export function beginLookup(
   return { epoch, networkIdentifier, candidates, outcomes: new Map(), startedAtEpochMs };
 }
 
+/** Epoch validity gate: lookups may proceed only inside the foreground epoch. */
+export function assertEpochValid(state: CandidateLookupState, nowMs: number): boolean {
+  return nowMs <= state.startedAtEpochMs + RECOVERY_EPOCH_MAX_MS;
+}
+
 /**
  * Run one sequential pass over the unresolved candidates in deterministic
  * precedence order. Each request is bounded by `timeoutMs` (default the
@@ -55,6 +61,9 @@ export async function runSequentialLookupPass(
   nowMs: number,
   timeoutMs: number = LOOKUP_REQUEST_TIMEOUT_MS,
 ): Promise<{ readonly state: CandidateLookupState; readonly attempted: number; readonly unresolvedAfter: number }> {
+  if (!assertEpochValid(state, nowMs)) {
+    return { state, attempted: 0, unresolvedAfter: countUnresolved(state) };
+  }
   let current = state;
   let attempted = 0;
   for (let index = 0; index < current.candidates.length; index += 1) {
@@ -87,6 +96,9 @@ export async function retryUnresolved(
   nowMs: number,
   timeoutMs: number = LOOKUP_REQUEST_TIMEOUT_MS,
 ): Promise<{ readonly state: CandidateLookupState; readonly retried: number }> {
+  if (!assertEpochValid(state, nowMs)) {
+    return { state, retried: 0 };
+  }
   let current = state;
   let retried = 0;
   for (let index = 0; index < current.candidates.length; index += 1) {

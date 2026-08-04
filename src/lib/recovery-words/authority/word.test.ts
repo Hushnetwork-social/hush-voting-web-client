@@ -133,4 +133,10 @@ describe('epoch custody and clear policy', () => {
     expect(mustClearOn('lock', 'staged')).toBe(true);
     expect(mustClearOn('lifecycleLoss', 'staged')).toBe(true);
   });
+
+  it('network change invalidates lookup/selection/stage at EVERY stage (fresh word entry)', () => {
+    expect(mustClearOn('networkChange', 'preVerify')).toBe(true);
+    expect(mustClearOn('networkChange', 'postVerify')).toBe(true);
+    expect(mustClearOn('networkChange', 'staged')).toBe(true);
+  });
 });

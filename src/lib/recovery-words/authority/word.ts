@@ -164,6 +164,11 @@ export type RecoveryClearEvent = 'back' | 'lock' | 'lifecycleLoss' | 'cancellati
 
 /** Deterministic clear policy — any of these destroys transient secret state. */
 export function mustClearOn(event: RecoveryClearEvent, stage: 'preVerify' | 'postVerify' | 'staged'): boolean {
+  // Network change invalidates the complete lookup/selection/stage and
+  // requires fresh word entry at EVERY stage (canonical network binding).
+  if (event === 'networkChange') {
+    return true;
+  }
   if (stage === 'staged') {
     // Staged keys persist; Back locks instead of destroying. Lifecycle loss
     // still clears the *session*; the encrypted stage survives for resume.

@@ -11,6 +11,7 @@ import type { CandidateLookupOutcome } from '../contracts/candidates';
 import { resolveLookup } from '../contracts/candidates';
 import type { NetworkIdentifier, RecoveryEpoch } from '../contracts/lifecycle';
 import {
+  assertEpochValid,
   beginLookup,
   resolutionVerdict,
   retryUnresolved,
@@ -120,6 +121,25 @@ describe('resolutionVerdict gate', () => {
     );
     const vM = resolutionVerdict(multipleAfter.state);
     expect(vM.ok && vM.value.kind).toBe('multiple');
+  });
+});
+
+describe('epoch validity gate', () => {
+  it('blocks lookup passes once the 10-minute foreground epoch expires', async () => {
+    const candidates = [candidate(1), candidate(2)];
+    const state = beginLookup(epoch, network, candidates, 0);
+    expect(assertEpochValid(state, 599_999)).toBe(true);
+    expect(assertEpochValid(state, 600_001)).toBe(false);
+    let calls = 0;
+    const countingPort: RecoveryLookupPort = {
+      async lookupCandidate() {
+        calls += 1;
+        return { kind: 'authoritativeNotFound' };
+      },
+    };
+    const { attempted } = await runSequentialLookupPass(state, countingPort, 600_001);
+    expect(attempted).toBe(0);
+    expect(calls).toBe(0);
   });
 });
 
