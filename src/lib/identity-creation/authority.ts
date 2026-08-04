@@ -60,7 +60,7 @@ export type RecoveryChallengeState =
 
 export type RecoveryAttemptResult =
   | { readonly ok: true }
-  | { readonly ok: false; readonly mismatchPosition: number; readonly attemptsRemaining: number }
+  | { readonly ok: false; readonly mismatchPosition: number }
   | { readonly ok: false; readonly invalidated: true };
 
 /** Sealed generation port (implemented by browser worker / native authority). */
@@ -120,7 +120,9 @@ export function evaluateRecoveryAttempt(positions: readonly number[], provided: 
     const given = provided.get(pos);
     const want = expected.get(pos);
     if (given !== want) {
-      return { ok: false, mismatchPosition: pos, attemptsRemaining: 0 }; // attempts bookkeeping handled by state
+      // Attempt bookkeeping lives in the challenge state machine; the result
+      // reports only the requested position (never the expected word).
+      return { ok: false, mismatchPosition: pos };
     }
   }
   return { ok: true };

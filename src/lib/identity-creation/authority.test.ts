@@ -95,7 +95,7 @@ describe('evaluateRecoveryAttempt + advanceChallenge', () => {
     state = advanceChallenge(state, result);
     expect(state.status).toBe('passed');
     // Subsequent attempts against a passed state are no-ops.
-    expect(advanceChallenge(state, { ok: false, mismatchPosition: 1, attemptsRemaining: 0 }).status).toBe('passed');
+    expect(advanceChallenge(state, { ok: false, mismatchPosition: 1 }).status).toBe('passed');
   });
 });
 
