@@ -16,7 +16,7 @@ import { createServerTransport } from '../server-transport';
 
 export const runtime = 'nodejs';
 
-const ADDRESS_RE = /^[A-Za-z0-9]+$/;
+const ADDRESS_RE = /^[A-Za-z0-9]{1,128}$/;
 
 export async function POST(request: Request): Promise<NextResponse> {
   const port: HushServerTransportPort | null = createServerTransport(process.env);
