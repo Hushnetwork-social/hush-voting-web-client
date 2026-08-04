@@ -24,21 +24,21 @@ Feature: Identity create — navigation, multi-owner, cancellation, security, na
     Then the token is rejected
     And a local/provisional user always blocks the three first-run actions
 
-  @FEAT-007 @AC-007-061 @HV-ID-CREATE-MULTI-001
+  @FEAT-007 @AC-007-061 @HV-ID-CREATE-MULTI-002
   Scenario: A non-secret cross-tab event invalidates stale onboarding authorities
     Given another tab commits a local user
     When the non-secret local-user event is observed or vault inspection runs
     Then the stale onboarding authority is invalidated
     And no alias, address, transaction, password, mnemonic, or key is broadcast
 
-  @FEAT-007 @AC-007-062 @HV-ID-CREATE-MULTI-002
+  @FEAT-007 @AC-007-062 @HV-ID-CREATE-MULTI-003
   Scenario: Single-owner authority prevents competing candidates
     Given two tabs/windows/processes attempt provisioning
     When ownership is evaluated
     Then only the single owner may provision or submit
     And a second owner cannot create a competing FEAT-007 candidate
 
-  @FEAT-007 @AC-007-031 @HV-ID-CREATE-MULTI-003
+  @FEAT-007 @AC-007-031 @HV-ID-CREATE-MULTI-001
   Scenario: Concurrent triggers coalesce into one reconciliation cycle
     Given startup, focus, connectivity, and user retry occur together
     When reconciliation starts

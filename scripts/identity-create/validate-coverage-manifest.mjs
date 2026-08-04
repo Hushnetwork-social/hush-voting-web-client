@@ -3,15 +3,23 @@
  * FEAT-007 coverage-manifest validator (Task 7.1).
  *
  * Machine-checks the acceptance-coverage manifest produced in Phase 1
- * (memory bank): every AC-007-NNN has at least one executable scenario ID,
- * every scenario ID is unique, every scenario references a known criterion,
- * and every criterion references one of the 17 mandatory families. Unknown or
- * missing mappings fail CI before acceptance execution.
+ * (memory bank) AND the executable Gherkin catalog
+ * (`features/identity-create/*.feature`): every AC-007-NNN has exactly the
+ * manifest scenario ID in the catalog, every scenario ID is unique, every
+ * scenario references a known criterion, and every criterion references one
+ * of the 17 mandatory families. Unknown or missing mappings fail CI before
+ * acceptance execution.
  *
  * Usage:
  *   node scripts/identity-create/validate-coverage-manifest.mjs <manifest.json>
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = join(SCRIPT_DIR, '..', '..');
+const FEATURES_DIR = join(REPO_ROOT, 'features', 'identity-create');
 
 const FAMILIES = new Set([
   'HV-ID-CREATE-ENTRY', 'HV-ID-CREATE-PROFILE', 'HV-ID-CREATE-GENERATE',
@@ -74,12 +82,48 @@ function main() {
     errors.push(`expected 76 criteria, found ${knownCriteria.length}`);
   }
 
+  // Cross-check the executable Gherkin catalog against the manifest.
+  const catalog = readCatalog();
+  for (const ac of knownCriteria) {
+    const expectedIds = new Set(criteria[ac].scenarioIds);
+    const actualIds = catalog.get(ac) ?? [];
+    const missing = [...expectedIds].filter((id) => !actualIds.includes(id));
+    const extra = actualIds.filter((id) => !expectedIds.has(id));
+    if (missing.length > 0) errors.push(`${ac}: catalog missing scenario(s) ${missing.join(', ')}`);
+    if (extra.length > 0) errors.push(`${ac}: catalog has unexpected scenario(s) ${extra.join(', ')}`);
+  }
+  for (const [ac, ids] of catalog) {
+    if (!knownCriteria.includes(ac)) {
+      errors.push(`${ac}: catalog references an unknown criterion`);
+    }
+    void ids;
+  }
+
   if (errors.length > 0) {
     console.error('COVERAGE MANIFEST FAILED:');
     for (const e of errors) console.error(`  - ${e}`);
     process.exit(1);
   }
-  console.log(`COVERAGE MANIFEST OK (${knownCriteria.length}/76 criteria, ${seenScenarioIds.size} scenario ids, ${FAMILIES.size} families)`);
+  console.log(`COVERAGE MANIFEST OK (${knownCriteria.length}/76 criteria, ${seenScenarioIds.size} scenario ids, ${FAMILIES.size} families, ${catalog.size} catalog scenarios)`);
+}
+
+/** Parse .feature files into AC -> scenario IDs. */
+function readCatalog() {
+  const catalog = new Map();
+  for (const name of readdirSync(FEATURES_DIR)) {
+    const file = join(FEATURES_DIR, name);
+    if (!statSync(file).isFile() || !name.endsWith('.feature')) continue;
+    const content = readFileSync(file, 'utf8');
+    // Each scenario tag line carries: @FEAT-007 @AC-007-NNN @HV-ID-CREATE-XXX-NNN
+    const tagRe = /@(AC-007-\d{3})\s+@(HV-ID-CREATE-[A-Z]+-\d{3})/g;
+    let match;
+    while ((match = tagRe.exec(content)) !== null) {
+      const ac = match[1];
+      const id = match[2];
+      catalog.set(ac, [...(catalog.get(ac) ?? []), id]);
+    }
+  }
+  return catalog;
 }
 
 main();

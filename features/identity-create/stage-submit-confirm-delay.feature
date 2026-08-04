@@ -70,63 +70,56 @@ Feature: Identity create — staging, submission, confirmation, delay, correctio
     Then exact signing and encryption addresses confirm the same identity
     And a signing match with encryption mismatch fails closed
 
-  @FEAT-007 @AC-007-031 @HV-ID-CREATE-SUBMIT-006
-  Scenario: One reconciliation cycle submits at most once
-    Given startup, focus, connectivity, and user retry occur together
-    When reconciliation coalesces
-    Then one authority-owned lookup runs
-    And at most one submission follows authoritative absence
-
-  @FEAT-007 @AC-007-032 @HV-ID-CREATE-SUBMIT-007
+  @FEAT-007 @AC-007-032 @HV-ID-CREATE-SUBMIT-006
   Scenario: ACCEPTED promotes to saved-waiting without claiming confirmation
     Given submission returns ACCEPTED
     When the lifecycle is promoted
     Then the provisional lifecycle becomes saved-user waiting
     And no block confirmation is claimed
 
-  @FEAT-007 @AC-007-033 @HV-ID-CREATE-SUBMIT-008
+  @FEAT-007 @AC-007-033 @HV-ID-CREATE-SUBMIT-007
   Scenario: PENDING waits without another submission
     Given submission returns PENDING
     When the same signing key is already in the mempool
     Then HushVoting promotes/waits like ACCEPTED
     And never resubmits or generates replacement bytes while pending knowledge is current
 
-  @FEAT-007 @AC-007-034 @HV-ID-CREATE-SUBMIT-009
+  @FEAT-007 @AC-007-034 @HV-ID-CREATE-SUBMIT-008
   Scenario: ALREADY_EXISTS resolves by exact lookup only
     Given submission returns ALREADY_EXISTS
     When reconciliation proceeds
     Then an exact GetIdentity lookup runs
     And ALREADY_EXISTS alone never authenticates the user
 
-  @FEAT-007 @AC-007-035 @HV-ID-CREATE-SUBMIT-010
+  @FEAT-007 @AC-007-035 @HV-ID-CREATE-SUBMIT-009
   Scenario: Status/code combinations use a closed allowlist
     Given any submission reply
     When it is normalized
     Then only allowlisted status/code combinations drive behavior
     And message parsing, unknown codes, unspecified statuses, and contradictions fail closed
 
-  @FEAT-007 @AC-007-036 @HV-ID-CREATE-SUBMIT-011
+  @FEAT-007 @AC-007-036 @HV-ID-CREATE-SUBMIT-010
   Scenario: Transport ambiguity preserves the exact transaction
     Given a transport or server failure
     When the outcome is evaluated
     Then the exact transaction and provisional identity are preserved
     And no replacement bytes are generated
 
-  @FEAT-007 @AC-007-045 @HV-ID-CREATE-SUBMIT-012
+  @FEAT-007 @AC-007-045 @HV-ID-CREATE-SUBMIT-011
   Scenario: Ambiguous retries reuse exact signed bytes
     Given an ambiguous retry while the transaction may be pending
     When retry occurs
     Then the exact signed bytes are reused
     And no new transaction is created
 
-  @FEAT-007 @AC-007-048 @HV-ID-CREATE-SUBMIT-013
+  @FEAT-007 @AC-007-048 @HV-ID-CREATE-SUBMIT-012
   Scenario: A missing transaction can be rebuilt only after verified eligibility
     Given the retained transaction record is missing
     When rebuild eligibility is evaluated
     Then authenticated credential/profile verification AND authoritative absence are both required
     And corruption never counts as missing
 
-  @FEAT-007 @AC-007-050 @HV-ID-CREATE-SUBMIT-014
+  @FEAT-007 @AC-007-050 @HV-ID-CREATE-SUBMIT-013
   Scenario: The client never polls as retry or periodically replaces transactions
     Given the waiting gate is active
     When time passes
