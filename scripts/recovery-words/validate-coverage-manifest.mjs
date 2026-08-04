@@ -63,8 +63,9 @@ function main() {
     if (!FAMILIES.has(entry.family)) {
       errors.push(`${ac}: unknown family ${entry.family}`);
     }
-    if (!TARGETS.has(entry.targets?.[0] ?? '')) {
-      errors.push(`${ac}: unknown target ${entry.targets?.[0]}`);
+    const targets = entry.targets ?? [];
+    if (targets.length === 0 || targets.some((target) => !TARGETS.has(target))) {
+      errors.push(`${ac}: unknown or empty target list`);
     }
     for (const sid of entry.scenarioIds) {
       if (seenScenarioIds.has(sid)) {
