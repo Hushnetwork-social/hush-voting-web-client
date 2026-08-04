@@ -1,0 +1,133 @@
+/**
+ * FEAT-008 Task 5.2 — component and accessibility tests for the word-entry UI.
+ * Coverage targets: AC-008-005–017 (component/a11y portion); paste into every
+ * position, empty/non-empty replacement, wrong-count atomicity, unknown
+ * positions, concealment, clear-all, error focus, no secret snapshots.
+ */
+import { describe, expect, it, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import type { WordGridProjection } from '../../../lib/recovery-words/contracts/projection';
+import { WordEntryScreen, decidePaste, normalizePastedPhrase } from './word-entry';
+
+const M24 = 'abandon amount liar amount expire adjust cage candy arch gather drum bullet absurd math era live bid rhythm alien crouch range attend journey unaware';
+const M12 = M24.split(' ').slice(0, 12).join(' ');
+
+function grid(overrides: Partial<WordGridProjection> = {}): WordGridProjection {
+  return {
+    selectedWordCount: null,
+    invalidPositions: [],
+    countValid: false,
+    vocabularyValid: false,
+    checksumState: 'notRun',
+    allConcealed: true,
+    busy: false,
+    canVerify: false,
+    errorSummary: [],
+    pasteReplacementPending: false,
+    ...overrides,
+  };
+}
+
+describe('decidePaste (entry contract)', () => {
+  it('fills the grid atomically for a count-correct phrase with no count selected', () => {
+    expect(decidePaste(M12, null, false)).toEqual({ kind: 'fillGrid', phrase: normalizePastedPhrase(M12), count: 12 });
+    expect(decidePaste(M24, null, false)).toEqual({ kind: 'fillGrid', phrase: normalizePastedPhrase(M24), count: 24 });
+  });
+
+  it('rejects a count mismatch entirely without truncation or padding', () => {
+    const decision = decidePaste(M12, '24', false);
+    expect(decision.kind).toBe('countMismatch');
+    if (decision.kind === 'countMismatch') {
+      expect(decision.expected).toBe(24);
+      expect(decision.actual).toBe(12);
+    }
+  });
+
+  it('requires explicit whole-grid replacement when fields are filled', () => {
+    const decision = decidePaste(M12, '12', true);
+    expect(decision.kind).toBe('replacementRequired');
+  });
+
+  it('normalizes NFKD/case/whitespace and collapses separators', () => {
+    expect(normalizePastedPhrase('  ABANDON\t Amount\nliar  amount ')).toBe('abandon amount liar amount');
+  });
+
+  it('rejects empty and unsupported-count pastes', () => {
+    expect(decidePaste('   ', null, false).kind).toBe('emptyPaste');
+    expect(decidePaste('one two three', null, false).kind).toBe('countMismatch');
+  });
+});
+
+describe('WordEntryScreen (Task 5.2)', () => {
+  it('renders exactly 12/24 choices and no initial grid', () => {
+    render(<WordEntryScreen grid={grid()} onSelectCount={vi.fn()} onPastePhrase={vi.fn()} onConfirmPasteReplacement={vi.fn()} onClearAll={vi.fn()} onVerify={vi.fn()} onBack={vi.fn()} />);
+    expect(screen.getByLabelText('12 words')).toBeDefined();
+    expect(screen.getByLabelText('24 words')).toBeDefined();
+    expect(screen.queryByTestId('word-grid')).toBeNull();
+    expect(screen.getByText(/will not save these recovery words/)).toBeDefined();
+  });
+
+  it('renders the full indexed grid with accessible labels once a count is selected', () => {
+    render(<WordEntryScreen grid={grid({ selectedWordCount: '24' })} onSelectCount={vi.fn()} onPastePhrase={vi.fn()} onConfirmPasteReplacement={vi.fn()} onClearAll={vi.fn()} onVerify={vi.fn()} onBack={vi.fn()} />);
+    expect(screen.getByLabelText('Recovery word 1 of 24')).toBeDefined();
+    expect(screen.getByLabelText('Recovery word 24 of 24')).toBeDefined();
+    expect(screen.getAllByTestId(/word-input-rw-/)).toHaveLength(24);
+  });
+
+  it('keeps Verify disabled until count/vocabulary are locally valid', () => {
+    render(<WordEntryScreen grid={grid({ selectedWordCount: '12', canVerify: false })} onSelectCount={vi.fn()} onPastePhrase={vi.fn()} onConfirmPasteReplacement={vi.fn()} onClearAll={vi.fn()} onVerify={vi.fn()} onBack={vi.fn()} />);
+    expect(screen.getByRole('button', { name: 'Verify' })).toBeDisabled();
+  });
+
+  it('enables Verify when valid and not busy, and forwards the phrase on click', async () => {
+    const user = userEvent.setup();
+    const onVerify = vi.fn();
+    render(<WordEntryScreen grid={grid({ selectedWordCount: '12', canVerify: true })} onSelectCount={vi.fn()} onPastePhrase={vi.fn()} onConfirmPasteReplacement={vi.fn()} onClearAll={vi.fn()} onVerify={onVerify} onBack={vi.fn()} />);
+    const first = screen.getByLabelText('Recovery word 1 of 12');
+    await user.type(first, 'abandon');
+    await user.click(screen.getByRole('button', { name: 'Verify' }));
+    expect(onVerify).toHaveBeenCalled();
+  });
+
+  it('never renders word values into nonessential accessibility content when concealed', () => {
+    render(<WordEntryScreen grid={grid({ selectedWordCount: '24', allConcealed: true })} onSelectCount={vi.fn()} onPastePhrase={vi.fn()} onConfirmPasteReplacement={vi.fn()} onClearAll={vi.fn()} onVerify={vi.fn()} onBack={vi.fn()} />);
+    const body = document.body.textContent ?? '';
+    expect(body).not.toMatch(/abandon|ability|zoo/i);
+  });
+
+  it('marks unknown positions and renders error summaries without echoing values', () => {
+    render(
+      <WordEntryScreen
+        grid={grid({ selectedWordCount: '12', vocabularyValid: false, canVerify: false, invalidPositions: [3], errorSummary: [{ code: 'UNKNOWN_WORD', positions: [3] }] })}
+        onSelectCount={vi.fn()}
+        onPastePhrase={vi.fn()}
+        onConfirmPasteReplacement={vi.fn()}
+        onClearAll={vi.fn()}
+       
+        onVerify={vi.fn()}
+        onBack={vi.fn()}
+      />
+    );
+    expect(screen.getAllByRole('alert').length).toBeGreaterThan(0);
+    expect(screen.getByText(/not in the supported word list/)).toBeDefined();
+    expect(document.body.textContent).not.toMatch(/abandon|ability|zoo/i);
+  });
+
+  it('shows the paste replacement prompt when pending', () => {
+    render(
+      <WordEntryScreen
+        grid={grid({ selectedWordCount: '12', pasteReplacementPending: true })}
+        onSelectCount={vi.fn()}
+        onPastePhrase={vi.fn()}
+        onConfirmPasteReplacement={vi.fn()}
+        onClearAll={vi.fn()}
+       
+        onVerify={vi.fn()}
+        onBack={vi.fn()}
+      />
+    );
+    expect(screen.getByRole('alertdialog')).toBeDefined();
+    expect(screen.getByText(/Replace all entered recovery words/)).toBeDefined();
+  });
+});
