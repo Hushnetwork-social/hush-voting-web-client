@@ -106,7 +106,7 @@ describe('FinishRestoringScreen (Task 5.6)', () => {
     render(<FinishRestoringScreen preview={stagedPreview()} onUnlock={vi.fn()} onLock={vi.fn()} />);
     expect(screen.getByText('Finish restoring your identity')).toBeDefined();
     expect(screen.getByText('Ab12Cd34…Xy98Zz76')).toBeDefined();
-    expect(document.body.textContent).not.toMatch(/abandon|ability|zoo/i);
+    expect(document.body.textContent).not.toMatch(/word1|word24/i);
   });
 
   it('fails closed on corrupted staged data', () => {

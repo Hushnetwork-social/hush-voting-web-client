@@ -67,7 +67,7 @@ export function LockedUser({ onSubmitSecret, onForgotPassword, onRemoveLocalUser
 
       <div className="locked-actions">
         <button type="submit" className="button-primary" disabled={disabled}>
-          {'Unlock HushVoting'}
+          {'Unlock HushVoting!'}
         </button>
         <button type="button" className="link-button" onClick={onForgotPassword} disabled={disabled}>
           {'Forgot device password?'}

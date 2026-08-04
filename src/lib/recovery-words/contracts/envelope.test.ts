@@ -101,13 +101,13 @@ describe('RecoveryEnvelopeRecord no-mnemonic enforcement', () => {
   });
 
   it('rejects any injected mnemonic/seed/phrase field (MNEMONIC_RECORD_INJECTED)', () => {
-    const injected = { ...validEnvelope(), mnemonic: 'abandon ... zoo' } as unknown;
+    const injected = { ...validEnvelope(), mnemonic: 'syntheticsecret1 syntheticsecret2' } as unknown;
     const parsed = parseRecoveryEnvelopeRecord(injected);
     expect(parsed.ok).toBe(false);
     if (!parsed.ok) {
       expect(parsed.code).toBe('MNEMONIC_RECORD_INJECTED');
     }
-    const seedInjected = { ...validEnvelope(), seed: '0xdeadbeef' } as unknown;
+    const seedInjected = { ...validEnvelope(), seed: 'syntheticseedvalue' } as unknown;
     expect(parseRecoveryEnvelopeRecord(seedInjected).ok).toBe(false);
   });
 

@@ -11,6 +11,7 @@
  * reserved for focus/selected/warning/error states.
  */
 
+import Image from 'next/image';
 import { useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { documentTitleForState } from '../../lib/auth/ui/copy';
@@ -32,11 +33,18 @@ export function AuthShell({ projection, children }: AuthShellProps) {
   return (
     <main className="auth-shell" aria-labelledby="auth-shell-heading">
       <div className="auth-shell-inner">
-        <header className="auth-brand" aria-label="HushVoting">
+        <header className="auth-brand" aria-label="HushVoting!">
           <span className="auth-brand-mark" aria-hidden="true">
-            <span className="auth-brand-dot" />
+            <Image
+              src="/assets/hushvoting-logo.png"
+              alt=""
+              width={48}
+              height={48}
+              priority
+              data-testid="hushvoting-logo"
+            />
           </span>
-          <span className="auth-brand-name">HushVoting</span>
+          <span className="auth-brand-name">HushVoting!</span>
           <span className="auth-env" aria-hidden="true">
             {projection.connectivity === 'offline' ? 'offline' : 'online'}
           </span>
@@ -44,7 +52,7 @@ export function AuthShell({ projection, children }: AuthShellProps) {
 
         <section className="auth-surface" aria-labelledby="auth-shell-heading">
           <h1 id="auth-shell-heading" className="auth-heading">
-            {projection.authState === 'initializing' ? 'HushVoting' : headingForProjection(projection)}
+            {projection.authState === 'initializing' ? 'HushVoting!' : headingForProjection(projection)}
           </h1>
 
           {authState !== 'initializing' && safeIdentity !== null && (
@@ -65,10 +73,12 @@ export function AuthShell({ projection, children }: AuthShellProps) {
           </p>
         )}
 
-        <footer className="auth-footer">
-          <span>Your device password protects credentials on this device only.</span>
-          <span aria-hidden="true">It is never sent to HushServerNode.</span>
-        </footer>
+        {authState === 'locked' && (
+          <footer className="auth-footer">
+            <span>Your device password protects credentials on this device only.</span>
+            <span aria-hidden="true">It is never sent to HushServerNode.</span>
+          </footer>
+        )}
       </div>
       <span className="sr-only" role="status" aria-live="polite">
         {progressAnnouncement(projection)}
@@ -80,9 +90,9 @@ export function AuthShell({ projection, children }: AuthShellProps) {
 function headingForProjection(projection: AuthRenderProjection): string {
   switch (projection.authState) {
     case 'noLocalUser':
-      return 'Welcome to HushVoting';
+      return 'Welcome to HushVoting!';
     case 'locked':
-      return 'Unlock HushVoting';
+      return 'Unlock HushVoting!';
     case 'unlocking':
       return 'Unlocking…';
     case 'verifyingIdentityOnline':
@@ -92,13 +102,13 @@ function headingForProjection(projection: AuthRenderProjection): string {
     case 'recoverableError':
       return 'Something went wrong';
     case 'blockedError':
-      return 'HushVoting is locked';
+      return 'HushVoting! is locked';
     case 'removingLocalUser':
       return 'Remove local user';
     case 'onboarding':
       return 'Set up this device';
     default:
-      return 'HushVoting';
+      return 'HushVoting!';
   }
 }
 

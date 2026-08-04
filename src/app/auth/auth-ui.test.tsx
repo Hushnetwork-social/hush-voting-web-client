@@ -211,7 +211,7 @@ describe('document titles never expose secrets or identifiers', () => {
 });
 
 describe('AuthGate composition', () => {
-  it('renders first-run actions for noLocalUser via dispatch', async () => {
+  it('renders official branding and first-run actions without premature password copy', async () => {
     const user = userEvent.setup();
     const dispatch = vi.fn();
     render(
@@ -220,6 +220,12 @@ describe('AuthGate composition', () => {
         handlers={{ dispatch, submitSecret: () => undefined }}
       />,
     );
+
+    const logo = screen.getByTestId('hushvoting-logo');
+    expect(logo).toHaveAttribute('src', expect.stringContaining('hushvoting-logo.png'));
+    expect(screen.getByRole('heading', { name: 'Welcome to HushVoting!' })).toBeInTheDocument();
+    expect(screen.queryByText(/your device password protects credentials/i)).toBeNull();
+
     await user.click(screen.getByRole('button', { name: /create user/i }));
     expect(dispatch).toHaveBeenCalledWith({ type: 'INTENT.CREATE_USER' });
   });
@@ -233,6 +239,7 @@ describe('AuthGate composition', () => {
       />,
     );
     expect(screen.getByLabelText('Device password')).toBeInTheDocument();
+    expect(screen.getByText(/your device password protects credentials/i)).toBeInTheDocument();
   });
 
   it('never mounts protected navigation behind any auth surface', () => {

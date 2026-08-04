@@ -36,7 +36,7 @@ export type RuntimeTarget = 'web' | 'tauri';
 
 /** Fixed, user-visible local-device terminology (normative, EPIC-001). */
 export const AUTH_TERMINOLOGY = {
-  unlock: 'Unlock HushVoting',
+  unlock: 'Unlock HushVoting!',
   lock: 'Lock',
   devicePassword: 'Device password',
   removeLocalUser: 'Remove local user',

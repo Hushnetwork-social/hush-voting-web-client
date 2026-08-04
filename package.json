@@ -72,7 +72,10 @@
     "android-vault:qualification": "node scripts/android-vault/qualification-harness.mjs --digest development",
     "identity-create:coverage": "node scripts/identity-create/validate-coverage-manifest.mjs ../hush-voting-memory-bank/Features/04_COMPLETED/FEAT-007-blockchain-identity-creation-flow/acceptance-coverage-manifest.json",
     "test:identity-create:bdd": "playwright test --config playwright.identity-create.config.ts",
-    "identity-create:secret-scan": "node scripts/identity-create/secret-scan.mjs"
+    "identity-create:secret-scan": "node scripts/identity-create/secret-scan.mjs",
+    "recovery-words:coverage": "node scripts/recovery-words/validate-coverage-manifest.mjs ../hush-voting-memory-bank/Features/03_IN_PROGRESS/FEAT-008-recovery-words-identity-restore/acceptance-coverage-manifest.json",
+    "test:recovery-words:bdd": "playwright test --config playwright.recovery-words.config.ts",
+    "recovery-words:secret-scan": "node scripts/recovery-words/secret-scan.mjs"
   },
   "dependencies": {
     "@noble/hashes": "2.2.0",

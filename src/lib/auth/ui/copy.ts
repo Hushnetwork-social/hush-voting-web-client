@@ -4,7 +4,7 @@
  * Maps every auth state / outcome to the exact user-facing copy and the
  * accessible document title. No secret content ever appears in titles,
  * labels, or live regions. Terminology is local-device language only
- * (Unlock HushVoting, Device password, Lock, Remove local user) — never
+ * (Unlock HushVoting!, Device password, Lock, Remove local user) — never
  * "server login", "account password", "password reset", or "remote sign-out".
  *
  * Normative source: FeatureDescription "Terminology", "Errors",
@@ -18,27 +18,27 @@ import type { AuthStateCode } from '../types';
 export function documentTitleForState(state: AuthStateCode): string {
   switch (state) {
     case 'initializing':
-      return 'HushVoting';
+      return 'HushVoting!';
     case 'noLocalUser':
-      return 'Welcome · HushVoting';
+      return 'Welcome · HushVoting!';
     case 'onboarding':
-      return 'Set up · HushVoting';
+      return 'Set up · HushVoting!';
     case 'locked':
-      return `${AUTH_TERMINOLOGY.unlock} · HushVoting`;
+      return `${AUTH_TERMINOLOGY.unlock} · HushVoting!`;
     case 'unlocking':
-      return `${AUTH_TERMINOLOGY.unlock} · HushVoting`;
+      return `${AUTH_TERMINOLOGY.unlock} · HushVoting!`;
     case 'verifyingIdentityOnline':
-      return `${AUTH_TERMINOLOGY.unlock} · HushVoting`;
+      return `${AUTH_TERMINOLOGY.unlock} · HushVoting!`;
     case 'missingProfileConfirmation':
-      return 'Confirm identity · HushVoting';
+      return 'Confirm identity · HushVoting!';
     case 'authenticated':
-      return 'HushVoting';
+      return 'HushVoting!';
     case 'recoverableError':
-      return 'Something went wrong · HushVoting';
+      return 'Something went wrong · HushVoting!';
     case 'blockedError':
-      return 'HushVoting is locked · HushVoting';
+      return 'HushVoting! is locked';
     case 'removingLocalUser':
-      return `${AUTH_TERMINOLOGY.removeLocalUser} · HushVoting`;
+      return `${AUTH_TERMINOLOGY.removeLocalUser} · HushVoting!`;
   }
 }
 
@@ -46,9 +46,9 @@ export function documentTitleForState(state: AuthStateCode): string {
 export function headingForState(state: AuthStateCode): string {
   switch (state) {
     case 'initializing':
-      return 'HushVoting';
+      return 'HushVoting!';
     case 'noLocalUser':
-      return 'Welcome to HushVoting';
+      return 'Welcome to HushVoting!';
     case 'onboarding':
       return 'Set up this device';
     case 'locked':
@@ -60,11 +60,11 @@ export function headingForState(state: AuthStateCode): string {
     case 'missingProfileConfirmation':
       return 'Confirm your identity';
     case 'authenticated':
-      return 'HushVoting';
+      return 'HushVoting!';
     case 'recoverableError':
       return 'Something went wrong';
     case 'blockedError':
-      return 'HushVoting is locked';
+      return 'HushVoting! is locked';
     case 'removingLocalUser':
       return AUTH_TERMINOLOGY.removeLocalUser;
   }
@@ -96,7 +96,7 @@ export function errorCopyForOutcome(outcomeCode: string | null): { title: string
     case 'INIT_STORAGE_UNAVAILABLE':
       return { title: 'Storage is temporarily unavailable', detail: 'Try again in a moment.' };
     case 'INIT_UNSUPPORTED_VAULT_VERSION':
-      return { title: 'This device uses an unsupported vault version', detail: 'Update HushVoting or follow the recovery guidance.' };
+      return { title: 'This device uses an unsupported vault version', detail: 'Update HushVoting! or follow the recovery guidance.' };
     case 'INIT_CORRUPT_VAULT':
       return { title: 'Local data could not be read', detail: 'You can restore from recovery words or a credential file.' };
     case 'INIT_UNSAFE_COORDINATION':

@@ -235,7 +235,7 @@ describe('secret-bearing values are rejected at the contract boundary', () => {
 
   it('holds the exact combined credential error and local-device terminology', () => {
     expect(COMBINED_CREDENTIAL_ERROR).toBe('The password is incorrect or the protected data is damaged.');
-    expect(AUTH_TERMINOLOGY.unlock).toBe('Unlock HushVoting');
+    expect(AUTH_TERMINOLOGY.unlock).toBe('Unlock HushVoting!');
     expect(AUTH_TERMINOLOGY.devicePassword).toBe('Device password');
     expect(AUTH_TERMINOLOGY.removeLocalUser).toBe('Remove local user');
     expect(AUTH_TERMINOLOGY.forgotDevicePassword).toBe('Forgot device password?');

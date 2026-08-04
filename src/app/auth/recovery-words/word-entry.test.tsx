@@ -10,7 +10,7 @@ import userEvent from '@testing-library/user-event';
 import type { WordGridProjection } from '../../../lib/recovery-words/contracts/projection';
 import { WordEntryScreen, decidePaste, normalizePastedPhrase } from './word-entry';
 
-const M24 = 'abandon amount liar amount expire adjust cage candy arch gather drum bullet absurd math era live bid rhythm alien crouch range attend journey unaware';
+const M24 = 'word1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12 word13 word14 word15 word16 word17 word18 word19 word20 word21 word22 word23 word24';
 const M12 = M24.split(' ').slice(0, 12).join(' ');
 
 function grid(overrides: Partial<WordGridProjection> = {}): WordGridProjection {
@@ -50,7 +50,7 @@ describe('decidePaste (entry contract)', () => {
   });
 
   it('normalizes NFKD/case/whitespace and collapses separators', () => {
-    expect(normalizePastedPhrase('  ABANDON\t Amount\nliar  amount ')).toBe('abandon amount liar amount');
+    expect(normalizePastedPhrase('  WORD1\t Word2\nword3  word4 ')).toBe('word1 word2 word3 word4');
   });
 
   it('rejects empty and unsupported-count pastes', () => {
@@ -93,7 +93,7 @@ describe('WordEntryScreen (Task 5.2)', () => {
   it('never renders word values into nonessential accessibility content when concealed', () => {
     render(<WordEntryScreen grid={grid({ selectedWordCount: '24', allConcealed: true })} onSelectCount={vi.fn()} onPastePhrase={vi.fn()} onConfirmPasteReplacement={vi.fn()} onClearAll={vi.fn()} onVerify={vi.fn()} onBack={vi.fn()} />);
     const body = document.body.textContent ?? '';
-    expect(body).not.toMatch(/abandon|ability|zoo/i);
+    expect(body).not.toMatch(/word1|word24/i);
   });
 
   it('marks unknown positions and renders error summaries without echoing values', () => {
@@ -111,7 +111,7 @@ describe('WordEntryScreen (Task 5.2)', () => {
     );
     expect(screen.getAllByRole('alert').length).toBeGreaterThan(0);
     expect(screen.getByText(/not in the supported word list/)).toBeDefined();
-    expect(document.body.textContent).not.toMatch(/abandon|ability|zoo/i);
+    expect(document.body.textContent).not.toMatch(/word1|word24/i);
   });
 
   it('shows the paste replacement prompt when pending', () => {

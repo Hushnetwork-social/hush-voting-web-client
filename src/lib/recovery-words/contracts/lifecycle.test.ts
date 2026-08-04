@@ -96,7 +96,7 @@ describe('RecoveryResult failure shape', () => {
 
 describe('assertNoSecretSurface guard', () => {
   it('rejects an object that accidentally carries mnemonic/privateKey fields', () => {
-    const leaked = { stage: 'wordEntry', mnemonic: 'abandon ... zoo' };
+    const leaked = { stage: 'wordEntry', mnemonic: 'syntheticsecret1 syntheticsecret2' };
     const violations = assertNoSecretSurface(leaked);
     expect(violations).toContain('mnemonic');
   });
