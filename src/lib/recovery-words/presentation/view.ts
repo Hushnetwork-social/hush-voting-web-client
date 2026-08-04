@@ -146,7 +146,7 @@ export function allowedActionsForScreen(screen: RecoveryScreen, inFlight: boolea
   }
   switch (screen) {
     case 'entry':
-      return ['verify'];
+      return []; // the three-choice entry dispatch belongs to the FEAT-002 auth shell, not the recovery child
     case 'vaultGuard':
       return ['removeLocalUser', 'back'];
     case 'networkLabel':
