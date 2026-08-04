@@ -48,14 +48,14 @@ describe('createBffRecoveryLookupPort (Task 6.2)', () => {
     expect(outcome.kind).toBe('exactProfile');
   });
 
-  it('maps an exact profile with both addresses to exactProfile', async () => {
+  it('maps an exact profile with both addresses to exactProfile, preserving blockchain visibility', async () => {
     const fetchImpl = vi.fn(
       async () =>
-        new Response(JSON.stringify({ reply: { identity: { alias: 'Voter', visibility: 'private', signingAddress: candidate.signingAddress, encryptionAddress: candidate.encryptionAddress } } }), { status: 200 }),
+        new Response(JSON.stringify({ reply: { identity: { alias: 'Voter', visibility: 'public', signingAddress: candidate.signingAddress, encryptionAddress: candidate.encryptionAddress } } }), { status: 200 }),
     );
     const port = createBffRecoveryLookupPort(fetchImpl as unknown as typeof fetch);
     const outcome = await port.lookupCandidate(candidate, 'hush-mainnet-1' as never);
-    expect(outcome).toEqual({ kind: 'exactProfile', profileAlias: 'Voter', visibility: 'private' });
+    expect(outcome).toEqual({ kind: 'exactProfile', profileAlias: 'Voter', visibility: 'public' });
   });
 });
 

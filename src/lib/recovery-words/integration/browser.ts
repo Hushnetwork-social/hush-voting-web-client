@@ -47,12 +47,14 @@ export function createBffRecoveryLookupPort(fetchImpl: typeof fetch = fetch): Re
         if (!response.ok) {
           return { kind: 'unresolved', reason: 'transport' };
         }
-        const payload = (await response.json()) as { reply?: { identity?: unknown } };
+        const payload = (await response.json()) as { reply?: { identity?: { alias?: unknown; visibility?: unknown } | null } };
         const profile = payload.reply?.identity;
         if (profile === null || profile === undefined) {
           return { kind: 'authoritativeNotFound' };
         }
-        return { kind: 'exactProfile', profileAlias: String((profile as { alias?: unknown }).alias ?? ''), visibility: 'private' };
+        // Blockchain visibility is authoritative; never hardcoded.
+        const visibility = profile.visibility === 'public' ? 'public' : 'private';
+        return { kind: 'exactProfile', profileAlias: String(profile.alias ?? ''), visibility };
       } catch {
         return { kind: 'unresolved', reason: 'timeout' };
       } finally {
