@@ -105,6 +105,8 @@ export function ConfirmRecoveryScreen({ positions, onVerify, onReviewAll, onBack
   const verify = () => {
     const map = new Map<number, string>(positions.map((p) => [p, (answers[p] ?? '').trim().toLowerCase()]));
     onVerify(map);
+    // Clear the transient answers immediately (bounded exception hygiene).
+    setAnswers({});
   };
 
   return (

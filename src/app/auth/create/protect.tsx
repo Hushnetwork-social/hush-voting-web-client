@@ -2,10 +2,11 @@
  * FEAT-007 create-user UI — device protection and safe final review
  * (Task 5.3).
  *
- * Device password is the ONLY persistent secret step: inputs are uncontrolled
- * and transferred directly to the secret authority (SecretSubmissionSink
- * boundary); they never enter React/XState business state and clear after
- * transfer. Review shows only safe public fields with abbreviated addresses.
+ * Device password is the ONLY persistent secret step: inputs are UNCONTROLLED
+ * (refs only, never React business state) and transferred directly to the
+ * secret authority (SecretSubmissionSink boundary); DOM buffers are cleared
+ * immediately after transfer. Review shows only safe public fields with
+ * abbreviated addresses.
  */
 
 import { useRef, useState } from 'react';
@@ -21,13 +22,14 @@ export interface ProtectProps {
 
 /** Wireframe 5 — Protect this device (direct authority boundary). */
 export function ProtectScreen({ onProtect, onBack, submitting }: ProtectProps) {
-  const [password, setPassword] = useState('');
-  const [confirm, setConfirm] = useState('');
+  const passwordRef = useRef<HTMLInputElement>(null);
+  const confirmRef = useRef<HTMLInputElement>(null);
   const [show, setShow] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const passwordRef = useRef<HTMLInputElement>(null);
 
   const submit = () => {
+    const password = passwordRef.current?.value ?? '';
+    const confirm = confirmRef.current?.value ?? '';
     if (password.length === 0) {
       setError(PROTECT.policy(6));
       passwordRef.current?.focus();
@@ -38,10 +40,10 @@ export function ProtectScreen({ onProtect, onBack, submitting }: ProtectProps) {
       return;
     }
     setError(null);
-    // Direct transfer to the secret authority; clear local buffers.
+    // Direct transfer to the secret authority; clear DOM buffers immediately.
     onProtect(password);
-    setPassword('');
-    setConfirm('');
+    if (passwordRef.current) passwordRef.current.value = '';
+    if (confirmRef.current) confirmRef.current.value = '';
   };
 
   return (
@@ -56,8 +58,7 @@ export function ProtectScreen({ onProtect, onBack, submitting }: ProtectProps) {
           id="device-password"
           ref={passwordRef}
           type={show ? 'text' : 'password'}
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          defaultValue=""
           autoComplete="new-password"
           aria-describedby={error ? 'device-password-error' : undefined}
           className="min-h-11 w-full rounded-xl border border-transparent bg-[var(--surface-strong)] px-3 text-sm text-[var(--text)] focus:border-[var(--accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
@@ -76,9 +77,9 @@ export function ProtectScreen({ onProtect, onBack, submitting }: ProtectProps) {
       </label>
       <input
         id="device-password-confirm"
+        ref={confirmRef}
         type={show ? 'text' : 'password'}
-        value={confirm}
-        onChange={(e) => setConfirm(e.target.value)}
+        defaultValue=""
         autoComplete="new-password"
         className="min-h-11 w-full rounded-xl border border-transparent bg-[var(--surface-strong)] px-3 text-sm text-[var(--text)] focus:border-[var(--accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
       />
