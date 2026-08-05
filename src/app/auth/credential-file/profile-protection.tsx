@@ -131,7 +131,7 @@ export function SuccessScreen({ view }: { readonly view: RestoreViewState }) {
 function protectionLabel(mode: RestoreProtectionChoice): string {
   switch (mode) {
     case 'devicePassword':
-      return COPY.protection.devicePassword;
+      return COPY.protection.devicePasswordLabel;
     case 'webAuthnPasswordless':
     case 'nativePasswordless':
       return COPY.protection.passwordless;

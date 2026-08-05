@@ -57,7 +57,7 @@ export const COPY = {
   protection: {
     title: 'Protect this device',
     createVaultPassword: 'Create a HushVoting vault password',
-    devicePassword: 'Device password (recommended)',
+    devicePasswordLabel: 'Device password (recommended)',
     passwordless: 'Passwordless (platform security)',
     sessionOnly: 'Session only — nothing saved on this device',
     sessionOnlyWarning: 'Keys stay only in memory; you will need this file again after closing.',

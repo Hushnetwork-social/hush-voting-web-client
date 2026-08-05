@@ -75,7 +75,11 @@
     "identity-create:secret-scan": "node scripts/identity-create/secret-scan.mjs",
     "recovery-words:coverage": "node scripts/recovery-words/validate-coverage-manifest.mjs ../hush-voting-memory-bank/Features/03_IN_PROGRESS/FEAT-008-recovery-words-identity-restore/acceptance-coverage-manifest.json",
     "test:recovery-words:bdd": "playwright test --config playwright.recovery-words.config.ts",
-    "recovery-words:secret-scan": "node scripts/recovery-words/secret-scan.mjs"
+    "recovery-words:secret-scan": "node scripts/recovery-words/secret-scan.mjs",
+    "credential-file-restore:conformance": "node scripts/credential-file-restore/conformance.mjs",
+    "credential-file-restore:coverage": "node scripts/credential-file-restore/validate-coverage-manifest.mjs conformance/credential-file-restore/v1/coverage-manifest.json",
+    "credential-file-restore:secret-scan": "node scripts/credential-file-restore/secret-scan.mjs",
+    "test:credential-file-restore:unit": "vitest run src/lib/credential-file-restore"
   },
   "dependencies": {
     "@noble/hashes": "2.2.0",

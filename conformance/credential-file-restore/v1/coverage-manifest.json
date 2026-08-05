@@ -1,0 +1,1893 @@
+{
+  "schemaVersion": 1,
+  "featureId": "FEAT-009",
+  "title": "Encrypted Credential File Restore",
+  "generatedAt": "2026-08-05T27:30:00Z",
+  "source": "FeatureDescription.md acceptance criteria AC-009-001..089 + mandatory Gherkin scenario families",
+  "families": [
+    "HV-DAT-AUTH",
+    "HV-DAT-BACKOFF",
+    "HV-DAT-CLEANUP",
+    "HV-DAT-ENTRY",
+    "HV-DAT-ENVELOPE",
+    "HV-DAT-EXTERNAL",
+    "HV-DAT-KEYS",
+    "HV-DAT-LOOKUP",
+    "HV-DAT-MNEMONIC",
+    "HV-DAT-NAV",
+    "HV-DAT-OWNER",
+    "HV-DAT-PASSWORD",
+    "HV-DAT-PICKER",
+    "HV-DAT-PROTECT",
+    "HV-DAT-READ",
+    "HV-DAT-RESET",
+    "HV-DAT-RESUME",
+    "HV-DAT-SCHEMA",
+    "HV-DAT-SECURITY",
+    "HV-DAT-SEPARATION",
+    "HV-DAT-SESSION",
+    "HV-DAT-SIGNATURE",
+    "HV-DAT-SOURCE",
+    "HV-DAT-STAGE",
+    "HV-DAT-TEMP"
+  ],
+  "criteria": [
+    {
+      "id": "AC-009-001",
+      "family": "HV-DAT-ENTRY",
+      "scenarioIds": [
+        "HV-DAT-ENTRY-001"
+      ],
+      "targets": [
+        "web",
+        "ubuntu",
+        "android"
+      ],
+      "implementationPhases": [
+        3,
+        4,
+        6
+      ],
+      "testLayers": [
+        "unit",
+        "model",
+        "bdd"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-002",
+      "family": "HV-DAT-ENTRY",
+      "scenarioIds": [
+        "HV-DAT-ENTRY-001"
+      ],
+      "targets": [
+        "web",
+        "ubuntu",
+        "android"
+      ],
+      "implementationPhases": [
+        3,
+        4,
+        5,
+        6
+      ],
+      "testLayers": [
+        "unit",
+        "component",
+        "bdd"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-003",
+      "family": "HV-DAT-ENTRY",
+      "scenarioIds": [
+        "HV-DAT-ENTRY-001"
+      ],
+      "targets": [
+        "web",
+        "ubuntu",
+        "android"
+      ],
+      "implementationPhases": [
+        3,
+        4,
+        6
+      ],
+      "testLayers": [
+        "unit",
+        "model",
+        "bdd"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-004",
+      "family": "HV-DAT-PICKER",
+      "scenarioIds": [
+        "HV-DAT-PICKER-001"
+      ],
+      "targets": [
+        "web",
+        "ubuntu",
+        "android"
+      ],
+      "implementationPhases": [
+        3,
+        5,
+        6
+      ],
+      "testLayers": [
+        "unit",
+        "component",
+        "bdd"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-005",
+      "family": "HV-DAT-PICKER",
+      "scenarioIds": [
+        "HV-DAT-PICKER-001"
+      ],
+      "targets": [
+        "web",
+        "ubuntu",
+        "android"
+      ],
+      "implementationPhases": [
+        4,
+        5
+      ],
+      "testLayers": [
+        "component",
+        "a11y",
+        "bdd"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-006",
+      "family": "HV-DAT-PICKER",
+      "scenarioIds": [
+        "HV-DAT-PICKER-001"
+      ],
+      "targets": [
+        "web",
+        "ubuntu",
+        "android"
+      ],
+      "implementationPhases": [
+        3,
+        5,
+        6
+      ],
+      "testLayers": [
+        "unit",
+        "conformance",
+        "bdd"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-007",
+      "family": "HV-DAT-READ",
+      "scenarioIds": [
+        "HV-DAT-READ-001"
+      ],
+      "targets": [
+        "web"
+      ],
+      "implementationPhases": [
+        3,
+        6
+      ],
+      "testLayers": [
+        "unit",
+        "unit",
+        "bdd"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-008",
+      "family": "HV-DAT-PICKER",
+      "scenarioIds": [
+        "HV-DAT-PICKER-001"
+      ],
+      "targets": [
+        "ubuntu"
+      ],
+      "implementationPhases": [
+        3,
+        6
+      ],
+      "testLayers": [
+        "unit",
+        "unit",
+        "bdd"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-009",
+      "family": "HV-DAT-PICKER",
+      "scenarioIds": [
+        "HV-DAT-PICKER-001"
+      ],
+      "targets": [
+        "android"
+      ],
+      "implementationPhases": [
+        3,
+        6
+      ],
+      "testLayers": [
+        "unit",
+        "unit",
+        "bdd"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-010",
+      "family": "HV-DAT-READ",
+      "scenarioIds": [
+        "HV-DAT-READ-001"
+      ],
+      "targets": [
+        "all",
+        "android"
+      ],
+      "implementationPhases": [
+        3,
+        5,
+        6
+      ],
+      "testLayers": [
+        "unit",
+        "property",
+        "bdd"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-011",
+      "family": "HV-DAT-READ",
+      "scenarioIds": [
+        "HV-DAT-READ-001"
+      ],
+      "targets": [
+        "web",
+        "ubuntu",
+        "android"
+      ],
+      "implementationPhases": [
+        3,
+        6
+      ],
+      "testLayers": [
+        "unit",
+        "property",
+        "bdd"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-012",
+      "family": "HV-DAT-TEMP",
+      "scenarioIds": [
+        "HV-DAT-TEMP-001"
+      ],
+      "targets": [
+        "ubuntu",
+        "android"
+      ],
+      "implementationPhases": [
+        3,
+        6
+      ],
+      "testLayers": [
+        "unit",
+        "property",
+        "unit"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-013",
+      "family": "HV-DAT-ENVELOPE",
+      "scenarioIds": [
+        "HV-DAT-ENVELOPE-001"
+      ],
+      "targets": [
+        "conformance"
+      ],
+      "implementationPhases": [
+        2,
+        3
+      ],
+      "testLayers": [
+        "conformance",
+        "conformance"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-014",
+      "family": "HV-DAT-ENVELOPE",
+      "scenarioIds": [
+        "HV-DAT-ENVELOPE-001"
+      ],
+      "targets": [
+        "conformance"
+      ],
+      "implementationPhases": [
+        2,
+        3
+      ],
+      "testLayers": [
+        "unit",
+        "conformance",
+        "property"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-015",
+      "family": "HV-DAT-ENVELOPE",
+      "scenarioIds": [
+        "HV-DAT-ENVELOPE-001"
+      ],
+      "targets": [
+        "conformance"
+      ],
+      "implementationPhases": [
+        2,
+        3
+      ],
+      "testLayers": [
+        "conformance",
+        "conformance"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-016",
+      "family": "HV-DAT-PASSWORD",
+      "scenarioIds": [
+        "HV-DAT-PASSWORD-001"
+      ],
+      "targets": [
+        "web"
+      ],
+      "implementationPhases": [
+        2,
+        3,
+        5
+      ],
+      "testLayers": [
+        "unit",
+        "conformance",
+        "component"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-017",
+      "family": "HV-DAT-PASSWORD",
+      "scenarioIds": [
+        "HV-DAT-PASSWORD-001"
+      ],
+      "targets": [
+        "web"
+      ],
+      "implementationPhases": [
+        2,
+        3,
+        5
+      ],
+      "testLayers": [
+        "unit",
+        "component",
+        "a11y",
+        "bdd"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-018",
+      "family": "HV-DAT-PASSWORD",
+      "scenarioIds": [
+        "HV-DAT-PASSWORD-001"
+      ],
+      "targets": [
+        "web"
+      ],
+      "implementationPhases": [
+        4,
+        5
+      ],
+      "testLayers": [
+        "component",
+        "a11y",
+        "bdd"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-019",
+      "family": "HV-DAT-AUTH",
+      "scenarioIds": [
+        "HV-DAT-AUTH-001"
+      ],
+      "targets": [
+        "all"
+      ],
+      "implementationPhases": [
+        2,
+        3,
+        4,
+        5
+      ],
+      "testLayers": [
+        "unit",
+        "component",
+        "bdd"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-020",
+      "family": "HV-DAT-BACKOFF",
+      "scenarioIds": [
+        "HV-DAT-BACKOFF-001"
+      ],
+      "targets": [
+        "web"
+      ],
+      "implementationPhases": [
+        2,
+        3
+      ],
+      "testLayers": [
+        "unit",
+        "model",
+        "unit"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-021",
+      "family": "HV-DAT-BACKOFF",
+      "scenarioIds": [
+        "HV-DAT-BACKOFF-001"
+      ],
+      "targets": [
+        "web"
+      ],
+      "implementationPhases": [
+        3,
+        6
+      ],
+      "testLayers": [
+        "unit",
+        "model",
+        "bdd"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-022",
+      "family": "HV-DAT-AUTH",
+      "scenarioIds": [
+        "HV-DAT-AUTH-001"
+      ],
+      "targets": [
+        "all"
+      ],
+      "implementationPhases": [
+        2,
+        3
+      ],
+      "testLayers": [
+        "unit",
+        "property",
+        "unit"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-023",
+      "family": "HV-DAT-SCHEMA",
+      "scenarioIds": [
+        "HV-DAT-SCHEMA-001"
+      ],
+      "targets": [
+        "conformance"
+      ],
+      "implementationPhases": [
+        2,
+        3
+      ],
+      "testLayers": [
+        "unit",
+        "fuzz",
+        "conformance"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-024",
+      "family": "HV-DAT-KEYS",
+      "scenarioIds": [
+        "HV-DAT-KEYS-001"
+      ],
+      "targets": [
+        "conformance"
+      ],
+      "implementationPhases": [
+        2,
+        3
+      ],
+      "testLayers": [
+        "unit",
+        "conformance",
+        "property"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-025",
+      "family": "HV-DAT-KEYS",
+      "scenarioIds": [
+        "HV-DAT-KEYS-001"
+      ],
+      "targets": [
+        "conformance"
+      ],
+      "implementationPhases": [
+        2,
+        3
+      ],
+      "testLayers": [
+        "unit",
+        "conformance",
+        "property"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-026",
+      "family": "HV-DAT-KEYS",
+      "scenarioIds": [
+        "HV-DAT-KEYS-001"
+      ],
+      "targets": [
+        "conformance"
+      ],
+      "implementationPhases": [
+        2,
+        3
+      ],
+      "testLayers": [
+        "unit",
+        "property",
+        "property"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-027",
+      "family": "HV-DAT-MNEMONIC",
+      "scenarioIds": [
+        "HV-DAT-MNEMONIC-001"
+      ],
+      "targets": [
+        "all"
+      ],
+      "implementationPhases": [
+        2,
+        3
+      ],
+      "testLayers": [
+        "unit",
+        "conformance",
+        "conformance"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-028",
+      "family": "HV-DAT-MNEMONIC",
+      "scenarioIds": [
+        "HV-DAT-MNEMONIC-001"
+      ],
+      "targets": [
+        "all"
+      ],
+      "implementationPhases": [
+        2,
+        3
+      ],
+      "testLayers": [
+        "unit",
+        "conformance"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-029",
+      "family": "HV-DAT-KEYS",
+      "scenarioIds": [
+        "HV-DAT-KEYS-001"
+      ],
+      "targets": [
+        "conformance"
+      ],
+      "implementationPhases": [
+        2,
+        3
+      ],
+      "testLayers": [
+        "unit",
+        "fuzz",
+        "property"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-030",
+      "family": "HV-DAT-KEYS",
+      "scenarioIds": [
+        "HV-DAT-KEYS-001"
+      ],
+      "targets": [
+        "web"
+      ],
+      "implementationPhases": [
+        2,
+        4,
+        5
+      ],
+      "testLayers": [
+        "unit",
+        "component",
+        "a11y"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-031",
+      "family": "HV-DAT-SCHEMA",
+      "scenarioIds": [
+        "HV-DAT-SCHEMA-001"
+      ],
+      "targets": [
+        "all"
+      ],
+      "implementationPhases": [
+        2,
+        3,
+        4
+      ],
+      "testLayers": [
+        "unit",
+        "property",
+        "secret-scan"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-032",
+      "family": "HV-DAT-KEYS",
+      "scenarioIds": [
+        "HV-DAT-KEYS-001"
+      ],
+      "targets": [
+        "web"
+      ],
+      "implementationPhases": [
+        3,
+        4
+      ],
+      "testLayers": [
+        "unit",
+        "model",
+        "bdd"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-033",
+      "family": "HV-DAT-MNEMONIC",
+      "scenarioIds": [
+        "HV-DAT-MNEMONIC-001"
+      ],
+      "targets": [
+        "all"
+      ],
+      "implementationPhases": [
+        2,
+        3
+      ],
+      "testLayers": [
+        "unit",
+        "unit",
+        "secret-scan"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-034",
+      "family": "HV-DAT-MNEMONIC",
+      "scenarioIds": [
+        "HV-DAT-MNEMONIC-001"
+      ],
+      "targets": [
+        "web",
+        "ubuntu",
+        "android"
+      ],
+      "implementationPhases": [
+        4,
+        5,
+        6
+      ],
+      "testLayers": [
+        "component",
+        "bdd"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-035",
+      "family": "HV-DAT-SOURCE",
+      "scenarioIds": [
+        "HV-DAT-SOURCE-001"
+      ],
+      "targets": [
+        "all"
+      ],
+      "implementationPhases": [
+        2,
+        3,
+        6
+      ],
+      "testLayers": [
+        "unit",
+        "property",
+        "unit"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-036",
+      "family": "HV-DAT-SOURCE",
+      "scenarioIds": [
+        "HV-DAT-SOURCE-001"
+      ],
+      "targets": [
+        "all"
+      ],
+      "implementationPhases": [
+        3,
+        6
+      ],
+      "testLayers": [
+        "unit",
+        "property",
+        "unit"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-037",
+      "family": "HV-DAT-SOURCE",
+      "scenarioIds": [
+        "HV-DAT-SOURCE-001"
+      ],
+      "targets": [
+        "all"
+      ],
+      "implementationPhases": [
+        3,
+        6
+      ],
+      "testLayers": [
+        "unit",
+        "property",
+        "secret-scan"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-038",
+      "family": "HV-DAT-LOOKUP",
+      "scenarioIds": [
+        "HV-DAT-LOOKUP-001"
+      ],
+      "targets": [
+        "server-twins"
+      ],
+      "implementationPhases": [
+        3,
+        6,
+        7
+      ],
+      "testLayers": [
+        "unit",
+        "unit",
+        "bdd"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-039",
+      "family": "HV-DAT-LOOKUP",
+      "scenarioIds": [
+        "HV-DAT-LOOKUP-001"
+      ],
+      "targets": [
+        "server-twins"
+      ],
+      "implementationPhases": [
+        3,
+        6
+      ],
+      "testLayers": [
+        "unit",
+        "model",
+        "twin"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-040",
+      "family": "HV-DAT-LOOKUP",
+      "scenarioIds": [
+        "HV-DAT-LOOKUP-001"
+      ],
+      "targets": [
+        "server-twins"
+      ],
+      "implementationPhases": [
+        3,
+        4,
+        5
+      ],
+      "testLayers": [
+        "unit",
+        "component",
+        "twin"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-041",
+      "family": "HV-DAT-LOOKUP",
+      "scenarioIds": [
+        "HV-DAT-LOOKUP-001"
+      ],
+      "targets": [
+        "web"
+      ],
+      "implementationPhases": [
+        3,
+        4,
+        5
+      ],
+      "testLayers": [
+        "unit",
+        "component",
+        "property"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-042",
+      "family": "HV-DAT-LOOKUP",
+      "scenarioIds": [
+        "HV-DAT-LOOKUP-001"
+      ],
+      "targets": [
+        "server-twins"
+      ],
+      "implementationPhases": [
+        3,
+        6
+      ],
+      "testLayers": [
+        "unit",
+        "model",
+        "twin"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-043",
+      "family": "HV-DAT-RESET",
+      "scenarioIds": [
+        "HV-DAT-RESET-001"
+      ],
+      "targets": [
+        "server-twins"
+      ],
+      "implementationPhases": [
+        4,
+        5
+      ],
+      "testLayers": [
+        "component",
+        "a11y",
+        "bdd"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-044",
+      "family": "HV-DAT-RESET",
+      "scenarioIds": [
+        "HV-DAT-RESET-001"
+      ],
+      "targets": [
+        "server-twins"
+      ],
+      "implementationPhases": [
+        3,
+        4,
+        5
+      ],
+      "testLayers": [
+        "unit",
+        "component",
+        "bdd"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-045",
+      "family": "HV-DAT-RESET",
+      "scenarioIds": [
+        "HV-DAT-RESET-001"
+      ],
+      "targets": [
+        "web"
+      ],
+      "implementationPhases": [
+        4,
+        5
+      ],
+      "testLayers": [
+        "component",
+        "a11y",
+        "bdd"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-046",
+      "family": "HV-DAT-SIGNATURE",
+      "scenarioIds": [
+        "HV-DAT-SIGNATURE-001"
+      ],
+      "targets": [
+        "server-twins"
+      ],
+      "implementationPhases": [
+        3,
+        6
+      ],
+      "testLayers": [
+        "unit",
+        "unit",
+        "twin"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-047",
+      "family": "HV-DAT-SIGNATURE",
+      "scenarioIds": [
+        "HV-DAT-SIGNATURE-001"
+      ],
+      "targets": [
+        "server-twins"
+      ],
+      "implementationPhases": [
+        3,
+        4,
+        6
+      ],
+      "testLayers": [
+        "unit",
+        "model",
+        "twin"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-048",
+      "family": "HV-DAT-SIGNATURE",
+      "scenarioIds": [
+        "HV-DAT-SIGNATURE-001"
+      ],
+      "targets": [
+        "web",
+        "ubuntu",
+        "android"
+      ],
+      "implementationPhases": [
+        6
+      ],
+      "testLayers": [
+        "unit",
+        "unit",
+        "bdd"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-049",
+      "family": "HV-DAT-SEPARATION",
+      "scenarioIds": [
+        "HV-DAT-SEPARATION-001"
+      ],
+      "targets": [
+        "web",
+        "ubuntu",
+        "android"
+      ],
+      "implementationPhases": [
+        3,
+        4,
+        5
+      ],
+      "testLayers": [
+        "unit",
+        "component",
+        "bdd"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-050",
+      "family": "HV-DAT-SEPARATION",
+      "scenarioIds": [
+        "HV-DAT-SEPARATION-001"
+      ],
+      "targets": [
+        "web",
+        "ubuntu",
+        "android"
+      ],
+      "implementationPhases": [
+        3,
+        4,
+        5
+      ],
+      "testLayers": [
+        "unit",
+        "component",
+        "secret-scan"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-051",
+      "family": "HV-DAT-PROTECT",
+      "scenarioIds": [
+        "HV-DAT-PROTECT-001"
+      ],
+      "targets": [
+        "web"
+      ],
+      "implementationPhases": [
+        3,
+        5,
+        6
+      ],
+      "testLayers": [
+        "unit",
+        "component",
+        "bdd"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-052",
+      "family": "HV-DAT-PROTECT",
+      "scenarioIds": [
+        "HV-DAT-PROTECT-001"
+      ],
+      "targets": [
+        "web"
+      ],
+      "implementationPhases": [
+        3,
+        5,
+        6
+      ],
+      "testLayers": [
+        "unit",
+        "unit",
+        "bdd"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-053",
+      "family": "HV-DAT-PROTECT",
+      "scenarioIds": [
+        "HV-DAT-PROTECT-001"
+      ],
+      "targets": [
+        "ubuntu",
+        "android"
+      ],
+      "implementationPhases": [
+        3,
+        5,
+        6
+      ],
+      "testLayers": [
+        "unit",
+        "unit",
+        "property"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-054",
+      "family": "HV-DAT-SESSION",
+      "scenarioIds": [
+        "HV-DAT-SESSION-001"
+      ],
+      "targets": [
+        "web",
+        "ubuntu",
+        "android"
+      ],
+      "implementationPhases": [
+        3,
+        4,
+        6
+      ],
+      "testLayers": [
+        "unit",
+        "model",
+        "bdd"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-055",
+      "family": "HV-DAT-PROTECT",
+      "scenarioIds": [
+        "HV-DAT-PROTECT-001"
+      ],
+      "targets": [
+        "web",
+        "ubuntu",
+        "android"
+      ],
+      "implementationPhases": [
+        2,
+        3
+      ],
+      "testLayers": [
+        "unit",
+        "unit",
+        "property"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-056",
+      "family": "HV-DAT-STAGE",
+      "scenarioIds": [
+        "HV-DAT-STAGE-001"
+      ],
+      "targets": [
+        "web",
+        "ubuntu",
+        "android"
+      ],
+      "implementationPhases": [
+        2,
+        3,
+        6
+      ],
+      "testLayers": [
+        "unit",
+        "unit",
+        "unit"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-057",
+      "family": "HV-DAT-STAGE",
+      "scenarioIds": [
+        "HV-DAT-STAGE-001"
+      ],
+      "targets": [
+        "web",
+        "ubuntu",
+        "android"
+      ],
+      "implementationPhases": [
+        3,
+        6
+      ],
+      "testLayers": [
+        "unit",
+        "property",
+        "unit"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-058",
+      "family": "HV-DAT-STAGE",
+      "scenarioIds": [
+        "HV-DAT-STAGE-001"
+      ],
+      "targets": [
+        "web",
+        "ubuntu",
+        "android"
+      ],
+      "implementationPhases": [
+        3,
+        6
+      ],
+      "testLayers": [
+        "unit",
+        "model",
+        "bdd"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-059",
+      "family": "HV-DAT-STAGE",
+      "scenarioIds": [
+        "HV-DAT-STAGE-001"
+      ],
+      "targets": [
+        "server-twins"
+      ],
+      "implementationPhases": [
+        3,
+        6
+      ],
+      "testLayers": [
+        "unit",
+        "model",
+        "twin"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-060",
+      "family": "HV-DAT-SESSION",
+      "scenarioIds": [
+        "HV-DAT-SESSION-001"
+      ],
+      "targets": [
+        "web",
+        "ubuntu",
+        "android"
+      ],
+      "implementationPhases": [
+        3,
+        6
+      ],
+      "testLayers": [
+        "unit",
+        "model",
+        "bdd"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-061",
+      "family": "HV-DAT-STAGE",
+      "scenarioIds": [
+        "HV-DAT-STAGE-001"
+      ],
+      "targets": [
+        "web",
+        "ubuntu",
+        "android"
+      ],
+      "implementationPhases": [
+        4,
+        5,
+        6
+      ],
+      "testLayers": [
+        "unit",
+        "component",
+        "bdd"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-062",
+      "family": "HV-DAT-RESUME",
+      "scenarioIds": [
+        "HV-DAT-RESUME-001"
+      ],
+      "targets": [
+        "web",
+        "ubuntu",
+        "android"
+      ],
+      "implementationPhases": [
+        3,
+        4,
+        6
+      ],
+      "testLayers": [
+        "unit",
+        "model",
+        "bdd"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-063",
+      "family": "HV-DAT-RESUME",
+      "scenarioIds": [
+        "HV-DAT-RESUME-001"
+      ],
+      "targets": [
+        "web",
+        "ubuntu",
+        "android"
+      ],
+      "implementationPhases": [
+        3,
+        4,
+        6
+      ],
+      "testLayers": [
+        "unit",
+        "property",
+        "bdd"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-064",
+      "family": "HV-DAT-NAV",
+      "scenarioIds": [
+        "HV-DAT-NAV-001"
+      ],
+      "targets": [
+        "web",
+        "ubuntu",
+        "android"
+      ],
+      "implementationPhases": [
+        4,
+        5
+      ],
+      "testLayers": [
+        "unit",
+        "component",
+        "bdd"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-065",
+      "family": "HV-DAT-NAV",
+      "scenarioIds": [
+        "HV-DAT-NAV-001"
+      ],
+      "targets": [
+        "web",
+        "ubuntu",
+        "android"
+      ],
+      "implementationPhases": [
+        4,
+        5,
+        6
+      ],
+      "testLayers": [
+        "component",
+        "a11y",
+        "bdd"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-066",
+      "family": "HV-DAT-NAV",
+      "scenarioIds": [
+        "HV-DAT-NAV-001"
+      ],
+      "targets": [
+        "web",
+        "android"
+      ],
+      "implementationPhases": [
+        3,
+        4,
+        5
+      ],
+      "testLayers": [
+        "unit",
+        "model",
+        "bdd"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-067",
+      "family": "HV-DAT-NAV",
+      "scenarioIds": [
+        "HV-DAT-NAV-001"
+      ],
+      "targets": [
+        "web",
+        "android"
+      ],
+      "implementationPhases": [
+        3,
+        4,
+        5
+      ],
+      "testLayers": [
+        "unit",
+        "model",
+        "bdd"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-068",
+      "family": "HV-DAT-NAV",
+      "scenarioIds": [
+        "HV-DAT-NAV-001"
+      ],
+      "targets": [
+        "web",
+        "android"
+      ],
+      "implementationPhases": [
+        3,
+        4,
+        5
+      ],
+      "testLayers": [
+        "unit",
+        "model",
+        "bdd"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-069",
+      "family": "HV-DAT-NAV",
+      "scenarioIds": [
+        "HV-DAT-NAV-001"
+      ],
+      "targets": [
+        "web",
+        "android"
+      ],
+      "implementationPhases": [
+        3,
+        4,
+        6
+      ],
+      "testLayers": [
+        "unit",
+        "property",
+        "bdd"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-070",
+      "family": "HV-DAT-OWNER",
+      "scenarioIds": [
+        "HV-DAT-OWNER-001"
+      ],
+      "targets": [
+        "web",
+        "ubuntu"
+      ],
+      "implementationPhases": [
+        3,
+        4,
+        6
+      ],
+      "testLayers": [
+        "unit",
+        "unit",
+        "bdd"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-071",
+      "family": "HV-DAT-CLEANUP",
+      "scenarioIds": [
+        "HV-DAT-CLEANUP-001"
+      ],
+      "targets": [
+        "all"
+      ],
+      "implementationPhases": [
+        3,
+        5,
+        6
+      ],
+      "testLayers": [
+        "unit",
+        "property",
+        "bdd"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-072",
+      "family": "HV-DAT-CLEANUP",
+      "scenarioIds": [
+        "HV-DAT-CLEANUP-001"
+      ],
+      "targets": [
+        "all"
+      ],
+      "implementationPhases": [
+        3,
+        4,
+        6
+      ],
+      "testLayers": [
+        "unit",
+        "property",
+        "bdd"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-073",
+      "family": "HV-DAT-EXTERNAL",
+      "scenarioIds": [
+        "HV-DAT-EXTERNAL-001"
+      ],
+      "targets": [
+        "conformance"
+      ],
+      "implementationPhases": [
+        6,
+        7
+      ],
+      "testLayers": [
+        "conformance",
+        "twin"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-074",
+      "family": "HV-DAT-EXTERNAL",
+      "scenarioIds": [
+        "HV-DAT-EXTERNAL-001"
+      ],
+      "targets": [
+        "controlled-local"
+      ],
+      "implementationPhases": [
+        6,
+        7
+      ],
+      "testLayers": [
+        "coverage-manifest",
+        "release-evidence"
+      ],
+      "classification": "target-owned-capability"
+    },
+    {
+      "id": "AC-009-075",
+      "family": "HV-DAT-EXTERNAL",
+      "scenarioIds": [
+        "HV-DAT-EXTERNAL-001"
+      ],
+      "targets": [
+        "web",
+        "ubuntu",
+        "android"
+      ],
+      "implementationPhases": [
+        6,
+        7
+      ],
+      "testLayers": [
+        "bdd",
+        "coverage-manifest"
+      ],
+      "classification": "target-owned-capability"
+    },
+    {
+      "id": "AC-009-076",
+      "family": "HV-DAT-EXTERNAL",
+      "scenarioIds": [
+        "HV-DAT-EXTERNAL-001"
+      ],
+      "targets": [
+        "controlled-local"
+      ],
+      "implementationPhases": [
+        6,
+        7
+      ],
+      "testLayers": [
+        "coverage-manifest",
+        "release-evidence"
+      ],
+      "classification": "target-owned-capability"
+    },
+    {
+      "id": "AC-009-077",
+      "family": "HV-DAT-EXTERNAL",
+      "scenarioIds": [
+        "HV-DAT-EXTERNAL-001"
+      ],
+      "targets": [
+        "controlled-local"
+      ],
+      "implementationPhases": [
+        6,
+        7
+      ],
+      "testLayers": [
+        "coverage-manifest",
+        "secret-scan"
+      ],
+      "classification": "target-owned-capability"
+    },
+    {
+      "id": "AC-009-078",
+      "family": "HV-DAT-SECURITY",
+      "scenarioIds": [
+        "HV-DAT-SECURITY-001"
+      ],
+      "targets": [
+        "conformance"
+      ],
+      "implementationPhases": [
+        1,
+        7
+      ],
+      "testLayers": [
+        "unit",
+        "secret-scan"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-079",
+      "family": "HV-DAT-SECURITY",
+      "scenarioIds": [
+        "HV-DAT-SECURITY-001"
+      ],
+      "targets": [
+        "web"
+      ],
+      "implementationPhases": [
+        7
+      ],
+      "testLayers": [
+        "bdd",
+        "secret-scan"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-080",
+      "family": "HV-DAT-SECURITY",
+      "scenarioIds": [
+        "HV-DAT-SECURITY-001"
+      ],
+      "targets": [
+        "ubuntu",
+        "android"
+      ],
+      "implementationPhases": [
+        6,
+        7
+      ],
+      "testLayers": [
+        "unit",
+        "bdd",
+        "coverage-manifest"
+      ],
+      "classification": "target-owned-capability"
+    },
+    {
+      "id": "AC-009-081",
+      "family": "HV-DAT-SECURITY",
+      "scenarioIds": [
+        "HV-DAT-SECURITY-001"
+      ],
+      "targets": [
+        "all"
+      ],
+      "implementationPhases": [
+        6,
+        7
+      ],
+      "testLayers": [
+        "twin",
+        "release-evidence"
+      ],
+      "classification": "release-evidence"
+    },
+    {
+      "id": "AC-009-082",
+      "family": "HV-DAT-SECURITY",
+      "scenarioIds": [
+        "HV-DAT-SECURITY-001"
+      ],
+      "targets": [
+        "all"
+      ],
+      "implementationPhases": [
+        6,
+        7
+      ],
+      "testLayers": [
+        "secret-scan",
+        "bdd"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-083",
+      "family": "HV-DAT-SECURITY",
+      "scenarioIds": [
+        "HV-DAT-SECURITY-001"
+      ],
+      "targets": [
+        "all"
+      ],
+      "implementationPhases": [
+        3,
+        6,
+        7
+      ],
+      "testLayers": [
+        "property",
+        "property",
+        "model"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-084",
+      "family": "HV-DAT-SECURITY",
+      "scenarioIds": [
+        "HV-DAT-SECURITY-001"
+      ],
+      "targets": [
+        "web",
+        "android"
+      ],
+      "implementationPhases": [
+        5,
+        7
+      ],
+      "testLayers": [
+        "a11y",
+        "component",
+        "bdd"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-085",
+      "family": "HV-DAT-SECURITY",
+      "scenarioIds": [
+        "HV-DAT-SECURITY-001"
+      ],
+      "targets": [
+        "all"
+      ],
+      "implementationPhases": [
+        7
+      ],
+      "testLayers": [
+        "unit",
+        "property"
+      ],
+      "classification": "target-owned"
+    },
+    {
+      "id": "AC-009-086",
+      "family": "HV-DAT-SECURITY",
+      "scenarioIds": [
+        "HV-DAT-SECURITY-001"
+      ],
+      "targets": [
+        "release-admission"
+      ],
+      "implementationPhases": [
+        6,
+        7,
+        8
+      ],
+      "testLayers": [
+        "release-evidence",
+        "secret-scan"
+      ],
+      "classification": "release-evidence"
+    },
+    {
+      "id": "AC-009-087",
+      "family": "HV-DAT-SECURITY",
+      "scenarioIds": [
+        "HV-DAT-SECURITY-001"
+      ],
+      "targets": [
+        "release-admission"
+      ],
+      "implementationPhases": [
+        6,
+        7,
+        8
+      ],
+      "testLayers": [
+        "release-evidence",
+        "twin"
+      ],
+      "classification": "release-evidence"
+    },
+    {
+      "id": "AC-009-088",
+      "family": "HV-DAT-SECURITY",
+      "scenarioIds": [
+        "HV-DAT-SECURITY-001"
+      ],
+      "targets": [
+        "release-admission"
+      ],
+      "implementationPhases": [
+        6,
+        7,
+        8
+      ],
+      "testLayers": [
+        "release-evidence",
+        "secret-scan"
+      ],
+      "classification": "release-evidence"
+    },
+    {
+      "id": "AC-009-089",
+      "family": "HV-DAT-SECURITY",
+      "scenarioIds": [
+        "HV-DAT-SECURITY-001"
+      ],
+      "targets": [
+        "release-admission"
+      ],
+      "implementationPhases": [
+        7,
+        8
+      ],
+      "testLayers": [
+        "release-evidence"
+      ],
+      "classification": "release-evidence"
+    }
+  ]
+}
