@@ -11,7 +11,7 @@
  * Usage:
  *   node scripts/credential-file-restore/validate-coverage-manifest.mjs <manifest.json>
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -68,4 +68,45 @@ if (reasons.length > 0) {
   process.exit(1);
 }
 
-console.log(`OK: 89/89 criteria, ${manifest.criteria.length} mappings, families unique, classifications valid`);
+// Cross-check the executable Gherkin catalog: every manifest scenario ID must
+// exist in the feature files, every feature scenario must reference a known
+// criterion, and scenario IDs must be unique.
+const FEATURES_DIR = join(REPO_ROOT, 'features', 'credential-file-restore');
+const catalogReasons = [];
+const catalogScenarioIds = new Set();
+const catalogCriteria = new Set();
+let featureFiles = [];
+try {
+  featureFiles = readdirSync(FEATURES_DIR).filter((f) => f.endsWith('.feature'));
+} catch {
+  catalogReasons.push('features/credential-file-restore directory missing');
+}
+for (const file of featureFiles) {
+  const content = readFileSync(join(FEATURES_DIR, file), 'utf8');
+  const tagLines = content.split('\n').filter((line) => line.trim().startsWith('@'));
+  for (const line of tagLines) {
+    const tags = line.trim().split(/\s+/);
+    const acTag = tags.find((t) => /^@AC-009-\d{3}$/.test(t));
+    const scenarioTag = tags.find((t) => /^@HV-DAT-[A-Z]+-AC\d{3}$/.test(t));
+    if (acTag) catalogCriteria.add(acTag.slice(1));
+    if (scenarioTag) {
+      if (catalogScenarioIds.has(scenarioTag)) catalogReasons.push(`duplicate scenario id in catalog: ${scenarioTag}`);
+      catalogScenarioIds.add(scenarioTag);
+    }
+  }
+}
+for (const criterion of manifest.criteria) {
+  for (const scenarioId of criterion.scenarioIds) {
+    if (!catalogScenarioIds.has(`@${scenarioId}`)) catalogReasons.push(`scenario ${scenarioId} (${criterion.id}) missing from catalog`);
+  }
+}
+for (const ac of catalogCriteria) {
+  if (!ids.has(ac)) catalogReasons.push(`catalog references unknown criterion: ${ac}`);
+}
+if (catalogReasons.length > 0) {
+  console.error(`FAIL: ${catalogReasons.length} catalog issue(s)`);
+  for (const reason of catalogReasons) console.error(`  - ${reason}`);
+  process.exit(1);
+}
+
+console.log(`OK: 89/89 criteria, ${manifest.criteria.length} mappings, ${catalogScenarioIds.size} catalog scenarios, families unique, classifications valid`);

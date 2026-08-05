@@ -79,7 +79,10 @@
     "credential-file-restore:conformance": "node scripts/credential-file-restore/conformance.mjs",
     "credential-file-restore:coverage": "node scripts/credential-file-restore/validate-coverage-manifest.mjs conformance/credential-file-restore/v1/coverage-manifest.json",
     "credential-file-restore:secret-scan": "node scripts/credential-file-restore/secret-scan.mjs",
-    "test:credential-file-restore:unit": "vitest run src/lib/credential-file-restore"
+    "test:credential-file-restore:unit": "vitest run src/lib/credential-file-restore",
+    "test:credential-file-restore:bdd": "playwright test --config playwright.credential-file-restore.config.ts",
+    "credential-file-restore:faults": "node scripts/credential-file-restore/fault-orchestration.mjs",
+    "credential-file-restore:quality": "node scripts/credential-file-restore/quality-gates.mjs"
   },
   "dependencies": {
     "@noble/hashes": "2.2.0",
