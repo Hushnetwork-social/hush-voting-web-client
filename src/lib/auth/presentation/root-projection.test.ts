@@ -38,7 +38,7 @@ describe('projectRootScreen', () => {
     }
   });
 
-  it('never uses Setting up… as a fallback for a missing child projection', () => {
+  it('never uses placeholder onboarding copy as a fallback for a missing child projection', () => {
     const result = projectRootScreen({ phase: 'onboarding' });
     expect(result.kind).toBe('blocked');
     if (result.kind === 'blocked') {

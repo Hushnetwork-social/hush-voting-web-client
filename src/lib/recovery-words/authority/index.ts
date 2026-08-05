@@ -9,8 +9,8 @@
  * SECRET BOUNDARY: no phrase, seed, private key, password, PRF output,
  * wrapping key, or transaction is representable here.
  */
-export * from './word.js';
-export * from './lookup.js';
-export * from './proof.js';
-export * from './activation.js';
-export * from './convergence.js';
+export * from './word';
+export * from './lookup';
+export * from './proof';
+export * from './activation';
+export * from './convergence';

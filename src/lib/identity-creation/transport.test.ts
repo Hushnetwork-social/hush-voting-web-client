@@ -4,13 +4,13 @@
  * 070–076 (integration/contract portion).
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { BffTransport, parseBffLookupResponse, parseBffSubmitResponse, RPC_TIMEOUT_MS } from './transport.js';
-import { createServerTransport } from '../../app/api/server-transport.js';
-import { normalizeGetIdentityReply, normalizeSubmitReply } from './wire.js';
-import { FULL_IDENTITY_PAYLOAD_KIND } from './profile.js';
-import { POST as lookupPost } from '../../app/api/identity/route.js';
-import { POST as submitPost } from '../../app/api/blockchain/route.js';
-import { abbreviateAddress, type MissingProfileCreationContract } from './contracts.js';
+import { BffTransport, parseBffLookupResponse, parseBffSubmitResponse, RPC_TIMEOUT_MS } from './transport';
+import { createServerTransport } from '../../app/api/server-transport';
+import { normalizeGetIdentityReply, normalizeSubmitReply } from './wire';
+import { FULL_IDENTITY_PAYLOAD_KIND } from './profile';
+import { POST as lookupPost } from '../../app/api/identity/route';
+import { POST as submitPost } from '../../app/api/blockchain/route';
+import { abbreviateAddress, type MissingProfileCreationContract } from './contracts';
 
 const LOCAL_SIGNING = 'A11B22C33D44E55F66A77B88C99D00E11F22A33B44C55D66E77F88A99B00C11';
 const LOCAL_ENCRYPT = 'Q77W66E55R44T33Y22U11I00O99P88A77S66D55F44G33H22J11K00L99M88';

@@ -15,7 +15,7 @@
  * "Submission Outcome Contract", "Waiting for Blockchain Confirmation",
  * "Error-specific replacement rules", "Three-minute abnormal delay".
  */
-import type { LookupOutcome, SubmissionOutcome } from './wire.js';
+import type { LookupOutcome, SubmissionOutcome } from './wire';
 
 export const POLL_INTERVAL_MS = 3_000 as const;
 export const ABNORMAL_DELAY_MS = 180_000 as const; // 3 minutes

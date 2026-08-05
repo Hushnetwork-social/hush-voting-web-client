@@ -10,7 +10,7 @@ import {
   invalidatePreCreationHistory,
   localUserExistsEvent,
   unifiedBack,
-} from './navigation-control.js';
+} from './navigation-control';
 
 describe('decideHistoryEntry — one opaque entry per navigation-relevant step', () => {
   it('pushes history only for navigation-relevant steps', () => {

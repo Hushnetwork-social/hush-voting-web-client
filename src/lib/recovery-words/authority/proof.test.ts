@@ -17,7 +17,7 @@ import {
   selectProtectionMode,
   type ProtectionCapabilityReport,
   type SelectedKeyProofPort,
-} from './proof.js';
+} from './proof';
 
 const epoch = 'epoch-1' as RecoveryEpoch;
 

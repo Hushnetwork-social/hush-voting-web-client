@@ -12,7 +12,7 @@ import {
   describeCanonicalTransaction,
   isFullIdentityPayloadKind,
   validateAlias,
-} from './profile.js';
+} from './profile';
 
 const SIGNING = 'A11B22C33D44E55F66A77B88C99D00E11F22A33B44C55D66E77F88A99B00C11';
 const ENCRYPT = 'Q77W66E55R44T33Y22U11I00O99P88A77S66D55F44G33H22J11K00L99M88';
@@ -166,7 +166,7 @@ describe('describeCanonicalTransaction — FEAT-001 corpus fidelity', () => {
     expect(tx.ok).toBe(true);
     if (!tx.ok) return;
     // Re-serialize through the canonical API and compare bytes exactly.
-    const { canonicalBytes, serializeUnsignedTransaction } = await import('../identity-compatibility/canonical.js');
+    const { canonicalBytes, serializeUnsignedTransaction } = await import('../identity-compatibility/canonical');
     const expected = canonicalBytes(serializeUnsignedTransaction(tx.value.unsignedTransaction));
     expect(Buffer.from(tx.value.canonicalBytes).equals(Buffer.from(expected))).toBe(true);
   });

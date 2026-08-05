@@ -6,7 +6,7 @@
  * startup, first-run, child flows, staged resume, root verification,
  * missing-profile confirmation, quarantine, and blocked states. React decides
  * copy/actions/focus only; it never decides business transitions or holds
- * secrets. `Setting up…` is not an allowed fallback: unknown/missing child
+ * secrets. Placeholder onboarding copy is not an allowed fallback: unknown/missing child
  * projections produce a typed blocking screen (AC-010-012).
  *
  * Post-Lock resume permits only home or settings landing (AC-010-085); forms,
@@ -61,7 +61,7 @@ export function projectRootScreen(state: RootStateView): RootScreen {
     case 'onboarding':
       if (state.childKind === undefined) {
         // Unknown/missing child projection → typed blocking error; NEVER
-        // "Setting up…" as a completion substitute (AC-010-012).
+        // placeholder onboarding copy as a completion substitute (AC-010-012).
         return { kind: 'blocked', supportCode: state.supportCode ?? 'ROOT-NO-CHILD' };
       }
       return { kind: 'childFlow', childKind: state.childKind };

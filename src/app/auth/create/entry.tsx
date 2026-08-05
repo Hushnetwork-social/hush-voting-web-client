@@ -7,7 +7,7 @@
  * block generation with typed remediation and bounded Retry.
  */
 
-import type { PreflightOutcome } from '../../../lib/identity-creation/authority.js';
+import type { PreflightOutcome } from '../../../lib/identity-creation/authority';
 import { ENTRY, PREF_LIGHT } from './copy';
 import { ActionButton, StatusRegion, SurfacePanel } from './surfaces';
 

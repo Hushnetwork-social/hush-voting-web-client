@@ -17,8 +17,8 @@ import {
   composeRestoreView,
   rootNavigationPolicy,
   validateCredentialFileRegistration,
-} from './onboarding.js';
-import { EXACT_COPY, mapErrorToRemediation } from './remediation.js';
+} from './onboarding';
+import { EXACT_COPY, mapErrorToRemediation } from './remediation';
 import {
   copyKeyForStage,
   focusTargetForFailure,
@@ -26,10 +26,10 @@ import {
   mapRestoreStageToScreen,
   permittedActionsForStage,
   toRestoreViewState,
-} from './view.js';
-import type { RestoreScreen } from './view.js';
-import type { RestoreStage } from '../contracts/lifecycle.js';
-import { assertNoRestoreSecretSurface } from '../contracts/lifecycle.js';
+} from './view';
+import type { RestoreScreen } from './view';
+import type { RestoreStage } from '../contracts/lifecycle';
+import { assertNoRestoreSecretSurface } from '../contracts/lifecycle';
 
 describe('FEAT-009 stage → screen mapping (Task 4.1)', () => {
   it('every authority stage maps to exactly one closed screen', () => {

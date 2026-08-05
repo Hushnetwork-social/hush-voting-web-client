@@ -16,9 +16,9 @@ import {
   evaluateEnvelopeGate,
   shouldShowProgress,
   sourceReleasePolicy,
-} from './snapshot.js';
-import type { BoundedSourceReadPort } from './snapshot.js';
-import type { RestoreEpoch } from '../contracts/lifecycle.js';
+} from './snapshot';
+import type { BoundedSourceReadPort } from './snapshot';
+import type { RestoreEpoch } from '../contracts/lifecycle';
 
 const EPOCH = 'epoch-1' as RestoreEpoch;
 

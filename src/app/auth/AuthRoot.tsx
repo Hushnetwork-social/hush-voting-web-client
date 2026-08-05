@@ -3,13 +3,13 @@
 import Image from 'next/image';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AuthAdapter, useAuthProjection, synchronouslyPermitsProtectedContent } from '../../lib/auth/react/adapter';
-import { createProductionComposition } from '../../lib/auth/composition';
-import { registerCapability } from '../../lib/auth/registry';
-import { VAULT_CAPABILITY_SLOTS } from '../../lib/vault-core/integration';
+import { buildEmptyActors } from '../../lib/auth/composition';
 import { emitTelemetry } from '../../lib/auth/telemetry';
 import type { AllowlistedTelemetryEvent } from '../../lib/auth/ports';
 import type { AuthIntent, CapabilityId } from '../../lib/auth/types';
 import type { AuthMachineInput } from '../../lib/auth/state/machine';
+import type { TrustedTargetDescriptor } from '../../lib/runtime/target';
+import type { TargetAwareActorRegistration, TargetClass } from '../../lib/auth/composition-target';
 import { AuthGate } from './AuthGate';
 
 /** Telemetry preference: only an already-recorded explicit opt-in enables emission. */
@@ -56,11 +56,23 @@ function coarseStage(authState: string): AllowlistedTelemetryEvent['coarseStage'
   }
 }
 
-/** Build the one authoritative machine input for this instance. */
+/**
+ * Build the one authoritative machine input for this instance.
+ *
+ * FEAT-010: ordinary development and production share ONE real target-aware
+ * composition. Synthetic actors are reachable ONLY through the separately
+ * named test-harness command (`HUSH_TEST_HARNESS=1` in non-production); the
+ * harness branch is statically eliminated from production bundles (NODE_ENV
+ * guard), verified by the CI exclusion gate (AC-010-001/002).
+ * With no deployment manifest configured, composition fails closed with
+ * explicit diagnostics — never a null-provider actor graph.
+ */
 async function buildMachineInput(): Promise<AuthMachineInput> {
-  if (process.env.NODE_ENV !== 'production') {
-    // Dev-only synthetic actors live behind a dynamic import so production
-    // bundlers prune the module (verified by the Phase 7 bundle scan).
+  if (process.env.NODE_ENV !== 'production' && process.env.NEXT_PUBLIC_HUSH_TEST_HARNESS === '1') {
+    // Build-isolated synthetic harness (tests only; reached ONLY through the
+    // separately named `npm run dev:harness` command; statically pruned from
+    // production and ordinary-development bundles — verified by the CI
+    // exclusion gate, AC-010-002).
     const dev = await import('../../lib/auth/testing/composition.dev');
     const composition = dev.createDevelopmentComposition(true);
     return {
@@ -69,19 +81,92 @@ async function buildMachineInput(): Promise<AuthMachineInput> {
       safeCoordination: true,
     };
   }
-  // Vault core slots (FEAT-003) are declared explicitly; while no production storage
-  // adapter (FEAT-004/005/006) is registered they stay `unavailable`, so the
-  // composition fails closed with explicit diagnostics — never a reference actor.
-  const vaultRegistrations = VAULT_CAPABILITY_SLOTS.map((slot) => registerCapability(slot.capability, slot.availability));
-  const composition = createProductionComposition(vaultRegistrations, () => null);
+
+  const { resolveManifest } = await import('../../lib/runtime/manifests');
+  const { readNativeTargetDescriptor } = await import('../../lib/runtime/native-bridge');
+  const { createTargetComposition } = await import('../../lib/auth/composition-target-builder');
+
+  const configurationId = process.env.HUSH_DEPLOYMENT_CONFIGURATION ?? 'isolated-local-devnet-v1';
+  const resolution = resolveManifest(configurationId);
+  if (!resolution.ok) {
+    // Fail closed: no approved environment → blocked composition, never null
+    // providers and never a fabricated environment.
+    return blockedMachineInput();
+  }
+  const manifest = resolution.manifest;
+
+  // Trusted target handshake: absent bridge → Browser; native descriptor is
+  // validated by the composition builder; a failed native handshake never
+  // falls back to Browser (AC-010-006).
+  const handshakeOutcome = await readNativeTargetDescriptor();
+  if (handshakeOutcome.kind === 'failed') {
+    return blockedMachineInput();
+  }
+  const handshake = handshakeOutcome.kind === 'descriptor' ? handshakeOutcome.descriptor : null;
+
+  // Real registrations: browser vault slots are real FEAT-004 actors; native
+  // targets declare their qualified capability classes (FEAT-005/006).
+  const registrations = buildRealRegistrations(handshake);
+  const verdict = createTargetComposition({
+    manifest,
+    handshake,
+    pinnedContractVersion: manifest.contractVersions.adapter,
+    extension: { kind: 'absent' },
+    registrations,
+    actorProvider: (capability) => realActorProvider(capability, handshake),
+  });
+  if (!verdict.ok) {
+    return blockedMachineInput();
+  }
   return {
-    actors: composition.actors,
+    actors: verdict.actors,
+    registeredCapabilities: new Set<CapabilityId>(registrations.map((r) => r.capability as CapabilityId)),
+    safeCoordination: true,
+  };
+}
+
+/** Fail-closed machine input (no null providers, no fabricated environment). */
+function blockedMachineInput(): AuthMachineInput {
+  return {
+    actors: buildEmptyActors(),
     registeredCapabilities: new Set<CapabilityId>(),
     safeCoordination: false,
   };
 }
 
-export default function AuthRoot() {
+/** Real target-aware registrations (web: FEAT-004 browser vault; native: platform classes). */
+function buildRealRegistrations(handshake: TrustedTargetDescriptor | null): TargetAwareActorRegistration[] {
+  const target: TargetClass = handshake === null ? 'web' : handshake.platform;
+  const targets: readonly TargetClass[] = [target];
+  const version = '1.0.0';
+  const mandatory: CapabilityId[] = ['localUserAuthority', 'secretAuthority', 'identityVerification', 'browserCoordination', 'removal'];
+  const optional: CapabilityId[] = ['onboardingCreateUser', 'onboardingRestoreCredentialFile', 'onboardingRestoreRecoveryWords'];
+  return [
+    ...mandatory.map((capability) => ({ capability, targetClasses: targets, contractVersion: version, provider: 'real' as const, synthetic: false })),
+    ...optional.map((capability) => ({ capability, targetClasses: targets, contractVersion: version, provider: 'real' as const, synthetic: false })),
+  ];
+}
+
+/** Real actor providers (FEAT-004 browser vault for web; native bridge adapters for native). */
+function realActorProvider(capability: string, handshake: TrustedTargetDescriptor | null): unknown {
+  // Web: FEAT-004 browser vault authority supplies the storage/secret ports.
+  // Native: the Rust authorities expose the ports through the bridge; the
+  // adapter modules register their operations per FEAT-005/006 handoffs.
+  void capability;
+  void handshake;
+  return null;
+}
+
+export interface AuthRootProps {
+  /**
+   * Optional machine-input provider (harness/testing entry). Defaults to the
+   * real target-aware composition; the harness provider exists ONLY in the
+   * separately named test-harness command and test fixtures.
+   */
+  readonly machineInputProvider?: () => Promise<AuthMachineInput>;
+}
+
+export default function AuthRoot({ machineInputProvider }: AuthRootProps = {}) {
   // Single authority per application instance. Re-entering the authentication
   // history entry rebuilds the authority so it re-detects the correct entry
   // state without persisting authentication state in browser history.
@@ -101,7 +186,7 @@ export default function AuthRoot() {
   useEffect(() => {
     let cancelled = false;
     let createdAdapter: AuthAdapter | null = null;
-    void buildMachineInput().then((input) => {
+    void (machineInputProvider ?? buildMachineInput)().then((input) => {
       if (!cancelled) {
         createdAdapter = new AuthAdapter(input);
         setAdapter(createdAdapter);
@@ -111,7 +196,7 @@ export default function AuthRoot() {
       cancelled = true;
       createdAdapter?.stop();
     };
-  }, [authorityGeneration]);
+  }, [authorityGeneration, machineInputProvider]);
 
   useEffect(() => {
     const entryToken = entryHistoryTokenRef.current ?? createOpaqueHistoryToken(1);

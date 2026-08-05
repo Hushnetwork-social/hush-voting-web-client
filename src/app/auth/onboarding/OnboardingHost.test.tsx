@@ -182,7 +182,7 @@ describe('OnboardingHost', () => {
     expect(screen.getByRole('button', { name: /choose/i })).toBeInTheDocument();
   });
 
-  it('shows a typed fail-closed error instead of Setting up… when no child is mounted', () => {
+  it('shows a typed fail-closed error instead of placeholder onboarding copy when no child is mounted', () => {
     render(<OnboardingHost child={null} onBack={onBack} />);
     expect(screen.getByTestId('onboarding-error')).toBeInTheDocument();
     expect(screen.queryByText(/setting up/i)).not.toBeInTheDocument();

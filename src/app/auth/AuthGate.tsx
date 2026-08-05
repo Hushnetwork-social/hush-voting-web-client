@@ -19,6 +19,8 @@ import { FirstRun } from './FirstRun';
 import { LockedUser } from './LockedUser';
 import { RemovalConfirmation } from './RemovalConfirmation';
 import { ErrorSurface, RecoveryNavigation, TemporaryMode } from './ErrorSurfaces';
+import { OnboardingHost } from './onboarding/OnboardingHost';
+import { resolveOnboardingChild } from './onboarding/onboarding-registry';
 import { useState } from 'react';
 
 export interface AuthGateHandlers {
@@ -69,19 +71,15 @@ export function AuthGate({ projection, handlers }: AuthGateProps) {
       );
       break;
     case 'onboarding':
-      // Child flows are implemented by downstream features; render a safe
-      // placeholder that dispatches Back so cleanup always runs.
+      // FEAT-010: mount the real completed child flow through the typed
+      // OnboardingHost. The child view is published by the child authority
+      // adapters; a missing/incompatible view yields a typed fail-closed
+      // error — placeholder onboarding copy is never a completion substitute (AC-010-012).
       surface = (
-        <div className="onboarding-placeholder">
-          <p className="auth-lead">Setting up…</p>
-          <button
-            type="button"
-            className="link-button"
-            onClick={() => handlers.dispatch({ type: 'INTENT.BACK_FROM_ONBOARDING' })}
-          >
-            Back
-          </button>
-        </div>
+        <OnboardingHost
+          child={resolveOnboardingChild(projection.onboardingKind)}
+          onBack={() => handlers.dispatch({ type: 'INTENT.BACK_FROM_ONBOARDING' })}
+        />
       );
       break;
     case 'locked':

@@ -19,7 +19,7 @@ import {
   derToCompact,
   bytesToHexLower,
   hexToBytesStrict,
-} from './index.js';
+} from './index';
 import mnemonicVectors from '../../../conformance/identity/v1/vectors/mnemonic-vectors.json';
 import datVectors from '../../../conformance/identity/v1/vectors/dat-vectors.json';
 import canonicalVectors from '../../../conformance/identity/v1/vectors/canonical-byte-vectors.json';

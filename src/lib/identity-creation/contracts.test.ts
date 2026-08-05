@@ -12,7 +12,7 @@ import {
   type CreationStage,
   type MissingProfileCreationContract,
   type ReconciliationTrigger,
-} from './contracts.js';
+} from './contracts';
 
 describe('CreationReviewProjection safe boundary', () => {
   it('exposes only safe public fields (no secret key names)', () => {

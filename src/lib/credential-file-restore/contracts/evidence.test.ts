@@ -14,8 +14,8 @@ import {
   assertSafeEvidence,
   validateCoverageManifest,
   validateFileRestoreHandoff,
-} from './evidence.js';
-import type { CoverageCriterion, CoverageManifest, ExternalReleaseFinding, FileRestoreHandoff } from './evidence.js';
+} from './evidence';
+import type { CoverageCriterion, CoverageManifest, ExternalReleaseFinding, FileRestoreHandoff } from './evidence';
 
 function criterion(id: string, overrides: Partial<CoverageCriterion> = {}): CoverageCriterion {
   return {

@@ -10,7 +10,7 @@
  */
 
 import { useRef, useState } from 'react';
-import type { CreationReviewProjection } from '../../../lib/identity-creation/contracts.js';
+import type { CreationReviewProjection } from '../../../lib/identity-creation/contracts';
 import { PROTECT, REVIEW } from './copy';
 import { ActionButton, BackButton, FieldError, SurfacePanel } from './surfaces';
 

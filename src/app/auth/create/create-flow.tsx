@@ -7,7 +7,7 @@
  * screens are self-contained and driven only by safe projections.
  */
 
-import type { CreationViewState } from '../../../lib/identity-creation/presentation.js';
+import type { CreationViewState } from '../../../lib/identity-creation/presentation';
 import { CancellingScreen, ConnectionScreen, CorrectingScreen, DelayScreen, FinishCreatingScreen, TerminalScreen, WaitingScreen } from './status';
 import { EntryScreen, PreflightScreen } from './entry';
 import { GenerateScreen, ProfileScreen } from './profile';
@@ -49,11 +49,11 @@ export interface CreateUserFlowProps {
   readonly confirmMismatchPosition: number | null;
   readonly confirmAttemptsRemaining: number;
   readonly confirmChallengeClosed: boolean;
-  readonly review: import('../../../lib/identity-creation/contracts.js').CreationReviewProjection;
+  readonly review: import('../../../lib/identity-creation/contracts').CreationReviewProjection;
   readonly waitingAddress: string | null;
   readonly blockHeight: number | null;
   readonly supportCode: string;
-  readonly preflightOutcome: import('../../../lib/identity-creation/authority.js').PreflightOutcome;
+  readonly preflightOutcome: import('../../../lib/identity-creation/authority').PreflightOutcome;
   readonly c: CreateUserCallbacks;
 }
 

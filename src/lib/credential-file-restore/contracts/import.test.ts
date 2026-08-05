@@ -21,7 +21,7 @@ import {
   INCONSISTENT_KEYS_COPY_KEY,
   SEMANTIC_FAILURE_TO_CODE,
   backoffDelaySeconds,
-} from './import.js';
+} from './import';
 import type {
   DecryptionAttemptOutcome,
   EnvelopeStageOutcome,
@@ -29,8 +29,8 @@ import type {
   KeyProofOutcome,
   StrictPayloadOutcome,
   ValidatedCredentialAuthorityRef,
-} from './import.js';
-import { assertNoRestoreSecretSurface } from './lifecycle.js';
+} from './import';
+import { assertNoRestoreSecretSurface } from './lifecycle';
 
 describe('FEAT-009 exact v1 constants (Task 2.3)', () => {
   it('envelope/format constants match the immutable v1 contract', () => {

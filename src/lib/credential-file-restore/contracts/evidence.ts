@@ -22,7 +22,7 @@
  * FEAT-008 evidence schemas.
  */
 
-import { assertNoRestoreSecretSurface } from './lifecycle.js';
+import { assertNoRestoreSecretSurface } from './lifecycle';
 
 /** Target-owned vs separately owned release qualification classification. */
 export type CoverageClassification = 'target-owned' | 'target-owned-capability' | 'release-evidence';

@@ -9,6 +9,6 @@
  * mnemonics, private keys, transaction JSON, signatures, or generic
  * capabilities. It is safe to import from XState/React/renderer code.
  */
-export * from './contracts.js';
-export * from './profile.js';
-export * from './wire.js';
+export * from './contracts';
+export * from './profile';
+export * from './wire';

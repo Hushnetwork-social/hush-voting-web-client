@@ -15,23 +15,23 @@ import {
   DEFAULT_PROTECTION_MODE,
   PROTECTION_MODES,
   STAGED_RESTORE_IS_AUTHENTICATION,
-} from './protection.js';
+} from './protection';
 import type {
   ActivationOutcome,
   ProtectionQualification,
   StageState,
   StageVerification,
   StagedRestoreRecordMetadata,
-} from './protection.js';
+} from './protection';
 import {
   LOOKUP_RPC_TIMEOUT_MS,
   PROFILE_ABNORMAL_DELAY_MS,
   PROFILE_POLL_INTERVAL_MS,
-} from './resolution.js';
-import type { LookupOutcome, RecreationOutcome, ResolutionResult, ResolvedChainProfile } from './resolution.js';
-import { CleanupScope } from './staging.js';
-import type { CleanupVerification, OwnerState, StagedCancellation, StartupInspection } from './staging.js';
-import { assertNoRestoreSecretSurface } from './lifecycle.js';
+} from './resolution';
+import type { LookupOutcome, RecreationOutcome, ResolutionResult, ResolvedChainProfile } from './resolution';
+import { CleanupScope } from './staging';
+import type { CleanupVerification, OwnerState, StagedCancellation, StartupInspection } from './staging';
+import { assertNoRestoreSecretSurface } from './lifecycle';
 
 const chainProfile: ResolvedChainProfile = {
   alias: 'chain-alias',

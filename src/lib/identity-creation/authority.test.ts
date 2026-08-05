@@ -13,7 +13,7 @@ import {
   revealDecision,
   selectChallengePositions,
   secureShuffle,
-} from './authority.js';
+} from './authority';
 
 describe('selectChallengePositions', () => {
   it('selects six distinct positions within 1..24', () => {

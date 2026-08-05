@@ -5,7 +5,7 @@
  * Coverage targets: AC-008-048–050, 075 (integration portion).
  */
 import { describe, expect, it } from 'vitest';
-import { androidCapabilityGate, mapNativeProviderState, nativeRecoveryContractReport, ubuntuCapabilityGate } from './native.js';
+import { androidCapabilityGate, mapNativeProviderState, nativeRecoveryContractReport, ubuntuCapabilityGate } from './native';
 
 describe('Ubuntu capability gate (Task 6.4)', () => {
   it('qualifies Secret Service passwordless only with a usable provider', () => {

@@ -10,10 +10,10 @@
  * Uses Web Crypto-compatible interfaces (globalThis.crypto.subtle) so it runs
  * in browsers, workers, and Node.
  */
-import { deriveP01Keys, deriveP02Keys, normalizeMnemonicOlimpo } from './producers.js';
-import { bytesToHexLower, hexToBytesStrict } from './crypto.js';
+import { deriveP01Keys, deriveP02Keys, normalizeMnemonicOlimpo } from './producers';
+import { bytesToHexLower, hexToBytesStrict } from './crypto';
 import { getPublicKey as secpGetPublicKey } from '@noble/secp256k1';
-import type { CompatibilityResult, CompatibilityFailure, DatDecodeResult, PortableCredentialsRecord } from './types.js';
+import type { CompatibilityResult, CompatibilityFailure, DatDecodeResult, PortableCredentialsRecord } from './types';
 
 export const DAT_MAGIC = 'HUSH';
 export const DAT_VERSION = 1;

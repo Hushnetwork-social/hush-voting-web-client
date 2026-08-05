@@ -6,8 +6,8 @@
  * `producers/*.json`). Adapters wrap the historical algorithms exactly; legacy
  * producer defaults are never rewritten.
  */
-import { mnemonicToSeed, hkdfSha256, derivePublicKey, isUsableScalar, bytesToHexLower } from './crypto.js';
-import type { ProducerInfo, PublicKeyEncoding, CompatibilityResult, CompatibilityFailure } from './types.js';
+import { mnemonicToSeed, hkdfSha256, derivePublicKey, isUsableScalar, bytesToHexLower } from './crypto';
+import type { ProducerInfo, PublicKeyEncoding, CompatibilityResult, CompatibilityFailure } from './types';
 
 export interface DerivedProducerKeys {
   readonly signingPrivateKey: string;

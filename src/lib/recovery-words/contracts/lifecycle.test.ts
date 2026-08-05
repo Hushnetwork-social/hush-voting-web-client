@@ -9,7 +9,7 @@ import {
   assertNoSecretSurface,
   type RecoveryFailureCode,
   type RecoveryStage,
-} from './lifecycle.js';
+} from './lifecycle';
 import {
   abbreviateAddress,
   assertNoRecoverySecretSurface,
@@ -18,7 +18,7 @@ import {
   type RecoveryViewProjection,
   type StagedPreviewProjection,
   type WordGridProjection,
-} from './projection.js';
+} from './projection';
 
 describe('RecoveryStage closed vocabulary', () => {
   it('covers every typed stage required by the specification', () => {

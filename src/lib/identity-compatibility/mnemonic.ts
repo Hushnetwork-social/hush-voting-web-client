@@ -11,8 +11,8 @@
  */
 import { wordlists } from 'bip39';
 import { sha256 } from '@noble/hashes/sha2.js';
-import { normalizeMnemonicOlimpo, countWords } from './producers.js';
-import type { CompatibilityFailure, CompatibilityResult } from './types.js';
+import { normalizeMnemonicOlimpo, countWords } from './producers';
+import type { CompatibilityFailure, CompatibilityResult } from './types';
 
 export type MnemonicValidationResult = { readonly valid: true } | { readonly valid: false; readonly code: CompatibilityFailure['code'] };
 

@@ -13,7 +13,7 @@ import {
   evaluateDelay,
   shouldPoll,
   type ReconciliationAction,
-} from './reconciliation.js';
+} from './reconciliation';
 
 const CYCLE = 'cycle-1';
 

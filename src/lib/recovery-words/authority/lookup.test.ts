@@ -18,7 +18,7 @@ import {
   runSequentialLookupPass,
   safeProgress,
   type RecoveryLookupPort,
-} from './lookup.js';
+} from './lookup';
 
 const epoch = 'epoch-1' as RecoveryEpoch;
 const network = 'hush-mainnet-1' as NetworkIdentifier;

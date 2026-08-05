@@ -9,11 +9,11 @@
  * secret exposure, or false authentication.
  */
 import { describe, expect, it } from 'vitest';
-import { canProvisionConcurrently } from './navigation-control.js';
-import { canReplaceTransaction, decideLookupAction, decideSubmissionAction, shouldPoll } from './reconciliation.js';
-import { canRebuildMissingTransaction, decidePostSubmitCancellation, decidePreSubmitCancellation, handlePromotionFailure } from './provision.js';
-import { advanceChallenge, beginChallenge, revealDecision } from './authority.js';
-import { normalizeGetIdentityReply, normalizeSubmitReply } from './wire.js';
+import { canProvisionConcurrently } from './navigation-control';
+import { canReplaceTransaction, decideLookupAction, decideSubmissionAction, shouldPoll } from './reconciliation';
+import { canRebuildMissingTransaction, decidePostSubmitCancellation, decidePreSubmitCancellation, handlePromotionFailure } from './provision';
+import { advanceChallenge, beginChallenge, revealDecision } from './authority';
+import { normalizeGetIdentityReply, normalizeSubmitReply } from './wire';
 
 const SIGNING = 'A11B22C33D44E55F66A77B88C99D00E11F22A33B44C55D66E77F88A99B00C11';
 const ENCRYPT = 'Q77W66E55R44T33Y22U11I00O99P88A77S66D55F44G33H22J11K00L99M88';

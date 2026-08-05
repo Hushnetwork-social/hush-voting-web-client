@@ -23,7 +23,7 @@ import { emitTelemetry, telemetryEnabled, validateTelemetryEvent } from './telem
 import type { AllowlistedTelemetryEvent } from './ports';
 import { AuthAdapter } from './react/adapter';
 import { createActor } from 'xstate';
-import { authMachine } from './state/machine';
+import { authMachine, type AuthMachineInput } from './state/machine';
 import AuthRoot from '../../app/auth/AuthRoot';
 import { createLocalUserAuthorityTestActor, createSecretAuthorityTestActor, createIdentityVerificationTestActor, createBrowserCoordinationTestActor, createNavigationTestActor, completeAllPendingOperations } from './testing/actors';
 import type { AuthActors } from './ports';
@@ -93,9 +93,19 @@ function makeDemoActors(): AuthActors {
 
 describe('root rendering privacy', () => {
   it('renders the branded auth shell without protected content initially', async () => {
-    render(<AuthRoot />);
-    // The adapter mounts asynchronously (dynamic dev import); flush pending
-    // test operations repeatedly until the init actor resolves to first-run.
+    // FEAT-010: synthetic actors are test-harness-only; the ordinary root uses
+    // real composition. This test passes the explicit harness provider.
+    const harness = async (): Promise<AuthMachineInput> => {
+      const composition = createDevelopmentComposition(true);
+      return {
+        actors: composition.actors,
+        registeredCapabilities: new Set(['localUserAuthority', 'secretAuthority', 'identityVerification', 'browserCoordination']),
+        safeCoordination: true,
+      };
+    };
+    render(<AuthRoot machineInputProvider={harness} />);
+    // The adapter mounts asynchronously; flush pending test operations
+    // repeatedly until the init actor resolves to first-run.
     await waitFor(() => {
       completeAllPendingOperations();
       expect(screen.getByText(/welcome to hushvoting/i)).toBeInTheDocument();

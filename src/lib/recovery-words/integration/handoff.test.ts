@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { validateDownstreamHandoff, validateEvidenceReportSecrets, type EvidenceReport } from '../contracts/evidence';
-import { RECOVERY_DOWNSTREAM_HANDOFF_V1, RECOVERY_RELEASE_FINDINGS, releaseFindingsManifest } from './handoff.js';
+import { RECOVERY_DOWNSTREAM_HANDOFF_V1, RECOVERY_RELEASE_FINDINGS, releaseFindingsManifest } from './handoff';
 
 describe('immutable downstream handoff (Task 6.10)', () => {
   it('exposes only approved versioned restore/resume/export inputs and forbids secret operations', () => {

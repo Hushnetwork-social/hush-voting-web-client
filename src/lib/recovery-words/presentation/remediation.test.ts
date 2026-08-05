@@ -13,7 +13,7 @@ import {
   mapErrorToRemediation,
   shouldAnnounceProgress,
   showAllAccessibleName,
-} from './remediation.js';
+} from './remediation';
 
 const ALL_CODES: RecoveryFailureCode[] = [
   'VAULT_NOT_VERIFIED_EMPTY',

@@ -5,7 +5,7 @@
  * seams, publishes the stable server scenario contract, the controlled
  * corpus harness guard, and the immutable downstream handoff.
  */
-export * from './browser.js';
-export * from './native.js';
-export * from './server.js';
-export * from './handoff.js';
+export * from './browser';
+export * from './native';
+export * from './server';
+export * from './handoff';

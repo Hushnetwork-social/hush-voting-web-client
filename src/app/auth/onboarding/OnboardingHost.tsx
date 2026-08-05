@@ -5,7 +5,7 @@
  * FEAT-009 Credential File flow at `/` through a closed discriminated
  * `child` slot. The host forwards typed callbacks only; it owns no business
  * policy and receives no secrets. Unknown or missing child projections render
- * a typed fail-closed error — `Setting up…` is never an allowed fallback
+ * a typed fail-closed error — placeholder onboarding copy is never an allowed fallback
  * (AC-010-012). Back requests child cleanup before the three-choice root
  * (AC-010-084).
  *
@@ -33,7 +33,7 @@ export interface OnboardingHostProps {
   readonly onBack: () => void;
 }
 
-/** Fail-closed error surface (never "Setting up…"). */
+/** Fail-closed error surface (never placeholder onboarding copy). */
 export function OnboardingError({ onBack }: { readonly onBack: () => void }) {
   return (
     <div role="alert" className="blocking-error" data-testid="onboarding-error">

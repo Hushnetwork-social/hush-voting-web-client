@@ -15,9 +15,9 @@ import {
   evaluateSessionOnly,
   selectProtection,
   stageValidatedCredentials,
-} from './provision.js';
-import type { FreshVerificationPort, ProtectionCapabilityPort, RegistrationPort, StagingPort } from './provision.js';
-import type { StagedRestoreRecordMetadata } from '../contracts/protection.js';
+} from './provision';
+import type { FreshVerificationPort, ProtectionCapabilityPort, RegistrationPort, StagingPort } from './provision';
+import type { StagedRestoreRecordMetadata } from '../contracts/protection';
 
 const METADATA: StagedRestoreRecordMetadata = {
   protectionMode: 'devicePassword',

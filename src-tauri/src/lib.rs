@@ -12,6 +12,9 @@ pub mod ubuntu_vault;
 /// shielding/clipboard/SAF Phase 4; composition/packaging/handoff Phase 6).
 pub mod android_vault;
 
+/// FEAT-010 trusted runtime-target descriptor (Rust-owned startup command).
+pub mod target_descriptor;
+
 use ubuntu_vault::commands::{hush_vault_handshake, hush_vault_submit_secret, VaultState};
 use ubuntu_vault::lifecycle::ownership::VaultOwnership;
 
@@ -35,7 +38,8 @@ pub fn run() {
         .manage(VaultState::default())
         .invoke_handler(tauri::generate_handler![
             hush_vault_handshake,
-            hush_vault_submit_secret
+            hush_vault_submit_secret,
+            target_descriptor::native_target_descriptor
         ])
         .setup(|app| {
             #[cfg(desktop)]

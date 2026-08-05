@@ -5,6 +5,6 @@
  * safe screens, actions, copy, focus, and remediation. React stays a thin
  * renderer over these projections.
  */
-export * from './view.js';
-export * from './remediation.js';
-export * from './onboarding.js';
+export * from './view';
+export * from './remediation';
+export * from './onboarding';

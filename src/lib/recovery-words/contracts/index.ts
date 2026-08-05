@@ -10,8 +10,8 @@
  * candidate linkage, or transactions. The secret authority owns all
  * credential material.
  */
-export * from './lifecycle.js';
-export * from './projection.js';
-export * from './envelope.js';
-export * from './candidates.js';
-export * from './evidence.js';
+export * from './lifecycle';
+export * from './projection';
+export * from './envelope';
+export * from './candidates';
+export * from './evidence';

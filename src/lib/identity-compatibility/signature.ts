@@ -9,8 +9,8 @@
  * cross-verification, never by exact-byte comparison.
  */
 import * as secp from '@noble/secp256k1';
-import { bytesToHexLower, compactToDer, derToCompact, hexToBytesStrict, utf8Bytes } from './crypto.js';
-import type { CompatibilityResult, CompatibilityFailure } from './types.js';
+import { bytesToHexLower, compactToDer, derToCompact, hexToBytesStrict, utf8Bytes } from './crypto';
+import type { CompatibilityResult, CompatibilityFailure } from './types';
 
 export interface SignatureMaterial {
   readonly compactHex: string;

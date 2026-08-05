@@ -8,7 +8,7 @@
  * timestamp and a computed PayloadSize (UTF-8 byte length of the payload JSON).
  * No RFC 8785/JCS and no new transaction digest is introduced.
  */
-import { utf8Bytes } from './crypto.js';
+import { utf8Bytes } from './crypto';
 
 /** The identity payload shape signed by the historical producers. */
 export interface CanonicalPayload {

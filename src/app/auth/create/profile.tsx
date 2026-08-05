@@ -7,7 +7,7 @@
  */
 
 import { useState } from 'react';
-import { validateAlias } from '../../../lib/identity-creation/profile.js';
+import { validateAlias } from '../../../lib/identity-creation/profile';
 import { CONFIRM, GENERATE, PROFILE } from './copy';
 import { ActionButton, BackButton, FieldError, StatusRegion, SurfacePanel } from './surfaces';
 

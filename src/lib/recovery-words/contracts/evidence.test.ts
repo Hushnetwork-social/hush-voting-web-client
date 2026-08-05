@@ -15,7 +15,7 @@ import {
   type CoverageManifest,
   type DownstreamHandoffManifest,
   type EvidenceReport,
-} from './evidence.js';
+} from './evidence';
 
 function criterion(id: string, family = 'HV-RW-SECURITY'): CoverageCriterion {
   return {

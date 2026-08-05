@@ -19,7 +19,7 @@
  * Normative source: FEAT-007 FeatureDescription "Platform Composition",
  * "Immutable HushServerNode Wire Contract"; FEAT-004/005/006 HANDOFFs.
  */
-import type { GetIdentityReply, SubmitSignedTransactionReply } from './wire.js';
+import type { GetIdentityReply, SubmitSignedTransactionReply } from './wire';
 
 /** Typed transport failure (never a not-found / never a rejection). */
 export type TransportFailure =

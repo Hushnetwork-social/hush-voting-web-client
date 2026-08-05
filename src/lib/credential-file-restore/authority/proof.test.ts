@@ -8,11 +8,11 @@
  * safe diagnostics.
  */
 import { describe, expect, it } from 'vitest';
-import { abbreviate, proveConcreteKeys, resolveIdentity } from './proof.js';
-import type { PublicLookupPort } from './proof.js';
+import { abbreviate, proveConcreteKeys, resolveIdentity } from './proof';
+import type { PublicLookupPort } from './proof';
 import type { PortableCredentialsRecord } from '../../identity-compatibility/types';
-import type { LookupOutcome } from '../contracts/resolution.js';
-import type { ValidatedCredentialAuthorityRef } from '../contracts/import.js';
+import type { LookupOutcome } from '../contracts/resolution';
+import type { ValidatedCredentialAuthorityRef } from '../contracts/import';
 
 /** Consistent record taken from the public FEAT-001 corpus (synthetic TEST fixture). */
 function consistentRecord(): PortableCredentialsRecord {

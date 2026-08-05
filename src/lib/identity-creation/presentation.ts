@@ -17,7 +17,7 @@
  * "Navigation and History", "Accessibility and Responsive UX"; FEAT-002
  * registration validation.
  */
-import type { CreationStage } from './contracts.js';
+import type { CreationStage } from './contracts';
 
 /** Deterministic creation screens (closed union). */
 export type CreationScreen =

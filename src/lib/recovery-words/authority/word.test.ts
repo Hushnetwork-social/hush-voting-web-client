@@ -16,8 +16,8 @@ import {
   normalizePhrase,
   RECOVERY_EPOCH_MAX_MS,
   verifyAndDerive,
-} from './word.js';
-import type { MnemonicDerivationPort } from './word.js';
+} from './word';
+import type { MnemonicDerivationPort } from './word';
 
 const vectors = mnemonicVectors as { vectors: Array<{ id: string; producerId: string; mnemonic: string }> };
 const M001 = vectors.vectors.find((v) => v.id === 'M-001')?.mnemonic ?? '';

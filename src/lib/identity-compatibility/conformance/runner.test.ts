@@ -8,8 +8,8 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { runConformance, writeReport, type ConformanceReport } from './runner.js';
-import { deriveCandidates } from '../candidates.js';
+import { runConformance, writeReport, type ConformanceReport } from './runner';
+import { deriveCandidates } from '../candidates';
 import mnemonicVectors from '../../../../conformance/identity/v1/vectors/mnemonic-vectors.json';
 
 let report: ConformanceReport;

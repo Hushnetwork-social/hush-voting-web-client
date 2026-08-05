@@ -5,7 +5,7 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 import type { PublicCandidateDescriptor } from '../../identity-compatibility/types';
-import { createBffRecoveryLookupPort, detectWebAuthnPrfCapabilities } from './browser.js';
+import { createBffRecoveryLookupPort, detectWebAuthnPrfCapabilities } from './browser';
 
 const candidate: PublicCandidateDescriptor = {
   producerId: 'p-01',

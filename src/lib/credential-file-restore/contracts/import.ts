@@ -25,7 +25,7 @@
  * interoperability evidence.
  */
 
-import type { RestoreEpoch, RestoreFailureCode, RestoreResult } from './lifecycle.js';
+import type { RestoreEpoch, RestoreFailureCode, RestoreResult } from './lifecycle';
 
 /** Exact v1 envelope constants (FEAT-001 contract; never modified). */
 export const IMPORT_ENVELOPE_MIN_BYTES = 36; // magic 4 + version 4 + salt 16 + nonce 12

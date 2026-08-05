@@ -15,23 +15,23 @@ import {
   createBffIdentityLookupPort,
   createBrowserFileReadPort,
   importCachePolicy,
-} from './browser.js';
+} from './browser';
 import {
   androidCredentialFileContract,
   mapNativeSourceKind,
   startupOrphanScanPolicy,
   ubuntuCredentialFileContract,
-} from './native.js';
+} from './native';
 import {
   RELEASE_FINDINGS,
   SERVER_SCENARIOS,
   admitReleaseFinding,
   aggregateCorpusEvidence,
   controlledCorpusPreflight,
-} from './server.js';
-import { createFileRestoreHandoff } from './handoff.js';
-import { validateFileRestoreHandoff } from '../contracts/evidence.js';
-import type { RestoreEpoch } from '../contracts/lifecycle.js';
+} from './server';
+import { createFileRestoreHandoff } from './handoff';
+import { validateFileRestoreHandoff } from '../contracts/evidence';
+import type { RestoreEpoch } from '../contracts/lifecycle';
 
 const EPOCH = 'epoch-1' as RestoreEpoch;
 

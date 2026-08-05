@@ -14,7 +14,7 @@ import {
   type FreshProfileOutcome,
   type RecreateReviewInput,
   type StagedInspection,
-} from './activation.js';
+} from './activation';
 
 const epoch = 'epoch-1' as RecoveryEpoch;
 const network = 'hush-mainnet-1' as NetworkIdentifier;

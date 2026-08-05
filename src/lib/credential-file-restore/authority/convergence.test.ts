@@ -18,9 +18,9 @@ import {
   evaluateOwnerRequest,
   isEpochExpired,
   isStaleHistoryToken,
-} from './convergence.js';
-import type { BackStage, OwnerDecision } from './convergence.js';
-import { RESTORE_EPOCH_FOREGROUND_BOUND_MS } from '../contracts/lifecycle.js';
+} from './convergence';
+import type { BackStage, OwnerDecision } from './convergence';
+import { RESTORE_EPOCH_FOREGROUND_BOUND_MS } from '../contracts/lifecycle';
 
 describe('FEAT-009 Back policy (Task 3.9)', () => {
   it('every Back stage maps to the exact clear/destroy/lock policy', () => {

@@ -16,7 +16,7 @@ import {
   webauthnCleanupHonesty,
   type BackStage,
   type VaultInspection,
-} from './convergence.js';
+} from './convergence';
 
 describe('Back policy (root-only navigation)', () => {
   it('clears inputs before Verify', () => {

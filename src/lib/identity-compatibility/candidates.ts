@@ -6,8 +6,8 @@
  * against caller-supplied controlled lookup outcomes never silently chooses
  * among distinct matching identities.
  */
-import { APPROVED_DERIVATION_PRODUCERS, deriveProducerKeys, getProducer } from './producers.js';
-import { validateMnemonicForProducer, validateInput } from './mnemonic.js';
+import { APPROVED_DERIVATION_PRODUCERS, deriveProducerKeys, getProducer } from './producers';
+import { validateMnemonicForProducer, validateInput } from './mnemonic';
 import type {
   CompatibilityResult,
   CompatibilityFailure,
@@ -15,7 +15,7 @@ import type {
   LookupResult,
   PublicCandidateDescriptor,
   RegistryEntry,
-} from './types.js';
+} from './types';
 
 const failure = (code: CompatibilityFailure['code'], message: string): CompatibilityFailure => ({ ok: false, code, message });
 

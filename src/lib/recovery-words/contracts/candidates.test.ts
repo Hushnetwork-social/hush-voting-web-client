@@ -18,7 +18,7 @@ import {
   SelectedKeyProofEvidence,
   unresolvedCandidateIndices,
   validateCompleteCandidateSet,
-} from './candidates.js';
+} from './candidates';
 
 const epoch = 'epoch-1' as RecoveryEpoch;
 const network = 'hush-mainnet-1' as NetworkIdentifier;

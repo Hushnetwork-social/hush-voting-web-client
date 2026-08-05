@@ -6,7 +6,7 @@
  * and allowlisted editable code supplied by the pinned external artifact.
  */
 import { describe, expect, it } from 'vitest';
-import { normalizeGetIdentityReply, normalizeSubmitReply, type LookupOutcome, type SubmissionOutcome } from './wire.js';
+import { normalizeGetIdentityReply, normalizeSubmitReply, type LookupOutcome, type SubmissionOutcome } from './wire';
 
 const LOCAL_SIGNING = 'A11B22C33D44E55F66A77B88C99D00E11F22A33B44C55D66E77F88A99B00C11';
 const LOCAL_ENCRYPT = 'Q77W66E55R44T33Y22U11I00O99P88A77S66D55F44G33H22J11K00L99M88';

@@ -34,8 +34,8 @@ import {
   verifyMessage,
   validateMnemonicForProducer,
   utf8Bytes,
-} from '../index.js';
-import type { PublicCandidateDescriptor } from '../types.js';
+} from '../index';
+import type { PublicCandidateDescriptor } from '../types';
 
 export const CONTRACT_VERSION = '1.0.0';
 export const SCHEMA_VERSION = '1.0.0';

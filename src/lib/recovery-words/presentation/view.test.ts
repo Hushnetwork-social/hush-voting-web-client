@@ -14,7 +14,7 @@ import {
   toRecoveryViewState,
   type RecoveryScreen,
   type RecoveryViewInput,
-} from './view.js';
+} from './view';
 
 const ALL_STAGES: RecoveryStage[] = [
   'vaultGuard',

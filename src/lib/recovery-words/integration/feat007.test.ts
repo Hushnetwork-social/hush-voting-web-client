@@ -5,7 +5,7 @@
  * (integration portion).
  */
 import { describe, expect, it } from 'vitest';
-import { normalizeFeat007Reply, normalizeLookupOutcome, SERVER_SCENARIO_CONTRACT, validateServerScenarioContract, type Feat007GetIdentityReply } from './feat007.js';
+import { normalizeFeat007Reply, normalizeLookupOutcome, SERVER_SCENARIO_CONTRACT, validateServerScenarioContract, type Feat007GetIdentityReply } from './feat007';
 
 const SIGNING = 'S'.repeat(40);
 const ENCRYPTION = 'E'.repeat(40);

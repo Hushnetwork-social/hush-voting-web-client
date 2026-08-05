@@ -1,6 +1,6 @@
 /**
  * FEAT-008 recovery-words presentation — public barrel.
  */
-export * from './view.js';
-export * from './remediation.js';
-export * from './onboarding.js';
+export * from './view';
+export * from './remediation';
+export * from './onboarding';

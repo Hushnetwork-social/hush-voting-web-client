@@ -10,11 +10,11 @@
  * private keys, full addresses, exact transactions, or generic
  * capabilities. The secret authority owns all credential material.
  */
-export * from './lifecycle.js';
-export * from './custody.js';
-export * from './projection.js';
-export * from './import.js';
-export * from './resolution.js';
-export * from './protection.js';
-export * from './staging.js';
-export * from './evidence.js';
+export * from './lifecycle';
+export * from './custody';
+export * from './projection';
+export * from './import';
+export * from './resolution';
+export * from './protection';
+export * from './staging';
+export * from './evidence';

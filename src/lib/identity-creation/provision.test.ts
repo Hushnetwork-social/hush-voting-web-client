@@ -11,7 +11,7 @@ import {
   decidePreSubmitCancellation,
   handlePromotionFailure,
   issueProvisionAuthorization,
-} from './provision.js';
+} from './provision';
 
 describe('password capability policy', () => {
   it('issues a one-use authorization valid for at most 60 seconds', () => {

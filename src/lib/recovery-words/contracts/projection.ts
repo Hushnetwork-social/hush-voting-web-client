@@ -19,12 +19,12 @@
  * "Accessibility and Responsive UX"; FEAT-007 creation presentation
  * vocabulary; FEAT-002 safe projections.
  */
-import type { ProtectionMode } from './envelope.js';
+import type { ProtectionMode } from './envelope';
 import type {
   NetworkIdentifier,
   RecoveryFailure,
   RecoveryStage,
-} from './lifecycle.js';
+} from './lifecycle';
 
 /** Abbreviate a public address to `<first 8>…<last 6>` (design baseline). */
 export function abbreviateAddress(address: string): string {

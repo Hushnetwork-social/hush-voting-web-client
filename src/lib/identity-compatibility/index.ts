@@ -11,12 +11,12 @@
  * or UI state. Expected failures are typed data with stable codes; nothing
  * throws for expected input errors; diagnostics never contain credentials.
  */
-export * from './types.js';
-export * from './crypto.js';
-export * from './producers.js';
-export * from './mnemonic.js';
-export * from './candidates.js';
-export * from './credentials.js';
-export * from './dat.js';
-export * from './canonical.js';
-export * from './signature.js';
+export * from './types';
+export * from './crypto';
+export * from './producers';
+export * from './mnemonic';
+export * from './candidates';
+export * from './credentials';
+export * from './dat';
+export * from './canonical';
+export * from './signature';

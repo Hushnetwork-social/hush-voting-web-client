@@ -4,7 +4,7 @@
  * (presentation portion).
  */
 import { describe, expect, it } from 'vitest';
-import { CREATE_USER_ACTOR_REGISTRATION, mapStageToScreen, toViewState, validateCreateUserRegistration } from './presentation.js';
+import { CREATE_USER_ACTOR_REGISTRATION, mapStageToScreen, toViewState, validateCreateUserRegistration } from './presentation';
 
 describe('mapStageToScreen — deterministic screen model', () => {
   it('maps every creation stage to exactly one screen', () => {

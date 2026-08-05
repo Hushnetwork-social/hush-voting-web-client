@@ -16,7 +16,7 @@ import {
   RESTORE_READ_INACTIVITY_TIMEOUT_MS,
   RESTORE_READ_OVERFLOW_BYTES,
   assertNoRestoreSecretSurface,
-} from './lifecycle.js';
+} from './lifecycle';
 import type {
   CleanupOutcome,
   CustodyCapabilityReport,
@@ -25,9 +25,9 @@ import type {
   RestoreAuthorityLease,
   SourcePreservationEvidence,
   TemporaryCopyPolicy,
-} from './custody.js';
-import { abbreviateAddress } from './projection.js';
-import type { RestoreStage } from './lifecycle.js';
+} from './custody';
+import { abbreviateAddress } from './projection';
+import type { RestoreStage } from './lifecycle';
 
 describe('FEAT-009 custody/lifecycle bounds (Task 2.1)', () => {
   it('read hard bound is exactly 1 MiB plus one overflow byte', () => {

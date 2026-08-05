@@ -19,8 +19,8 @@ import {
   resetBackoff,
   strictImport,
   utf8ByteLength,
-} from './import.js';
-import { backoffDelaySeconds } from '../contracts/import.js';
+} from './import';
+import { backoffDelaySeconds } from '../contracts/import';
 
 /** Envelope built with the same exact v1 layout the FEAT-001 API expects. */
 function validEnvelopeStub(): Uint8Array {

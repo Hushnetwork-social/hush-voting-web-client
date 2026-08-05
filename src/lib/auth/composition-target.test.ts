@@ -34,7 +34,7 @@ describe('validateChildRenderProjection', () => {
     }
   });
 
-  it('rejects unknown child kinds (Setting up… is not a fallback)', () => {
+  it('rejects unknown child kinds (placeholder onboarding copy is not a fallback)', () => {
     const result = validateChildRenderProjection('elections' as never, { safe: 'view' }, ['CHILD.BACK']);
     expect(result.ok).toBe(false);
     expect(result.diagnostics).toContainEqual({ code: 'UNKNOWN_CHILD_KIND' });

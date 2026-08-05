@@ -12,7 +12,7 @@ import { sha256 } from '@noble/hashes/sha2.js';
 import { hmac } from '@noble/hashes/hmac.js';
 import * as secp from '@noble/secp256k1';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
-import type { CompatibilityFailure, PublicKeyEncoding } from './types.js';
+import type { CompatibilityFailure, PublicKeyEncoding } from './types';
 
 // noble v3 requires explicit hash registration (the historical producer runtime
 // registers these once; we do the same at module load).

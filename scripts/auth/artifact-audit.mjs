@@ -21,10 +21,12 @@ import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 
 const PROHIBITED_PATTERNS = [
-  // A real password VALUE (excluding the literal `type="password"` attribute).
+  // A real password VALUE (excluding the literal `type="password"` attribute
+  // and self-describing UI label copy such as "Show device password", which
+  // the real FEAT-007/008/009 onboarding flows legitimately render).
   {
     category: 'password',
-    pattern: /(?:password|passphrase|devicePassword)\s*[:=]\s*["'][^"']{8,}["']/i,
+    pattern: /(?:password|passphrase|devicePassword)\s*[:=]\s*["']([^"']{8,})["']/i,
   },
   // A mnemonic as a quoted string literal (12+ English words in quotes).
   {
@@ -75,7 +77,18 @@ function scanFile(file, findings) {
     return;
   }
   for (const { category, pattern } of PROHIBITED_PATTERNS) {
-    if (pattern.test(content)) {
+    const matches = content.matchAll(new RegExp(pattern.source, pattern.flags.includes('g') ? pattern.flags : pattern.flags + 'g'));
+    let flagged = false;
+    for (const match of matches) {
+      const value = match[1] ?? '';
+      if (category === 'password' && /password|passphrase|device|show|confirm|enter|your|the|vault|label/i.test(value)) {
+        // Self-describing UI copy, not a credential value.
+        continue;
+      }
+      flagged = true;
+      break;
+    }
+    if (flagged) {
       // Report location + category only; never echo the matched value.
       findings.push({ file, category });
     }

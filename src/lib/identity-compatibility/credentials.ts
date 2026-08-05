@@ -5,9 +5,9 @@
  * candidate derivation and lookup/selection. The API never returns every
  * candidate's private keys to application state simultaneously.
  */
-import { APPROVED_DERIVATION_PRODUCERS, deriveProducerKeys, getProducer } from './producers.js';
-import { validateMnemonicForProducer, validateInput } from './mnemonic.js';
-import type { CompatibilityResult, CompatibilityFailure, SelectedCredentials } from './types.js';
+import { APPROVED_DERIVATION_PRODUCERS, deriveProducerKeys, getProducer } from './producers';
+import { validateMnemonicForProducer, validateInput } from './mnemonic';
+import type { CompatibilityResult, CompatibilityFailure, SelectedCredentials } from './types';
 
 const failure = (code: CompatibilityFailure['code'], message: string): CompatibilityFailure => ({ ok: false, code, message });
 

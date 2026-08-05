@@ -21,7 +21,7 @@ import {
   validateNoMnemonicRecord,
   type ProtectionMode,
   type RecoveryEnvelopeRecord,
-} from './envelope.js';
+} from './envelope';
 
 function validEnvelope(overrides: Partial<RecoveryEnvelopeRecord> = {}): RecoveryEnvelopeRecord {
   const base: RecoveryEnvelopeRecord = {

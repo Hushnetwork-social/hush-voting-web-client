@@ -152,7 +152,7 @@ function hasForbiddenField(value: unknown, markers: readonly string[]): boolean 
 /**
  * Validate a child render projection. Unknown kinds, missing views,
  * forbidden fields (secrets/authority references), and forbidden actions fail
- * closed — `Setting up…` and default-child fallbacks are never allowed
+ * closed — placeholder onboarding copy and default-child fallbacks are never allowed
  * (AC-010-012).
  */
 export function validateChildRenderProjection(

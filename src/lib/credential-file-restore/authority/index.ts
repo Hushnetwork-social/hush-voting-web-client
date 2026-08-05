@@ -12,8 +12,8 @@
  * capability is representable here. The sealed platform authority owns all
  * credential material.
  */
-export * from './snapshot.js';
-export * from './import.js';
-export * from './proof.js';
-export * from './provision.js';
-export * from './convergence.js';
+export * from './snapshot';
+export * from './import';
+export * from './proof';
+export * from './provision';
+export * from './convergence';

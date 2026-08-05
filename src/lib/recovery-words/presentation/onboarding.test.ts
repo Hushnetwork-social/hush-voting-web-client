@@ -13,7 +13,7 @@ import {
   RECOVERY_WORDS_ACTOR_REGISTRATION,
   surfaceForStaged,
   validateRecoveryWordsRegistration,
-} from './onboarding.js';
+} from './onboarding';
 import { assertNoRecoverySecretSurface } from '../contracts/projection';
 
 describe('recovery words actor registration', () => {

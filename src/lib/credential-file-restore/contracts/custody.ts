@@ -17,7 +17,7 @@
  * Ownership", "Source Preservation and Cleanup".
  */
 
-import type { RestoreEpoch, RestoreFailure, RestoreOperationId, RestoreResult } from './lifecycle.js';
+import type { RestoreEpoch, RestoreFailure, RestoreOperationId, RestoreResult } from './lifecycle';
 
 /** Coarse bounded read progress (never exposes byte content or identifiers). */
 export type ReadProgress =

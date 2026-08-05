@@ -21,7 +21,7 @@
  * FEAT-003 two-slot/CAS kernels; FEAT-004/005/006 platform protection.
  */
 
-import type { RestoreFailureCode, RestoreResult } from './lifecycle.js';
+import type { RestoreFailureCode, RestoreResult } from './lifecycle';
 
 /** Closed protection modes (FEAT-008 vocabulary; no empty/plaintext modes). */
 export type ProtectionMode = 'devicePassword' | 'webAuthnPasswordless' | 'nativePasswordless' | 'sessionOnly';
