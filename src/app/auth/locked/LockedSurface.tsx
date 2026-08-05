@@ -121,7 +121,7 @@ export function HomeSurface({ projection, onLock, onOpenSettings, onRemoveLocalU
       </p>
       <p className="network-context">{projection.networkContext}</p>
       {projection.showSessionOnlyWarning ? (
-        <p role="warning" className="session-only-warning">
+        <p role="note" className="session-only-warning">
           Session-only — Lock or closing the app removes this local session.
         </p>
       ) : null}
