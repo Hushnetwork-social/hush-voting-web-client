@@ -126,6 +126,18 @@ describe('classifyVaultForMigration', () => {
     expect(classifyVaultForMigration(current, SUPPORTED_HISTORICAL, manifest())).toEqual({ kind: 'wrongNetwork' });
   });
 
+  it('rejects contradictory records claiming both current and historical versions', () => {
+    const contradictory = {
+      schemaVersion: 1,
+      version: 'vault-v0.7',
+      networkBinding: { canonicalNetworkId: 'hushnetwork-devnet', networkMagic: 5195086, configurationId: 'isolated-local-devnet-v1' },
+      keyBinding: { signingAddress: 'A'.repeat(44), encryptionAddress: 'B'.repeat(44) },
+      protectionModeClass: 'device-password',
+      generation: 2,
+    };
+    expect(classifyVaultForMigration(contradictory, SUPPORTED_HISTORICAL, manifest())).toEqual({ kind: 'corrupt' });
+  });
+
   it('rejects unsupported/newer versions and corrupt payloads non-destructively', () => {
     expect(classifyVaultForMigration({ version: 'vault-v2.0' }, SUPPORTED_HISTORICAL, manifest())).toEqual({ kind: 'unsupported' });
     expect(classifyVaultForMigration(null, SUPPORTED_HISTORICAL, manifest())).toEqual({ kind: 'corrupt' });

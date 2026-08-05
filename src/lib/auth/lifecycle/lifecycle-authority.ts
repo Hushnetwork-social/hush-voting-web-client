@@ -52,20 +52,15 @@ export type ConnectivityPhase = 'unknown' | 'online' | 'offline' | 'reconnecting
 /** One reconnect attempt verdict (AC-010-048). */
 export function nextReconnectDelayMs(
   attempt: number,
-  coalescedRetryUsed: boolean,
+  _coalescedRetryUsed: boolean,
   connectivitySignalReceived: boolean,
 ): { readonly delayMs: number; readonly immediateBounded: boolean } {
   if (connectivitySignalReceived) {
     return { delayMs: 0, immediateBounded: true };
   }
-  if (coalescedRetryUsed) {
-    // One coalesced Retry already consumed: resume the fixed schedule at the
-    // current attempt slot, then bounded jitter.
-    if (attempt < RECONNECT_STEPS_MS.length) {
-      return { delayMs: RECONNECT_STEPS_MS[attempt], immediateBounded: false };
-    }
-    return { delayMs: RECONNECT_JITTER_INTERVAL_MS, immediateBounded: false };
-  }
+  // Fixed schedule 2/5/10/30 s, then bounded jitter at 30 s. The coalesced
+  // Retry does not alter the schedule (it was consumed by the caller); it is
+  // kept as a parameter so call sites document their retry budget.
   if (attempt < RECONNECT_STEPS_MS.length) {
     return { delayMs: RECONNECT_STEPS_MS[attempt], immediateBounded: false };
   }

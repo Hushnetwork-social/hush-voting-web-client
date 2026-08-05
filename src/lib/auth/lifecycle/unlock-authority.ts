@@ -117,6 +117,12 @@ export function classifyVaultForMigration(
   }
   const record = payload as Record<string, unknown>;
 
+  // Contradictory record: claims both a current numeric schema and a
+  // historical string version → fail closed as corrupt (never guess).
+  if (record.schemaVersion === 1 && typeof record.version === 'string') {
+    return { kind: 'corrupt' };
+  }
+
   // Current record family: validate and network-bind.
   if (record.schemaVersion === 1 && historicalSupportedVersions.has('current-v1')) {
     const validation = validateCurrentRecord(payload);
