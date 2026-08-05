@@ -145,12 +145,13 @@ export type TransitionProgressProjection =
   | { readonly kind: 'newModeUnlockRequired' }
   | { readonly kind: 'failedPreservingOldGeneration' };
 
-export function projectTransitionProgress(state: TransitionProgressProjection['kind'], targetMode?: CurrentProtectionModeClass): TransitionProgressProjection {
-  if (state === 'enrolling' && targetMode !== undefined) {
-    return { kind: 'enrolling', targetMode };
-  }
-  if (state === 'enrolling') {
-    return { kind: 'failedPreservingOldGeneration' };
-  }
-  return { kind: state };
+/** Discriminated input: enrolling REQUIRES the target mode (1:1 mapping). */
+export type TransitionProgressState =
+  | { readonly kind: 'enrolling'; readonly targetMode: CurrentProtectionModeClass }
+  | { readonly kind: 'commitPending' }
+  | { readonly kind: 'newModeUnlockRequired' }
+  | { readonly kind: 'failedPreservingOldGeneration' };
+
+export function projectTransitionProgress(state: TransitionProgressState): TransitionProgressProjection {
+  return state;
 }

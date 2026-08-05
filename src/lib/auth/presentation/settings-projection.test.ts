@@ -73,10 +73,10 @@ describe('projectMigrationRemediation', () => {
 
 describe('projectTransitionProgress', () => {
   it('projects enrolling, commit, new-mode unlock, and preserved-rollback states', () => {
-    expect(projectTransitionProgress('enrolling', 'webauthn-prf')).toEqual({ kind: 'enrolling', targetMode: 'webauthn-prf' });
-    expect(projectTransitionProgress('commitPending')).toEqual({ kind: 'commitPending' });
-    expect(projectTransitionProgress('newModeUnlockRequired')).toEqual({ kind: 'newModeUnlockRequired' });
-    expect(projectTransitionProgress('failedPreservingOldGeneration')).toEqual({ kind: 'failedPreservingOldGeneration' });
+    expect(projectTransitionProgress({ kind: 'enrolling', targetMode: 'webauthn-prf' })).toEqual({ kind: 'enrolling', targetMode: 'webauthn-prf' });
+    expect(projectTransitionProgress({ kind: 'commitPending' })).toEqual({ kind: 'commitPending' });
+    expect(projectTransitionProgress({ kind: 'newModeUnlockRequired' })).toEqual({ kind: 'newModeUnlockRequired' });
+    expect(projectTransitionProgress({ kind: 'failedPreservingOldGeneration' })).toEqual({ kind: 'failedPreservingOldGeneration' });
   });
 });
 
