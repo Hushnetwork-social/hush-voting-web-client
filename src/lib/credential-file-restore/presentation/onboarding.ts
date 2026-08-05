@@ -21,7 +21,7 @@
  */
 import type { OnboardingKind } from '../../auth/types';
 import type { OnboardingResult } from '../../auth/results';
-import type { RestoreStage } from '../contracts/lifecycle';
+import type { RestoreFailureCode, RestoreStage } from '../contracts/lifecycle';
 import { mapRestoreStageToScreen, toRestoreViewState, type RestoreViewInput, type RestoreViewState } from './view';
 import { mapErrorToRemediation } from './remediation';
 
@@ -99,9 +99,12 @@ export function backForStage(stage: RestoreStage): 'clearInputs' | 'destroyAutho
 }
 
 /** Deterministic view-state composition for the child actor. */
-export function composeRestoreView(input: RestoreViewInput): { readonly view: RestoreViewState; readonly remediation: ReturnType<typeof mapErrorToRemediation> | null } {
+export function composeRestoreView(input: RestoreViewInput & { readonly failureCode: RestoreFailureCode | null }): {
+  readonly view: RestoreViewState;
+  readonly remediation: ReturnType<typeof mapErrorToRemediation> | null;
+} {
   const view = toRestoreViewState(input);
-  const remediation = input.failureCode !== null ? mapErrorToRemediation(input.failureCode as Parameters<typeof mapErrorToRemediation>[0]) : null;
+  const remediation = input.failureCode !== null ? mapErrorToRemediation(input.failureCode) : null;
   return { view, remediation };
 }
 
