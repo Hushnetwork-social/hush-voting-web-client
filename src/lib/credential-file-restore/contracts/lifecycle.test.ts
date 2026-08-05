@@ -17,11 +17,6 @@ import {
   RESTORE_READ_OVERFLOW_BYTES,
   assertNoRestoreSecretSurface,
 } from './lifecycle.js';
-import {
-  RESTORE_READ_HARD_BOUND_BYTES as CUSTODY_BOUND,
-  RESTORE_READ_INACTIVITY_TIMEOUT_MS as CUSTODY_TIMEOUT,
-  RESTORE_MAX_SNAPSHOT_BYTES as CUSTODY_MAX,
-} from '../contracts/lifecycle.js';
 import type {
   CleanupOutcome,
   CustodyCapabilityReport,
@@ -30,22 +25,22 @@ import type {
   RestoreAuthorityLease,
   SourcePreservationEvidence,
   TemporaryCopyPolicy,
-} from '../contracts/custody.js';
-import { abbreviateAddress } from '../contracts/projection.js';
-import type { RestoreStage } from '../contracts/lifecycle.js';
+} from './custody.js';
+import { abbreviateAddress } from './projection.js';
+import type { RestoreStage } from './lifecycle.js';
 
 describe('FEAT-009 custody/lifecycle bounds (Task 2.1)', () => {
   it('read hard bound is exactly 1 MiB plus one overflow byte', () => {
     expect(RESTORE_READ_HARD_BOUND_BYTES).toBe(1024 * 1024);
     expect(RESTORE_READ_OVERFLOW_BYTES).toBe(1);
     expect(RESTORE_MAX_SNAPSHOT_BYTES).toBe(RESTORE_READ_HARD_BOUND_BYTES + 1);
-    expect(CUSTODY_BOUND).toBe(RESTORE_READ_HARD_BOUND_BYTES);
-    expect(CUSTODY_MAX).toBe(RESTORE_MAX_SNAPSHOT_BYTES);
+
+
   });
 
   it('read inactivity timeout is exactly 30 seconds', () => {
     expect(RESTORE_READ_INACTIVITY_TIMEOUT_MS).toBe(30_000);
-    expect(CUSTODY_TIMEOUT).toBe(30_000);
+
   });
 
   it('foreground authority epoch bound is 10 minutes (FEAT-008 rule)', () => {
