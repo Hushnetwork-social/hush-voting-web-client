@@ -49,7 +49,7 @@ const failure = (code: RestoreFailure['code'], message: string): RestoreFailure 
  * mnemonic-to-both consistency when present. Returns typed internal
  * outcomes; the UI renders one combined safe message.
  */
-export function proveConcreteKeys(record: PortableCredentialsRecord): KeyProofResult {
+export function proveConcreteKeys(record: PortableCredentialsRecord, epoch: ValidatedCredentialAuthorityRef['epoch'], nowMs: number): KeyProofResult {
   const consistency = validateKeyConsistency(record);
   if (!consistency.privatePublicConsistent) {
     // Distinguish which pair mismatched at the typed level without values.
@@ -71,14 +71,14 @@ export function proveConcreteKeys(record: PortableCredentialsRecord): KeyProofRe
     value: {
       authority: {
         kind: 'validatedCredentialAuthority',
-        epoch: 'epoch' as ValidatedCredentialAuthorityRef['epoch'], // replaced by caller
+        epoch,
         signingAddressAbbreviated: abbreviate(record.PublicSigningAddress),
         encryptionAddressAbbreviated: abbreviate(record.PublicEncryptAddress),
         publicKeyEncoding: record.PublicSigningAddress.startsWith('04') ? 'UNCOMPRESSED' : 'COMPRESSED',
         profileName: record.ProfileName,
         isPublic: record.IsPublic,
         hasMnemonic: record.Mnemonic !== null,
-        validatedAtMs: 0, // replaced by caller
+        validatedAtMs: nowMs,
       },
       proofOutcome: 'passed',
       mnemonicPresent: record.Mnemonic !== null,

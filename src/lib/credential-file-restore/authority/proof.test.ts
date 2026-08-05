@@ -48,7 +48,7 @@ function lookupPort(outcome: LookupOutcome): PublicLookupPort {
 
 describe('FEAT-009 concrete key proof (Task 3.5)', () => {
   it('consistent pairs pass and produce an opaque validated authority', () => {
-    const result = proveConcreteKeys(consistentRecord());
+    const result = proveConcreteKeys(consistentRecord(), 'epoch-1' as never, 1000);
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.proofOutcome).toBe('passed');
@@ -59,34 +59,34 @@ describe('FEAT-009 concrete key proof (Task 3.5)', () => {
 
   it('signing mismatch returns SIGNING_KEY_MISMATCH typed code', () => {
     const record = { ...consistentRecord(), PrivateSigningKey: '6e3f74236c3d4a20553be05963f624696990c22245599b3d1b30262af793d884' }; // altered scalar
-    const result = proveConcreteKeys(record);
+    const result = proveConcreteKeys(record, 'epoch-1' as never, 1000);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.code).toBe('SIGNING_KEY_MISMATCH');
   });
 
   it('encryption mismatch returns ENCRYPTION_KEY_MISMATCH typed code', () => {
     const record = { ...consistentRecord(), PrivateEncryptKey: '1a68f2d543282dd612502a1b3688e85eeca280057129d512011645a51cf6d553' }; // altered scalar
-    const result = proveConcreteKeys(record);
+    const result = proveConcreteKeys(record, 'epoch-1' as never, 1000);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.code).toBe('ENCRYPTION_KEY_MISMATCH');
   });
 
   it('malformed key encoding fails before lookup', () => {
     const record = { ...consistentRecord(), PrivateSigningKey: 'not-hex' };
-    const result = proveConcreteKeys(record);
+    const result = proveConcreteKeys(record, 'epoch-1' as never, 1000);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.code).toBe('SIGNING_KEY_MISMATCH');
   });
 
   it('mnemonic mismatch rejects the entire file', () => {
     const record = { ...consistentRecord(), Mnemonic: 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about' }; // valid BIP-39, wrong phrase
-    const result = proveConcreteKeys(record);
+    const result = proveConcreteKeys(record, 'epoch-1' as never, 1000);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.code).toBe('MNEMONIC_KEY_MISMATCH');
   });
 
   it('a consistent file with Mnemonic:null remains supported', () => {
-    const result = proveConcreteKeys({ ...consistentRecord(), Mnemonic: null });
+    const result = proveConcreteKeys({ ...consistentRecord(), Mnemonic: null }, 'epoch-1' as never, 1000);
     expect(result.ok).toBe(true);
   });
 
