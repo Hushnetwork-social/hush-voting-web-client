@@ -13,17 +13,18 @@ import {
   performRootVerification,
   prepareSameKeyRecreation,
   runStartupInspection,
+  type RootVerificationOutcome,
   type RootVerificationPort,
   type StartupInspectionPorts,
   type VerificationOnlyCustody,
 } from './startup-authority';
-import type { VerificationOnlyCompletion } from '../child-flow';
+import type { VerificationOnlyCapability, VerificationOnlyCompletion } from '../child-flow';
 import type { CurrentVaultRecordV1 } from '../../vault-core/contracts/current-binding';
 import type { DeploymentManifest } from '../../runtime/deployment';
 
 function validCompletion(overrides: Partial<VerificationOnlyCompletion> = {}): VerificationOnlyCompletion {
   return {
-    capability: 'verification-only-token',
+    capability: 'verification-only-token' as VerificationOnlyCapability,
     binding: { signingAddress: 'A'.repeat(44), encryptionAddress: 'B'.repeat(44) },
     outcome: 'provisioned',
     ...overrides,
@@ -114,22 +115,31 @@ describe('acceptChildCompletion', () => {
 });
 
 describe('performRootVerification', () => {
+  const exactPort = (outcome: RootVerificationOutcome): RootVerificationPort => ({
+    verifyExact: async () => outcome,
+  });
+
   it('forwards one fresh exact verification for the current epoch', async () => {
-    const port: RootVerificationPort = { verifyExact: vi.fn(async () => ({ kind: 'exactExisting' })) };
+    const port = exactPort({ kind: 'exactExisting' });
     const outcome = await performRootVerification(port, custody(1), 1);
     expect(outcome).toEqual({ kind: 'exactExisting' });
   });
 
   it('rejects stale epochs — stale results can never restore access', async () => {
-    const port: RootVerificationPort = { verifyExact: vi.fn(async () => ({ kind: 'exactExisting' })) };
+    const spy = { called: false };
+    const port: RootVerificationPort = {
+      verifyExact: async () => {
+        spy.called = true;
+        return { kind: 'exactExisting' };
+      },
+    };
     const outcome = await performRootVerification(port, custody(1), 2);
     expect(outcome).toEqual({ kind: 'stale' });
-    expect(port.verifyExact).not.toHaveBeenCalled();
+    expect(spy.called).toBe(false);
   });
 
   it('preserves verification-only custody on transport failure (Retry without re-unlock)', async () => {
-    const port: RootVerificationPort = { verifyExact: vi.fn(async () => ({ kind: 'transportFailure' })) };
-    const outcome = await performRootVerification(port, custody(1), 1);
+    const outcome = await performRootVerification(exactPort({ kind: 'transportFailure' }), custody(1), 1);
     expect(outcome).toEqual({ kind: 'transportFailure' });
   });
 });
