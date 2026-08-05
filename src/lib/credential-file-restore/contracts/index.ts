@@ -14,3 +14,6 @@ export * from './lifecycle.js';
 export * from './custody.js';
 export * from './projection.js';
 export * from './import.js';
+export * from './resolution.js';
+export * from './protection.js';
+export * from './staging.js';
