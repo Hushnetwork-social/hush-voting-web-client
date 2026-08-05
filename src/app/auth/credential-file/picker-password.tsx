@@ -83,7 +83,8 @@ export interface PasswordScreenProps {
 /** Backup-file password surface — uncontrolled field, direct secret sink. */
 export function PasswordScreen({ view, onSubmit, onToggleVisibility, onToggleEmptyOption, onChooseDifferentFile, onBack }: PasswordScreenProps) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [emptyEnabled, setEmptyEnabled] = useState(false);
+  // Empty-password state is view-driven (the authority projection owns it).
+  const emptyEnabled = view.passwordFieldState?.emptyOptionChecked ?? false;
   const visible = view.passwordFieldState?.visible ?? false;
 
   const submit = () => {
@@ -96,7 +97,6 @@ export function PasswordScreen({ view, onSubmit, onToggleVisibility, onToggleEmp
 
   const toggleEmpty = () => {
     const next = !emptyEnabled;
-    setEmptyEnabled(next);
     onToggleEmptyOption(next);
     if (inputRef.current) {
       inputRef.current.value = '';
@@ -163,8 +163,9 @@ export function PasswordScreen({ view, onSubmit, onToggleVisibility, onToggleEmp
 export function errorCopy(code: string): string {
   switch (code) {
     case 'AUTHENTICATION_FAILED':
-    case 'BACKOFF_ACTIVE':
       return COPY.errors.combined;
+    case 'BACKOFF_ACTIVE':
+      return COPY.errors.wait;
     case 'SIGNING_KEY_MISMATCH':
     case 'ENCRYPTION_KEY_MISMATCH':
     case 'KEY_PROOF_FAILED':

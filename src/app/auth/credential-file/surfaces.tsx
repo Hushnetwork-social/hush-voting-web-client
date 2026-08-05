@@ -77,6 +77,7 @@ export const COPY = {
     invalidFile: 'This file is not a valid HUSH credential backup.',
     serverProof: 'HushServerNode rejected the identity proof.',
     quarantine: 'Restore is blocked until local cleanup is verified.',
+    wait: 'Please wait before trying again.',
     generic: 'Something went wrong; please try again.',
   },
 } as const;
