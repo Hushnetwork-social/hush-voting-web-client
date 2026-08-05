@@ -128,10 +128,25 @@ const FORBIDDEN_COMPLETION_MARKERS = [
 /** Closed action vocabulary the host ever forwards. */
 const ALLOWED_ACTIONS: readonly ChildAction['type'][] = ['CHILD.BACK', 'CHILD.SUBMIT', 'CHILD.SELECT_PROTECTION', 'CHILD.RETRY'];
 
-function hasForbiddenField(value: unknown, markers: readonly string[]): boolean {
+/**
+ * Recursively scan an object tree for forbidden markers (never descends into
+ * cycles — parsed JSON payloads are acyclic).
+ */
+function hasForbiddenFieldRecursive(value: unknown, markers: readonly string[]): boolean {
   if (value === null || typeof value !== 'object') return false;
   const record = value as Record<string, unknown>;
-  return markers.some((marker) => Object.prototype.hasOwnProperty.call(record, marker));
+  for (const key of Object.keys(record)) {
+    if (markers.includes(key)) return true;
+    const child = record[key];
+    if (child !== null && typeof child === 'object') {
+      if (hasForbiddenFieldRecursive(child, markers)) return true;
+    }
+  }
+  return false;
+}
+
+function hasForbiddenField(value: unknown, markers: readonly string[]): boolean {
+  return hasForbiddenFieldRecursive(value, markers);
 }
 
 /**
