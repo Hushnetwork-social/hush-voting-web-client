@@ -55,8 +55,6 @@ export interface FreshVerificationPort {
   >;
 }
 
-const failure = (code: 'PROTECTION_CANCELLED' | 'STAGE_WRITE_FAILURE' | 'STAGED_RESTART_FAILURE' | 'LOOKUP_TRANSPORT_FAILURE' | 'UNKNOWN_OUTCOME', message: string): RestoreResult<never> => ({ ok: false, code, message, supportCode: `PROV-${code}` });
-
 /**
  * Protection selection policy: Device-password default; alternatives only
  * when qualified; capability loss fails closed without downgrade.

@@ -13,7 +13,7 @@
  *  6. immutable release ledger (EXT-009-001…005 truthful states),
  *  7. downstream handoff integrity.
  *
- * Usage: node scripts/credential-file-restore/quality-gates.mjs [--selftest]
+ * Usage: node scripts/credential-file-restore/quality-gates.mjs
  */
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -23,7 +23,6 @@ import { fileURLToPath } from 'node:url';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(SCRIPT_DIR, '..', '..');
-const SELF_TEST = process.argv.includes('--selftest');
 
 const findings = [];
 const gates = [];
