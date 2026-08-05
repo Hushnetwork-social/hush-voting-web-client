@@ -17,3 +17,4 @@ export * from './import.js';
 export * from './resolution.js';
 export * from './protection.js';
 export * from './staging.js';
+export * from './evidence.js';
