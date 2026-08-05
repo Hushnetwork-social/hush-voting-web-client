@@ -20,8 +20,16 @@ import {
 const sha256 = (canonical: string): string => createHash('sha256').update(canonical).digest('hex');
 
 function validManifest(overrides: Partial<DeploymentManifest> = {}): DeploymentManifest {
-  const { digest: _digest, ...rest } = { ...DEFAULT_MANIFEST, ...overrides };
-  const withoutDigest = rest as Omit<DeploymentManifest, 'digest'>;
+  const rest = { ...DEFAULT_MANIFEST, ...overrides };
+  const withoutDigest: Omit<DeploymentManifest, 'digest'> = {
+    configurationId: rest.configurationId,
+    canonicalNetworkId: rest.canonicalNetworkId,
+    networkMagic: rest.networkMagic,
+    transportMode: rest.transportMode,
+    endpointIds: rest.endpointIds,
+    contractVersions: rest.contractVersions,
+    classification: rest.classification,
+  };
   return { ...withoutDigest, digest: sha256(canonicalManifestJson(withoutDigest)) };
 }
 
