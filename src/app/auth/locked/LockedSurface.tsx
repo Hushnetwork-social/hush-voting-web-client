@@ -14,8 +14,14 @@
  * field clears immediately; no component state, log, or announcement keeps it.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import type { LockedViewProjection, HomeProjection, UnlockProgressProjection } from '../../../lib/auth/presentation';
+
+/** Mode-scoped field error (never survives a mode change). */
+interface FieldError {
+  readonly mode: string;
+  readonly message: string;
+}
 
 /** Mode-specific locked surface driven ONLY by the Phase 4 projection. */
 export interface LockedSurfaceProps {
@@ -29,17 +35,13 @@ export interface LockedSurfaceProps {
 
 export function LockedSurface({ projection, progress, onSubmitSecret, onUnlockDevice, onRecovery, onRemoveLocalUser }: LockedSurfaceProps) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [fieldError, setFieldError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setFieldError(null);
-  }, [projection.mode]);
+  const [fieldError, setFieldError] = useState<FieldError | null>(null);
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const input = inputRef.current;
     if (input === null || input.value.length === 0) {
-      setFieldError('Enter your device password.');
+      setFieldError({ mode: projection.mode, message: 'Enter your device password.' });
       return;
     }
     // Direct secret transfer → authority, then immediate clear (AC-010-029).
@@ -49,6 +51,7 @@ export function LockedSurface({ projection, progress, onSubmitSecret, onUnlockDe
 
   const busy = progress?.state === 'unlocking' || progress?.state === 'verifying';
   const throttled = progress?.state === 'cooldown';
+  const visibleError = fieldError !== null && fieldError.mode === projection.mode ? fieldError.message : null;
 
   return (
     <div className="locked-surface">
@@ -61,12 +64,12 @@ export function LockedSurface({ projection, progress, onSubmitSecret, onUnlockDe
             ref={inputRef}
             type="password"
             autoComplete="current-password"
-            aria-describedby={fieldError !== null ? 'device-password-error' : undefined}
+            aria-describedby={visibleError !== null ? 'device-password-error' : undefined}
             disabled={busy || throttled}
           />
-          {fieldError !== null ? (
+          {visibleError !== null ? (
             <p id="device-password-error" role="alert">
-              {fieldError}
+              {visibleError}
             </p>
           ) : null}
           <button type="submit" className="button-primary" disabled={busy || throttled}>

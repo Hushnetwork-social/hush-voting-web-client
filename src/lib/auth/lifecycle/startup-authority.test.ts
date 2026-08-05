@@ -7,7 +7,7 @@
  * "Startup and Reconciliation", "Unlock and Authentication Boundary";
  * AC-010-013/024…028/035/039…043/050).
  */
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   acceptChildCompletion,
   performRootVerification,

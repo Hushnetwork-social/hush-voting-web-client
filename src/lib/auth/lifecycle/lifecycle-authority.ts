@@ -23,13 +23,15 @@
  * Framework-neutral, secret-free.
  */
 import {
-  RECONNECT_COALESCED_RETRIES,
   RECONNECT_JITTER_INTERVAL_MS,
   RECONNECT_STEPS_MS,
   TRUSTED_ACTIVITY_CLASSES,
   type TrustedActivityClass,
   type UntrustedActivityClass,
 } from '../lifecycle-policy';
+
+/** One coalesced user retry budget (documented call-site constant). */
+export { RECONNECT_COALESCED_RETRIES } from '../lifecycle-policy';
 
 /** Lock triggers (AC-010-060: manual/restart/loss/uncertain cannot be disabled). */
 export type LockTrigger =
