@@ -12,13 +12,13 @@
       "target": "ubuntu",
       "result": "NOT_EXECUTED",
       "digests": "pending: real Ubuntu Tauri functional procedure requires a dedicated GUI session with Secret Service provider state",
-      "note": "AC-010-093 target-owned; no qualifying execution target for the autonomous procedure in this environment"
+      "note": "AC-010-093 mandatory Manual TestPack qualification; no qualifying execution target in this environment. Pending evidence blocks release readiness, not implementation completion."
     },
     {
       "target": "android-physical",
       "result": "NOT_EXECUTED",
       "digests": "pending: no physical Android device available to the autonomous executor",
-      "note": "AC-010-094 target-owned; NOT_EXECUTED is a documented blocker, never emulator substitution"
+      "note": "AC-010-094 mandatory Manual TestPack qualification; NOT_EXECUTED is truthful pending release evidence and never permits emulator substitution."
     }
   ]
 }

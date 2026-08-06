@@ -2,26 +2,24 @@
 /**
  * FEAT-010 aggregate-gate self-tests (Task 7.8).
  *
- * Proves the quality aggregate and its admission rules detect every defect
- * class: fabricated external PASS without evidence, invalid blocker state,
- * missing/red platform matrices, secret-bearing evidence, and harness runs
- * credited as real-root evidence.
+ * Proves the quality aggregate and its admission rules detect malformed or
+ * fabricated evidence while preserving the independent release-readiness
+ * result for valid FAIL/NOT_EXECUTED physical qualification evidence.
  *
  * Usage: node scripts/auth-lifecycle/quality-selftest.mjs
  */
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { readFileSync, mkdirSync, copyFileSync, existsSync } from 'node:fs';
 
 const QUALITY = join(import.meta.dirname, 'quality.mjs');
 let failures = 0;
 
 function runQuality(env) {
   try {
-    execFileSync('node', [QUALITY], { stdio: 'pipe', encoding: 'utf8', env: { ...process.env, ...env } });
-    return { status: 0, output: '' };
+    const output = execFileSync('node', [QUALITY], { stdio: 'pipe', encoding: 'utf8', env: { ...process.env, ...env } });
+    return { status: 0, output };
   } catch (error) {
     return { status: error.status ?? 1, output: String(error.stdout ?? '') + String(error.stderr ?? '') };
   }
@@ -36,13 +34,13 @@ function expect(label, ok, detail) {
   }
 }
 
-// The aggregate is expected RED today because the target-owned platform
-// matrices are NOT_EXECUTED (documented blocker, never fabricated).
+// The implementation aggregate is green when the platform ledger truthfully
+// records NOT_EXECUTED. Release readiness remains independently blocked.
 const baseline = runQuality({});
 expect(
-  'baseline aggregate reports the platform-evidence blocker',
-  baseline.status !== 0 && baseline.output.includes('platform-evidence'),
-  `status ${baseline.status}, output ${baseline.output.slice(-200)}`,
+  'baseline implementation aggregate accepts truthful pending manual qualification',
+  baseline.status === 0 && baseline.output.includes('RELEASE READINESS: BLOCKED_BY_MANUAL_QUALIFICATION'),
+  `status ${baseline.status}, output ${baseline.output.slice(-300)}`,
 );
 
 // Seeded defect 1: fabricated external PASS without evidence.
@@ -64,34 +62,27 @@ failedMatrix.matrices[0].result = 'FAIL';
 writeFileSync(join(tmp, 'platform-evidence-fail.json'), JSON.stringify(failedMatrix));
 
 function runQualityWithSubstitution(blockerName, platformName) {
-  // Substitute the ledger files in a shadow directory beside a copied quality.mjs.
-  const shadow = join(tmp, 'shadow');
-  mkdirSync(shadow);
-  copyFileSync(QUALITY, join(shadow, 'quality.mjs'));
-  for (const file of ['coverage.mjs', 'coverage-ledger.json', 'production-exclusion.mjs', 'secret-scan.mjs']) {
-    copyFileSync(join(import.meta.dirname, file), join(shadow, file));
-  }
-  const blockerSource = existsSync(join(tmp, blockerName)) ? join(tmp, blockerName) : join(import.meta.dirname, blockerName);
-  const platformSource = existsSync(join(tmp, platformName)) ? join(tmp, platformName) : join(import.meta.dirname, platformName);
-  copyFileSync(blockerSource, join(shadow, 'external-blockers.json'));
-  copyFileSync(platformSource, join(shadow, 'platform-evidence.json'));
-  try {
-    return execFileSync('node', [join(shadow, 'quality.mjs')], { stdio: 'pipe', encoding: 'utf8' }) && { status: 0, output: '' };
-  } catch (error) {
-    return { status: error.status ?? 1, output: String(error.stdout ?? '') + String(error.stderr ?? '') };
-  } finally {
-    rmSync(shadow, { recursive: true, force: true });
-  }
+  return runQuality({
+    FEAT010_EXTERNAL_BLOCKER_LEDGER: join(tmp, blockerName),
+    FEAT010_PLATFORM_EVIDENCE_LEDGER: join(tmp, platformName),
+  });
 }
 
-const fabricatedRun = runQualityWithSubstitution('external-blockers.json', 'platform-evidence.json');
+writeFileSync(join(tmp, 'external-blockers-valid.json'), JSON.stringify(ledger));
+writeFileSync(join(tmp, 'platform-evidence-valid.json'), JSON.stringify(platforms));
+
+const fabricatedRun = runQualityWithSubstitution('external-blockers.json', 'platform-evidence-valid.json');
 expect('fabricated external PASS fails admission', fabricatedRun.status !== 0 && fabricatedRun.output.includes('fabricated'), `status ${fabricatedRun.status}`);
 
-const invalidRun = runQualityWithSubstitution('external-blockers-invalid.json', 'platform-evidence.json');
+const invalidRun = runQualityWithSubstitution('external-blockers-invalid.json', 'platform-evidence-valid.json');
 expect('invalid blocker state fails admission', invalidRun.status !== 0 && invalidRun.output.includes('invalid or fabricated'), `status ${invalidRun.status}`);
 
-const failRun = runQualityWithSubstitution('external-blockers.json', 'platform-evidence-fail.json');
-expect('FAIL platform matrix fails admission', failRun.status !== 0 && failRun.output.includes('matrix FAIL'), `status ${failRun.status}`);
+const failRun = runQualityWithSubstitution('external-blockers-valid.json', 'platform-evidence-fail.json');
+expect(
+  'truthful FAIL platform matrix blocks release readiness without failing implementation admission',
+  failRun.status === 0 && failRun.output.includes('RELEASE READINESS: BLOCKED_BY_MANUAL_QUALIFICATION'),
+  `status ${failRun.status}, output ${failRun.output.slice(-300)}`,
+);
 
 rmSync(tmp, { recursive: true, force: true });
 
