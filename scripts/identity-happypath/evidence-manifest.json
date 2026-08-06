@@ -1,6 +1,6 @@
 {
   "feature": "FEAT-011",
-  "updatedAt": "2026-08-07T00:40:00Z",
+  "updatedAt": "2026-08-07T01:30:00Z",
   "rows": [
     {
       "stableId": "AC-011-001",
@@ -8,7 +8,7 @@
       "state": "PASS",
       "counts": "8/8 BDD + 34/34 browser",
       "command": "npm run test:auth-lifecycle:bdd + test:browser:auth",
-      "revision": "5b8a372",
+      "revision": "2c9abc5",
       "captureDisabled": true
     },
     {
@@ -17,7 +17,7 @@
       "state": "PASS",
       "counts": "95 convergence tests",
       "command": "npm run test:unit",
-      "revision": "5b8a372"
+      "revision": "2c9abc5"
     },
     {
       "stableId": "AC-011-003",
@@ -25,7 +25,7 @@
       "state": "PASS",
       "counts": "95 convergence tests",
       "command": "npm run test:unit",
-      "revision": "5b8a372"
+      "revision": "2c9abc5"
     },
     {
       "stableId": "AC-011-004",
@@ -33,7 +33,7 @@
       "state": "PASS",
       "counts": "95 convergence tests",
       "command": "npm run test:unit",
-      "revision": "5b8a372"
+      "revision": "2c9abc5"
     },
     {
       "stableId": "AC-011-005",
@@ -41,7 +41,7 @@
       "state": "PASS",
       "counts": "95 convergence tests",
       "command": "npm run test:unit",
-      "revision": "5b8a372"
+      "revision": "2c9abc5"
     },
     {
       "stableId": "AC-011-006",
@@ -49,7 +49,7 @@
       "state": "PASS",
       "counts": "95 convergence tests",
       "command": "npm run test:unit",
-      "revision": "5b8a372"
+      "revision": "2c9abc5"
     },
     {
       "stableId": "AC-011-007",
@@ -81,7 +81,7 @@
       "state": "PASS",
       "counts": "8/8 BDD",
       "command": "npm run test:auth-lifecycle:bdd",
-      "revision": "5b8a372",
+      "revision": "2c9abc5",
       "captureDisabled": true
     },
     {
@@ -90,7 +90,7 @@
       "state": "PASS",
       "counts": "0 findings",
       "command": "npm run identity-happypath:secret-scan",
-      "revision": "5b8a372"
+      "revision": "2c9abc5"
     },
     {
       "stableId": "AC-011-012",
@@ -106,7 +106,7 @@
       "state": "PASS",
       "counts": "95 convergence tests",
       "command": "npm run test:unit",
-      "revision": "5b8a372"
+      "revision": "2c9abc5"
     },
     {
       "stableId": "AC-011-014",
@@ -114,7 +114,7 @@
       "state": "PASS",
       "counts": "95 convergence tests",
       "command": "npm run test:unit",
-      "revision": "5b8a372"
+      "revision": "2c9abc5"
     },
     {
       "stableId": "AC-011-015",
@@ -130,7 +130,7 @@
       "state": "PASS",
       "counts": "95 convergence tests",
       "command": "npm run test:unit",
-      "revision": "5b8a372"
+      "revision": "2c9abc5"
     },
     {
       "stableId": "AC-011-017",
@@ -210,7 +210,7 @@
       "state": "PASS",
       "counts": "15/15+14/14 vault stages",
       "command": "npm run ubuntu-vault:ci + android-vault:ci",
-      "revision": "5b8a372"
+      "revision": "2c9abc5"
     },
     {
       "stableId": "AC-011-027",
@@ -218,7 +218,7 @@
       "state": "PASS",
       "counts": "0 findings",
       "command": "npm run identity-happypath:secret-scan",
-      "revision": "5b8a372"
+      "revision": "2c9abc5"
     },
     {
       "stableId": "AC-011-028",
@@ -226,7 +226,7 @@
       "state": "PASS",
       "counts": "95 convergence tests",
       "command": "npm run test:unit",
-      "revision": "5b8a372"
+      "revision": "2c9abc5"
     },
     {
       "stableId": "AC-011-029",
@@ -234,7 +234,7 @@
       "state": "PASS",
       "counts": "95 convergence tests",
       "command": "npm run test:unit",
-      "revision": "5b8a372"
+      "revision": "2c9abc5"
     },
     {
       "stableId": "AC-011-030",
@@ -242,7 +242,7 @@
       "state": "PASS",
       "counts": "16 a11y tests",
       "command": "npm run test:unit",
-      "revision": "5b8a372"
+      "revision": "2c9abc5"
     },
     {
       "stableId": "AC-011-031",
@@ -250,7 +250,7 @@
       "state": "PASS",
       "counts": "0 findings",
       "command": "npm run identity-happypath:secret-scan",
-      "revision": "5b8a372"
+      "revision": "2c9abc5"
     },
     {
       "stableId": "AC-011-032",
@@ -258,7 +258,7 @@
       "state": "PASS",
       "counts": "1453/1453 unit + lint/tsc/builds 0/0",
       "command": "npm run test:unit + lint + typecheck + build:web + build:static",
-      "revision": "5b8a372"
+      "revision": "2c9abc5"
     },
     {
       "stableId": "AC-011-033",
@@ -274,7 +274,7 @@
       "state": "PASS",
       "counts": "7/7 conformance",
       "command": "npm run identity:conformance",
-      "revision": "5b8a372"
+      "revision": "2c9abc5"
     },
     {
       "stableId": "AC-011-035",
@@ -298,7 +298,7 @@
       "state": "PASS",
       "counts": "1/1",
       "command": "npm run identity-happypath:coverage",
-      "revision": "5b8a372"
+      "revision": "2c9abc5"
     },
     {
       "stableId": "AC-011-038",
@@ -306,7 +306,7 @@
       "state": "PASS",
       "counts": "1/1",
       "command": "npm run identity-happypath:quality",
-      "revision": "5b8a372"
+      "revision": "2c9abc5"
     },
     {
       "stableId": "HV-ID-ROOT-001",
@@ -314,7 +314,7 @@
       "state": "PASS",
       "counts": "8/8 BDD",
       "command": "npm run test:auth-lifecycle:bdd",
-      "revision": "5b8a372",
+      "revision": "2c9abc5",
       "captureDisabled": true
     },
     {
@@ -323,7 +323,7 @@
       "state": "PASS",
       "counts": "8/8 BDD",
       "command": "npm run test:auth-lifecycle:bdd",
-      "revision": "5b8a372",
+      "revision": "2c9abc5",
       "captureDisabled": true
     },
     {
@@ -332,7 +332,7 @@
       "state": "PASS",
       "counts": "8/8 BDD",
       "command": "npm run test:auth-lifecycle:bdd",
-      "revision": "5b8a372",
+      "revision": "2c9abc5",
       "captureDisabled": true
     },
     {
@@ -341,7 +341,7 @@
       "state": "PASS",
       "counts": "34/34 browser",
       "command": "npm run test:browser:auth",
-      "revision": "5b8a372",
+      "revision": "2c9abc5",
       "captureDisabled": true
     },
     {
@@ -350,7 +350,7 @@
       "state": "PASS",
       "counts": "8/8 BDD",
       "command": "npm run test:auth-lifecycle:bdd",
-      "revision": "5b8a372",
+      "revision": "2c9abc5",
       "captureDisabled": true
     },
     {
@@ -359,7 +359,7 @@
       "state": "PASS",
       "counts": "8/8 BDD",
       "command": "npm run test:auth-lifecycle:bdd",
-      "revision": "5b8a372",
+      "revision": "2c9abc5",
       "captureDisabled": true
     },
     {
@@ -368,7 +368,7 @@
       "state": "PASS",
       "counts": "8/8 BDD",
       "command": "npm run test:auth-lifecycle:bdd",
-      "revision": "5b8a372",
+      "revision": "2c9abc5",
       "captureDisabled": true
     },
     {
@@ -377,7 +377,7 @@
       "state": "PASS",
       "counts": "8/8 BDD",
       "command": "npm run test:auth-lifecycle:bdd",
-      "revision": "5b8a372",
+      "revision": "2c9abc5",
       "captureDisabled": true
     },
     {
@@ -386,7 +386,7 @@
       "state": "PASS",
       "counts": "8/8 BDD",
       "command": "npm run test:auth-lifecycle:bdd",
-      "revision": "5b8a372",
+      "revision": "2c9abc5",
       "captureDisabled": true
     },
     {
@@ -395,7 +395,7 @@
       "state": "PASS",
       "counts": "8/8 BDD",
       "command": "npm run test:auth-lifecycle:bdd",
-      "revision": "5b8a372",
+      "revision": "2c9abc5",
       "captureDisabled": true
     },
     {
@@ -404,7 +404,7 @@
       "state": "PASS",
       "counts": "8/8 BDD",
       "command": "npm run test:auth-lifecycle:bdd",
-      "revision": "5b8a372",
+      "revision": "2c9abc5",
       "captureDisabled": true
     },
     {
@@ -413,7 +413,7 @@
       "state": "PASS",
       "counts": "8/8 BDD",
       "command": "npm run test:auth-lifecycle:bdd",
-      "revision": "5b8a372",
+      "revision": "2c9abc5",
       "captureDisabled": true
     },
     {
@@ -598,7 +598,7 @@
       "state": "PASS",
       "counts": "15/15",
       "command": "npm run ubuntu-vault:ci",
-      "revision": "5b8a372"
+      "revision": "2c9abc5"
     },
     {
       "stableId": "HV-ID-NATIVE-002",
@@ -606,7 +606,7 @@
       "state": "PASS",
       "counts": "14/14",
       "command": "npm run android-vault:ci",
-      "revision": "5b8a372"
+      "revision": "2c9abc5"
     },
     {
       "stableId": "HV-ID-LIFECYCLE-001",
@@ -614,7 +614,7 @@
       "state": "PASS",
       "counts": "95 convergence tests",
       "command": "npm run test:unit",
-      "revision": "5b8a372"
+      "revision": "2c9abc5"
     },
     {
       "stableId": "HV-ID-LIFECYCLE-002",
@@ -622,7 +622,7 @@
       "state": "PASS",
       "counts": "95 convergence tests",
       "command": "npm run test:unit",
-      "revision": "5b8a372"
+      "revision": "2c9abc5"
     },
     {
       "stableId": "HV-ID-SECURITY-001",
@@ -630,7 +630,7 @@
       "state": "PASS",
       "counts": "0 findings",
       "command": "npm run identity-happypath:secret-scan",
-      "revision": "5b8a372"
+      "revision": "2c9abc5"
     },
     {
       "stableId": "HV-ID-EPIC-001",
@@ -638,7 +638,7 @@
       "state": "PASS",
       "counts": "1/1",
       "command": "npm run identity-happypath:coverage",
-      "revision": "5b8a372"
+      "revision": "2c9abc5"
     },
     {
       "stableId": "MT-QUAL-UBUNTU-011-001",
