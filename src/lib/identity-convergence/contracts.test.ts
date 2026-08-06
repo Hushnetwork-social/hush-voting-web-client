@@ -12,7 +12,6 @@ import { describe, expect, it } from 'vitest';
 import * as contracts from './contracts';
 import {
   ALIAS_MAX_GRAPHEMES,
-  ALIAS_MAX_UTF8_BYTES,
   CONVERGENCE_OPERATIONS,
   classifyLookupDecision,
   projectPublicIdentity,

@@ -13,7 +13,6 @@
  */
 
 import {
-  PENDING_TRANSACTION_SCHEMA_VERSION,
   validatePendingTransaction,
   type SealedPendingTransactionV2,
 } from './pending-transaction';

@@ -24,7 +24,6 @@
 import {
   type ConvergenceEpoch,
   type ExactIdentityProof,
-  type IdentityLookupDecision,
   type MissingProfileIntent,
   type MissingProfileReview,
 } from './contracts';

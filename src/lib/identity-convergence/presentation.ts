@@ -170,7 +170,7 @@ export function projectExistingProfile(identity: PublicIdentityProjection): Conv
  * cryptographic identity is being registered. Creation starts only on the
  * explicit confirmation action.
  */
-export function projectMissingProfileReview(origin: MissingProfileOrigin, review: { readonly alias: string; readonly visibility: 'private' | 'public' }): ConvergenceViewProjection {
+export function projectMissingProfileReview(origin: MissingProfileOrigin, _review: { readonly alias: string; readonly visibility: 'private' | 'public' }): ConvergenceViewProjection {
   const prefillNote = origin === 'credentialFile' ? 'These details come from your credential file and can be changed.' : null;
   return {
     screen: 'missingProfileReview',

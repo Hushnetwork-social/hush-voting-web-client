@@ -8,7 +8,7 @@ import { Server, ServerCredentials } from '@grpc/grpc-js';
 import { loadSync } from '@grpc/proto-loader';
 import { loadPackageDefinition } from '@grpc/grpc-js';
 import path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import {
   BinaryGrpcTransport,
   PINNED_PROTO_DIGESTS,
@@ -17,7 +17,6 @@ import {
   verifyPinnedProtos,
   PROTO_DIR,
 } from './binary-grpc-transport';
-import type { LookupTransportResult } from '../../lib/identity-creation/transport';
 
 interface TestServer {
   server: Server;

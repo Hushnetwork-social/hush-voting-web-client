@@ -48,13 +48,13 @@ function makeHarness(state: HarnessState) {
   const store = new InMemorySealedPendingStore();
   const ports: ConvergencePorts = {
     lookup: async () => state.lookupResults.shift() ?? { kind: 'transportAmbiguity' },
-    sealAndSign: async (review) => {
+    sealAndSign: async (_review) => {
       state.sealCalls = (state.sealCalls ?? 0) + 1;
       return {
       schemaVersion: 2,
-      transaction: { exactJson: JSON.stringify({ review }), digest: digestOf(JSON.stringify({ review })) },
+      transaction: { exactJson: JSON.stringify({ review: _review }), digest: digestOf(JSON.stringify({ review: _review })) },
       transactionId: 'tx-1',
-      reviewedMetadata: { alias: review.alias, visibility: review.visibility },
+      reviewedMetadata: { alias: _review.alias, visibility: _review.visibility },
       lifecycle: 'sealed',
       attemptEvidence: [],
       epochBinding: EPOCH,
@@ -144,6 +144,7 @@ describe('lookup-first and submit outcomes (Task 4.6)', () => {
 
   it('terminal rejection clears the sealed pending state', async () => {
     const { coordinator, store } = makeHarness({ lookupResults: [{ kind: 'explicitNotfound' }], submitOutcomes: ['rejectedTerminal'], submitCodes: ['X'], now: 0 });
+    void store;
     coordinator.enterReview(REVIEW);
 
     await coordinator.confirmMissingProfile('CONFIRM_MISSING_PROFILE', EPOCH);
@@ -154,7 +155,7 @@ describe('lookup-first and submit outcomes (Task 4.6)', () => {
 
 describe('reconciliation (Task 4.6)', () => {
   it('polls only while eligible; exact lookup confirms and retires pending state', async () => {
-    const { coordinator, store } = makeHarness({ lookupResults: [{ kind: 'explicitNotfound' }], submitOutcomes: ['accepted'], submitCodes: [null], now: 0 });
+    const { coordinator } = makeHarness({ lookupResults: [{ kind: 'explicitNotfound' }], submitOutcomes: ['accepted'], submitCodes: [null], now: 0 });
     coordinator.enterReview(REVIEW);
     await coordinator.confirmMissingProfile('CONFIRM_MISSING_PROFILE', EPOCH);
 
