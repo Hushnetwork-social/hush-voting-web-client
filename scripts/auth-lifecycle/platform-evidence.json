@@ -1,17 +1,18 @@
 {
   "schema": "feat010-platform-evidence-v1",
+  "generatedAt": "2026-08-06T05:50:00Z",
   "matrices": [
     {
       "target": "web",
       "result": "NOT_EXECUTED",
-      "digests": "pending: real-root Web matrix requires the FEAT-002-port adapter (recorded Phase 6 precondition); harness-only evidence is not substitution",
-      "note": "AC-010-092 target-owned; adapter seam tracked in phase-6 notes"
+      "digests": "real-root Web matrix executed: 8/8 auth-lifecycle BDD scenarios PASS (entry, child mount, unlock combined error, restart-locked, removal, nav, offline, capture policy) on the ordinary dev composition; full-matrix journeys gated on the pinned HushServerNode fixture (block confirm, exact both-key authenticate, global Lock, words/file UI restore) remain NOT_EXECUTED per AC-010-092",
+      "note": "Web partial evidence recorded in scripts/auth-lifecycle/evidence-web-matrix.json; executed commit c4f0f02"
     },
     {
       "target": "ubuntu",
       "result": "NOT_EXECUTED",
-      "digests": "pending: physical Ubuntu Tauri functional procedure requires GUI session + Secret Service provider state",
-      "note": "AC-010-093 target-owned; package build gate attempted separately"
+      "digests": "pending: real Ubuntu Tauri functional procedure requires a dedicated GUI session with Secret Service provider state",
+      "note": "AC-010-093 target-owned; no qualifying execution target for the autonomous procedure in this environment"
     },
     {
       "target": "android-physical",

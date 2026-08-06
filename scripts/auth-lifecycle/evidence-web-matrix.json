@@ -1,0 +1,808 @@
+{
+  "schema": "feat010-evidence-manifest-v1",
+  "generatedAt": "2026-08-06T05:45:00Z",
+  "feature": "FEAT-010",
+  "source": "Phase 7 machine-checked evidence manifest (Tasks 7.1-7.8) + Task 7.3 real-root Web matrix execution",
+  "entries": [
+    {
+      "criterionId": "AC-010-001",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed real-root evidence (C-class; ledger C,R,X)"
+    },
+    {
+      "criterionId": "AC-010-002",
+      "class": "C",
+      "realRoot": false,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C,X)"
+    },
+    {
+      "criterionId": "AC-010-003",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed real-root evidence (C-class; ledger C,R)"
+    },
+    {
+      "criterionId": "AC-010-004",
+      "class": "C",
+      "realRoot": false,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C)"
+    },
+    {
+      "criterionId": "AC-010-005",
+      "class": "C",
+      "realRoot": false,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C,N)"
+    },
+    {
+      "criterionId": "AC-010-006",
+      "class": "C",
+      "realRoot": false,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C,N,X)"
+    },
+    {
+      "criterionId": "AC-010-007",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed real-root evidence (C-class; ledger C,R,N,M)"
+    },
+    {
+      "criterionId": "AC-010-008",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed real-root evidence (C-class; ledger C,R,N,M)"
+    },
+    {
+      "criterionId": "AC-010-009",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed real-root evidence (C-class; ledger C,R,N,M)"
+    },
+    {
+      "criterionId": "AC-010-010",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed real-root evidence (C-class; ledger C,R,N,M)"
+    },
+    {
+      "criterionId": "AC-010-011",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C,R)"
+    },
+    {
+      "criterionId": "AC-010-012",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed real-root evidence (C-class; ledger C,R,X)"
+    },
+    {
+      "criterionId": "AC-010-013",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": true,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed real-root evidence (C-class; ledger C,R,S)"
+    },
+    {
+      "criterionId": "AC-010-014",
+      "class": "C",
+      "realRoot": false,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C,R,S,X)"
+    },
+    {
+      "criterionId": "AC-010-015",
+      "class": "C",
+      "realRoot": false,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C,N)"
+    },
+    {
+      "criterionId": "AC-010-016",
+      "class": "C",
+      "realRoot": false,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C,N)"
+    },
+    {
+      "criterionId": "AC-010-017",
+      "class": "C",
+      "realRoot": false,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C,X)"
+    },
+    {
+      "criterionId": "AC-010-018",
+      "class": "C",
+      "realRoot": false,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C)"
+    },
+    {
+      "criterionId": "AC-010-019",
+      "class": "C",
+      "realRoot": false,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C,R,N)"
+    },
+    {
+      "criterionId": "AC-010-020",
+      "class": "C",
+      "realRoot": false,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C,X)"
+    },
+    {
+      "criterionId": "AC-010-021",
+      "class": "C",
+      "realRoot": false,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C)"
+    },
+    {
+      "criterionId": "AC-010-022",
+      "class": "C",
+      "realRoot": false,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C)"
+    },
+    {
+      "criterionId": "AC-010-023",
+      "class": "C",
+      "realRoot": false,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C,X)"
+    },
+    {
+      "criterionId": "AC-010-024",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed real-root evidence (C-class; ledger C,R)"
+    },
+    {
+      "criterionId": "AC-010-025",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C,R)"
+    },
+    {
+      "criterionId": "AC-010-026",
+      "class": "C",
+      "realRoot": false,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C)"
+    },
+    {
+      "criterionId": "AC-010-027",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed real-root evidence (C-class; ledger C,R,N)"
+    },
+    {
+      "criterionId": "AC-010-028",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed real-root evidence (C-class; ledger C,R,N)"
+    },
+    {
+      "criterionId": "AC-010-029",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": true,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed real-root evidence (C-class; ledger C,R)"
+    },
+    {
+      "criterionId": "AC-010-030",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C,R,M)"
+    },
+    {
+      "criterionId": "AC-010-031",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C,N,M)"
+    },
+    {
+      "criterionId": "AC-010-032",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C,N,M)"
+    },
+    {
+      "criterionId": "AC-010-033",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C,R,N)"
+    },
+    {
+      "criterionId": "AC-010-034",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C,R,N)"
+    },
+    {
+      "criterionId": "AC-010-035",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C,R,S)"
+    },
+    {
+      "criterionId": "AC-010-036",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": true,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed real-root evidence (C-class; ledger C,R)"
+    },
+    {
+      "criterionId": "AC-010-037",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": true,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C,R)"
+    },
+    {
+      "criterionId": "AC-010-038",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C,R,N)"
+    },
+    {
+      "criterionId": "AC-010-039",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C,R)"
+    },
+    {
+      "criterionId": "AC-010-040",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C,R,S)"
+    },
+    {
+      "criterionId": "AC-010-041",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C,R,S)"
+    },
+    {
+      "criterionId": "AC-010-042",
+      "class": "C",
+      "realRoot": false,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C,R)"
+    },
+    {
+      "criterionId": "AC-010-043",
+      "class": "C",
+      "realRoot": false,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C)"
+    },
+    {
+      "criterionId": "AC-010-044",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C,R,N,M)"
+    },
+    {
+      "criterionId": "AC-010-045",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C,R,N,M)"
+    },
+    {
+      "criterionId": "AC-010-046",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C,R,X)"
+    },
+    {
+      "criterionId": "AC-010-047",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": true,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed real-root evidence (C-class; ledger C,R,N)"
+    },
+    {
+      "criterionId": "AC-010-048",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": true,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed real-root evidence (C-class; ledger C,R)"
+    },
+    {
+      "criterionId": "AC-010-049",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C,R,S)"
+    },
+    {
+      "criterionId": "AC-010-050",
+      "class": "C",
+      "realRoot": false,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C)"
+    },
+    {
+      "criterionId": "AC-010-051",
+      "class": "C",
+      "realRoot": false,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C)"
+    },
+    {
+      "criterionId": "AC-010-052",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C,R,N,M)"
+    },
+    {
+      "criterionId": "AC-010-053",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C,R)"
+    },
+    {
+      "criterionId": "AC-010-054",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C,R)"
+    },
+    {
+      "criterionId": "AC-010-055",
+      "class": "C",
+      "realRoot": false,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C)"
+    },
+    {
+      "criterionId": "AC-010-056",
+      "class": "C",
+      "realRoot": false,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C)"
+    },
+    {
+      "criterionId": "AC-010-057",
+      "class": "C",
+      "realRoot": false,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C)"
+    },
+    {
+      "criterionId": "AC-010-058",
+      "class": "C",
+      "realRoot": false,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C)"
+    },
+    {
+      "criterionId": "AC-010-059",
+      "class": "C",
+      "realRoot": false,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C,R)"
+    },
+    {
+      "criterionId": "AC-010-060",
+      "class": "C",
+      "realRoot": false,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C)"
+    },
+    {
+      "criterionId": "AC-010-061",
+      "class": "C",
+      "realRoot": false,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C)"
+    },
+    {
+      "criterionId": "AC-010-062",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed real-root evidence (C-class; ledger C,R)"
+    },
+    {
+      "criterionId": "AC-010-063",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C,R)"
+    },
+    {
+      "criterionId": "AC-010-064",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C)"
+    },
+    {
+      "criterionId": "AC-010-065",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C,R)"
+    },
+    {
+      "criterionId": "AC-010-066",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C,R)"
+    },
+    {
+      "criterionId": "AC-010-067",
+      "class": "C",
+      "realRoot": false,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C)"
+    },
+    {
+      "criterionId": "AC-010-068",
+      "class": "C",
+      "realRoot": false,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C)"
+    },
+    {
+      "criterionId": "AC-010-069",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C,R)"
+    },
+    {
+      "criterionId": "AC-010-070",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C,R)"
+    },
+    {
+      "criterionId": "AC-010-071",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C,R)"
+    },
+    {
+      "criterionId": "AC-010-072",
+      "class": "C",
+      "realRoot": false,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C,X)"
+    },
+    {
+      "criterionId": "AC-010-073",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": true,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed real-root evidence (C-class; ledger C,R,N)"
+    },
+    {
+      "criterionId": "AC-010-074",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": true,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed real-root evidence (C-class; ledger C,R,N)"
+    },
+    {
+      "criterionId": "AC-010-075",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": true,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed real-root evidence (C-class; ledger C,R)"
+    },
+    {
+      "criterionId": "AC-010-076",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C,R)"
+    },
+    {
+      "criterionId": "AC-010-077",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C,R,N)"
+    },
+    {
+      "criterionId": "AC-010-078",
+      "class": "C",
+      "realRoot": false,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C,X)"
+    },
+    {
+      "criterionId": "AC-010-079",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C,R)"
+    },
+    {
+      "criterionId": "AC-010-080",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C,R)"
+    },
+    {
+      "criterionId": "AC-010-081",
+      "class": "C",
+      "realRoot": false,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C)"
+    },
+    {
+      "criterionId": "AC-010-082",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": true,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed real-root evidence (C-class; ledger C,R)"
+    },
+    {
+      "criterionId": "AC-010-083",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed real-root evidence (C-class; ledger C,R,N)"
+    },
+    {
+      "criterionId": "AC-010-084",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed real-root evidence (C-class; ledger C,R,N)"
+    },
+    {
+      "criterionId": "AC-010-085",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed real-root evidence (C-class; ledger C,R,N)"
+    },
+    {
+      "criterionId": "AC-010-086",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed real-root evidence (C-class; ledger C,R)"
+    },
+    {
+      "criterionId": "AC-010-087",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed real-root evidence (C-class; ledger C,R,N)"
+    },
+    {
+      "criterionId": "AC-010-088",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C,R,N,X)"
+    },
+    {
+      "criterionId": "AC-010-089",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": true,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed real-root evidence (C-class; ledger C,R,N,X)"
+    },
+    {
+      "criterionId": "AC-010-090",
+      "class": "C",
+      "realRoot": false,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (C-class; ledger C,R,X)"
+    },
+    {
+      "criterionId": "AC-010-091",
+      "class": "X",
+      "realRoot": false,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (X-class; ledger X)"
+    },
+    {
+      "criterionId": "AC-010-092",
+      "class": "R",
+      "realRoot": true,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed real-root evidence (R-class; ledger R,X)"
+    },
+    {
+      "criterionId": "AC-010-093",
+      "class": "N",
+      "realRoot": false,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (N-class; ledger N,M,X)"
+    },
+    {
+      "criterionId": "AC-010-094",
+      "class": "N",
+      "realRoot": false,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (N-class; ledger N,M,X)"
+    },
+    {
+      "criterionId": "AC-010-095",
+      "class": "M",
+      "realRoot": false,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (M-class; ledger M,X)"
+    },
+    {
+      "criterionId": "AC-010-096",
+      "class": "M",
+      "realRoot": false,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (M-class; ledger M,X)"
+    },
+    {
+      "criterionId": "AC-010-097",
+      "class": "X",
+      "realRoot": false,
+      "secretBearing": true,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (X-class; ledger X)"
+    },
+    {
+      "criterionId": "AC-010-098",
+      "class": "X",
+      "realRoot": false,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (X-class; ledger X)"
+    },
+    {
+      "criterionId": "AC-010-099",
+      "class": "X",
+      "realRoot": false,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (X-class; ledger X)"
+    },
+    {
+      "criterionId": "AC-010-100",
+      "class": "M",
+      "realRoot": false,
+      "secretBearing": false,
+      "capturePolicy": "disabled",
+      "evidence": "phase7-executed evidence (M-class; ledger M,X)"
+    }
+  ]
+}
