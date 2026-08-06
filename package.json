@@ -91,7 +91,12 @@
     "auth-lifecycle:quality:selftest": "node scripts/auth-lifecycle/quality-selftest.mjs",
     "auth-lifecycle:coverage:selftest": "node scripts/auth-lifecycle/coverage-selftest.mjs",
     "build:worker": "node scripts/build-worker.mjs",
-    "test:auth-lifecycle:bdd": "playwright test --config playwright.auth-lifecycle.config.ts"
+    "test:auth-lifecycle:bdd": "playwright test --config playwright.auth-lifecycle.config.ts",
+    "identity-happypath:coverage": "node scripts/identity-happypath/coverage.mjs",
+    "identity-happypath:secret-scan": "node scripts/identity-happypath/secret-scan.mjs",
+    "identity-happypath:quality": "node scripts/identity-happypath/quality.mjs",
+    "identity-happypath:selftest": "node scripts/identity-happypath/selftest.mjs",
+    "identity-happypath:gates": "npm run identity-happypath:selftest && npm run identity-happypath:coverage && npm run identity-happypath:secret-scan && npm run identity-happypath:quality"
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.14.4",

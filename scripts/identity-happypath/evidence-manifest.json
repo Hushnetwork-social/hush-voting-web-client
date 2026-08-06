@@ -1,0 +1,676 @@
+{
+  "feature": "FEAT-011",
+  "updatedAt": "2026-08-07T00:40:00Z",
+  "rows": [
+    {
+      "stableId": "AC-011-001",
+      "evidenceClass": "EXECUTABLE_ROOT",
+      "state": "PASS",
+      "counts": "8/8 BDD + 34/34 browser",
+      "command": "npm run test:auth-lifecycle:bdd + test:browser:auth",
+      "revision": "5b8a372",
+      "captureDisabled": true
+    },
+    {
+      "stableId": "AC-011-002",
+      "evidenceClass": "EXECUTABLE_CLIENT",
+      "state": "PASS",
+      "counts": "95 convergence tests",
+      "command": "npm run test:unit",
+      "revision": "5b8a372"
+    },
+    {
+      "stableId": "AC-011-003",
+      "evidenceClass": "EXECUTABLE_CLIENT",
+      "state": "PASS",
+      "counts": "95 convergence tests",
+      "command": "npm run test:unit",
+      "revision": "5b8a372"
+    },
+    {
+      "stableId": "AC-011-004",
+      "evidenceClass": "EXECUTABLE_CLIENT",
+      "state": "PASS",
+      "counts": "95 convergence tests",
+      "command": "npm run test:unit",
+      "revision": "5b8a372"
+    },
+    {
+      "stableId": "AC-011-005",
+      "evidenceClass": "EXECUTABLE_CLIENT",
+      "state": "PASS",
+      "counts": "95 convergence tests",
+      "command": "npm run test:unit",
+      "revision": "5b8a372"
+    },
+    {
+      "stableId": "AC-011-006",
+      "evidenceClass": "EXECUTABLE_CLIENT",
+      "state": "PASS",
+      "counts": "95 convergence tests",
+      "command": "npm run test:unit",
+      "revision": "5b8a372"
+    },
+    {
+      "stableId": "AC-011-007",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "15/15",
+      "command": "dotnet test --filter IdentityHappypathTwinTests",
+      "revision": "ebb690b+13cb433"
+    },
+    {
+      "stableId": "AC-011-008",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "15/15",
+      "command": "dotnet test --filter IdentityHappypathTwinTests",
+      "revision": "ebb690b+13cb433"
+    },
+    {
+      "stableId": "AC-011-009",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "15/15",
+      "command": "dotnet test --filter IdentityHappypathTwinTests",
+      "revision": "ebb690b+13cb433"
+    },
+    {
+      "stableId": "AC-011-010",
+      "evidenceClass": "EXECUTABLE_ROOT",
+      "state": "PASS",
+      "counts": "8/8 BDD",
+      "command": "npm run test:auth-lifecycle:bdd",
+      "revision": "5b8a372",
+      "captureDisabled": true
+    },
+    {
+      "stableId": "AC-011-011",
+      "evidenceClass": "EXECUTABLE_STATIC",
+      "state": "PASS",
+      "counts": "0 findings",
+      "command": "npm run identity-happypath:secret-scan",
+      "revision": "5b8a372"
+    },
+    {
+      "stableId": "AC-011-012",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "15/15",
+      "command": "dotnet test --filter IdentityHappypathTwinTests",
+      "revision": "ebb690b+13cb433"
+    },
+    {
+      "stableId": "AC-011-013",
+      "evidenceClass": "EXECUTABLE_CLIENT",
+      "state": "PASS",
+      "counts": "95 convergence tests",
+      "command": "npm run test:unit",
+      "revision": "5b8a372"
+    },
+    {
+      "stableId": "AC-011-014",
+      "evidenceClass": "EXECUTABLE_CLIENT",
+      "state": "PASS",
+      "counts": "95 convergence tests",
+      "command": "npm run test:unit",
+      "revision": "5b8a372"
+    },
+    {
+      "stableId": "AC-011-015",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "15/15",
+      "command": "dotnet test --filter IdentityHappypathTwinTests",
+      "revision": "ebb690b+13cb433"
+    },
+    {
+      "stableId": "AC-011-016",
+      "evidenceClass": "EXECUTABLE_CLIENT",
+      "state": "PASS",
+      "counts": "95 convergence tests",
+      "command": "npm run test:unit",
+      "revision": "5b8a372"
+    },
+    {
+      "stableId": "AC-011-017",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "15/15",
+      "command": "dotnet test --filter IdentityHappypathTwinTests",
+      "revision": "ebb690b+13cb433"
+    },
+    {
+      "stableId": "AC-011-018",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "15/15",
+      "command": "dotnet test --filter IdentityHappypathTwinTests",
+      "revision": "ebb690b+13cb433"
+    },
+    {
+      "stableId": "AC-011-019",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "15/15",
+      "command": "dotnet test --filter IdentityHappypathTwinTests",
+      "revision": "ebb690b+13cb433"
+    },
+    {
+      "stableId": "AC-011-020",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "15/15",
+      "command": "dotnet test --filter IdentityHappypathTwinTests",
+      "revision": "ebb690b+13cb433"
+    },
+    {
+      "stableId": "AC-011-021",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "15/15",
+      "command": "dotnet test --filter IdentityHappypathTwinTests",
+      "revision": "ebb690b+13cb433"
+    },
+    {
+      "stableId": "AC-011-022",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "15/15",
+      "command": "dotnet test --filter IdentityHappypathTwinTests",
+      "revision": "ebb690b+13cb433"
+    },
+    {
+      "stableId": "AC-011-023",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "15/15",
+      "command": "dotnet test --filter IdentityHappypathTwinTests",
+      "revision": "ebb690b+13cb433"
+    },
+    {
+      "stableId": "AC-011-024",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "15/15",
+      "command": "dotnet test --filter IdentityHappypathTwinTests",
+      "revision": "ebb690b+13cb433"
+    },
+    {
+      "stableId": "AC-011-025",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "15/15",
+      "command": "dotnet test --filter IdentityHappypathTwinTests",
+      "revision": "ebb690b+13cb433"
+    },
+    {
+      "stableId": "AC-011-026",
+      "evidenceClass": "EXECUTABLE_NATIVE",
+      "state": "PASS",
+      "counts": "15/15+14/14 vault stages",
+      "command": "npm run ubuntu-vault:ci + android-vault:ci",
+      "revision": "5b8a372"
+    },
+    {
+      "stableId": "AC-011-027",
+      "evidenceClass": "EXECUTABLE_STATIC",
+      "state": "PASS",
+      "counts": "0 findings",
+      "command": "npm run identity-happypath:secret-scan",
+      "revision": "5b8a372"
+    },
+    {
+      "stableId": "AC-011-028",
+      "evidenceClass": "EXECUTABLE_CLIENT",
+      "state": "PASS",
+      "counts": "95 convergence tests",
+      "command": "npm run test:unit",
+      "revision": "5b8a372"
+    },
+    {
+      "stableId": "AC-011-029",
+      "evidenceClass": "EXECUTABLE_CLIENT",
+      "state": "PASS",
+      "counts": "95 convergence tests",
+      "command": "npm run test:unit",
+      "revision": "5b8a372"
+    },
+    {
+      "stableId": "AC-011-030",
+      "evidenceClass": "EXECUTABLE_CLIENT",
+      "state": "PASS",
+      "counts": "16 a11y tests",
+      "command": "npm run test:unit",
+      "revision": "5b8a372"
+    },
+    {
+      "stableId": "AC-011-031",
+      "evidenceClass": "EXECUTABLE_STATIC",
+      "state": "PASS",
+      "counts": "0 findings",
+      "command": "npm run identity-happypath:secret-scan",
+      "revision": "5b8a372"
+    },
+    {
+      "stableId": "AC-011-032",
+      "evidenceClass": "EXECUTABLE_CLIENT",
+      "state": "PASS",
+      "counts": "1453/1453 unit + lint/tsc/builds 0/0",
+      "command": "npm run test:unit + lint + typecheck + build:web + build:static",
+      "revision": "5b8a372"
+    },
+    {
+      "stableId": "AC-011-033",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "15/15 + unit projects green",
+      "command": "dotnet test --filter IdentityHappypathTwinTests",
+      "revision": "ebb690b+13cb433"
+    },
+    {
+      "stableId": "AC-011-034",
+      "evidenceClass": "EXECUTABLE_CLIENT",
+      "state": "PASS",
+      "counts": "7/7 conformance",
+      "command": "npm run identity:conformance",
+      "revision": "5b8a372"
+    },
+    {
+      "stableId": "AC-011-035",
+      "evidenceClass": "MANUAL",
+      "state": "NOT_SUPPLIED",
+      "counts": null,
+      "command": null,
+      "revision": null
+    },
+    {
+      "stableId": "AC-011-036",
+      "evidenceClass": "EXTERNAL",
+      "state": "NOT_SUPPLIED",
+      "counts": null,
+      "command": null,
+      "revision": null
+    },
+    {
+      "stableId": "AC-011-037",
+      "evidenceClass": "EXECUTABLE_STATIC",
+      "state": "PASS",
+      "counts": "1/1",
+      "command": "npm run identity-happypath:coverage",
+      "revision": "5b8a372"
+    },
+    {
+      "stableId": "AC-011-038",
+      "evidenceClass": "EXECUTABLE_STATIC",
+      "state": "PASS",
+      "counts": "1/1",
+      "command": "npm run identity-happypath:quality",
+      "revision": "5b8a372"
+    },
+    {
+      "stableId": "HV-ID-ROOT-001",
+      "evidenceClass": "EXECUTABLE_ROOT",
+      "state": "PASS",
+      "counts": "8/8 BDD",
+      "command": "npm run test:auth-lifecycle:bdd",
+      "revision": "5b8a372",
+      "captureDisabled": true
+    },
+    {
+      "stableId": "HV-ID-ROOT-002",
+      "evidenceClass": "EXECUTABLE_ROOT",
+      "state": "PASS",
+      "counts": "8/8 BDD",
+      "command": "npm run test:auth-lifecycle:bdd",
+      "revision": "5b8a372",
+      "captureDisabled": true
+    },
+    {
+      "stableId": "HV-ID-CREATE-001",
+      "evidenceClass": "EXECUTABLE_ROOT",
+      "state": "PASS",
+      "counts": "8/8 BDD",
+      "command": "npm run test:auth-lifecycle:bdd",
+      "revision": "5b8a372",
+      "captureDisabled": true
+    },
+    {
+      "stableId": "HV-ID-CREATE-002",
+      "evidenceClass": "EXECUTABLE_ROOT",
+      "state": "PASS",
+      "counts": "34/34 browser",
+      "command": "npm run test:browser:auth",
+      "revision": "5b8a372",
+      "captureDisabled": true
+    },
+    {
+      "stableId": "HV-ID-WORDS12-001",
+      "evidenceClass": "EXECUTABLE_ROOT",
+      "state": "PASS",
+      "counts": "8/8 BDD",
+      "command": "npm run test:auth-lifecycle:bdd",
+      "revision": "5b8a372",
+      "captureDisabled": true
+    },
+    {
+      "stableId": "HV-ID-WORDS12-002",
+      "evidenceClass": "EXECUTABLE_ROOT",
+      "state": "PASS",
+      "counts": "8/8 BDD",
+      "command": "npm run test:auth-lifecycle:bdd",
+      "revision": "5b8a372",
+      "captureDisabled": true
+    },
+    {
+      "stableId": "HV-ID-WORDS24-001",
+      "evidenceClass": "EXECUTABLE_ROOT",
+      "state": "PASS",
+      "counts": "8/8 BDD",
+      "command": "npm run test:auth-lifecycle:bdd",
+      "revision": "5b8a372",
+      "captureDisabled": true
+    },
+    {
+      "stableId": "HV-ID-WORDS24-002",
+      "evidenceClass": "EXECUTABLE_ROOT",
+      "state": "PASS",
+      "counts": "8/8 BDD",
+      "command": "npm run test:auth-lifecycle:bdd",
+      "revision": "5b8a372",
+      "captureDisabled": true
+    },
+    {
+      "stableId": "HV-ID-DAT-001",
+      "evidenceClass": "EXECUTABLE_ROOT",
+      "state": "PASS",
+      "counts": "8/8 BDD",
+      "command": "npm run test:auth-lifecycle:bdd",
+      "revision": "5b8a372",
+      "captureDisabled": true
+    },
+    {
+      "stableId": "HV-ID-DAT-002",
+      "evidenceClass": "EXECUTABLE_ROOT",
+      "state": "PASS",
+      "counts": "8/8 BDD",
+      "command": "npm run test:auth-lifecycle:bdd",
+      "revision": "5b8a372",
+      "captureDisabled": true
+    },
+    {
+      "stableId": "HV-ID-RETURN-001",
+      "evidenceClass": "EXECUTABLE_ROOT",
+      "state": "PASS",
+      "counts": "8/8 BDD",
+      "command": "npm run test:auth-lifecycle:bdd",
+      "revision": "5b8a372",
+      "captureDisabled": true
+    },
+    {
+      "stableId": "HV-ID-RETURN-002",
+      "evidenceClass": "EXECUTABLE_ROOT",
+      "state": "PASS",
+      "counts": "8/8 BDD",
+      "command": "npm run test:auth-lifecycle:bdd",
+      "revision": "5b8a372",
+      "captureDisabled": true
+    },
+    {
+      "stableId": "HV-ID-LOOKUP-001",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "15/15",
+      "command": "dotnet test --filter IdentityHappypathTwinTests",
+      "revision": "ebb690b+13cb433"
+    },
+    {
+      "stableId": "HV-ID-LOOKUP-002",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "15/15",
+      "command": "dotnet test --filter IdentityHappypathTwinTests",
+      "revision": "ebb690b+13cb433"
+    },
+    {
+      "stableId": "HV-ID-LOOKUP-003",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "15/15",
+      "command": "dotnet test --filter IdentityHappypathTwinTests",
+      "revision": "ebb690b+13cb433"
+    },
+    {
+      "stableId": "HV-ID-LOOKUP-004",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "15/15",
+      "command": "dotnet test --filter IdentityHappypathTwinTests",
+      "revision": "ebb690b+13cb433"
+    },
+    {
+      "stableId": "HV-ID-LOOKUP-005",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "15/15",
+      "command": "dotnet test --filter IdentityHappypathTwinTests",
+      "revision": "ebb690b+13cb433"
+    },
+    {
+      "stableId": "HV-ID-SIGN-001",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "15/15",
+      "command": "dotnet test --filter IdentityHappypathTwinTests",
+      "revision": "ebb690b+13cb433"
+    },
+    {
+      "stableId": "HV-ID-SIGN-002",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "15/15",
+      "command": "dotnet test --filter IdentityHappypathTwinTests",
+      "revision": "ebb690b+13cb433"
+    },
+    {
+      "stableId": "HV-ID-SIGN-003",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "15/15",
+      "command": "dotnet test --filter IdentityHappypathTwinTests",
+      "revision": "ebb690b+13cb433"
+    },
+    {
+      "stableId": "HV-ID-SUBMIT-001",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "15/15",
+      "command": "dotnet test --filter IdentityHappypathTwinTests",
+      "revision": "ebb690b+13cb433"
+    },
+    {
+      "stableId": "HV-ID-SUBMIT-002",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "15/15",
+      "command": "dotnet test --filter IdentityHappypathTwinTests",
+      "revision": "ebb690b+13cb433"
+    },
+    {
+      "stableId": "HV-ID-SUBMIT-003",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "15/15",
+      "command": "dotnet test --filter IdentityHappypathTwinTests",
+      "revision": "ebb690b+13cb433"
+    },
+    {
+      "stableId": "HV-ID-SUBMIT-004",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "15/15",
+      "command": "dotnet test --filter IdentityHappypathTwinTests",
+      "revision": "ebb690b+13cb433"
+    },
+    {
+      "stableId": "HV-ID-RECONCILE-001",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "15/15",
+      "command": "dotnet test --filter IdentityHappypathTwinTests",
+      "revision": "ebb690b+13cb433"
+    },
+    {
+      "stableId": "HV-ID-RECONCILE-002",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "15/15",
+      "command": "dotnet test --filter IdentityHappypathTwinTests",
+      "revision": "ebb690b+13cb433"
+    },
+    {
+      "stableId": "HV-ID-RECONCILE-003",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "15/15",
+      "command": "dotnet test --filter IdentityHappypathTwinTests",
+      "revision": "ebb690b+13cb433"
+    },
+    {
+      "stableId": "HV-ID-IDEMPOTENCY-001",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "15/15",
+      "command": "dotnet test --filter IdentityHappypathTwinTests",
+      "revision": "ebb690b+13cb433"
+    },
+    {
+      "stableId": "HV-ID-IDEMPOTENCY-002",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "15/15",
+      "command": "dotnet test --filter IdentityHappypathTwinTests",
+      "revision": "ebb690b+13cb433"
+    },
+    {
+      "stableId": "HV-ID-IDEMPOTENCY-003",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "15/15",
+      "command": "dotnet test --filter IdentityHappypathTwinTests",
+      "revision": "ebb690b+13cb433"
+    },
+    {
+      "stableId": "HV-ID-CACHE-001",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "15/15",
+      "command": "dotnet test --filter IdentityHappypathTwinTests",
+      "revision": "ebb690b+13cb433"
+    },
+    {
+      "stableId": "HV-ID-CACHE-002",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "15/15",
+      "command": "dotnet test --filter IdentityHappypathTwinTests",
+      "revision": "ebb690b+13cb433"
+    },
+    {
+      "stableId": "HV-ID-CACHE-003",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "15/15",
+      "command": "dotnet test --filter IdentityHappypathTwinTests",
+      "revision": "ebb690b+13cb433"
+    },
+    {
+      "stableId": "HV-ID-CACHE-004",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "15/15",
+      "command": "dotnet test --filter IdentityHappypathTwinTests",
+      "revision": "ebb690b+13cb433"
+    },
+    {
+      "stableId": "HV-ID-NATIVE-001",
+      "evidenceClass": "EXECUTABLE_NATIVE",
+      "state": "PASS",
+      "counts": "15/15",
+      "command": "npm run ubuntu-vault:ci",
+      "revision": "5b8a372"
+    },
+    {
+      "stableId": "HV-ID-NATIVE-002",
+      "evidenceClass": "EXECUTABLE_NATIVE",
+      "state": "PASS",
+      "counts": "14/14",
+      "command": "npm run android-vault:ci",
+      "revision": "5b8a372"
+    },
+    {
+      "stableId": "HV-ID-LIFECYCLE-001",
+      "evidenceClass": "EXECUTABLE_CLIENT",
+      "state": "PASS",
+      "counts": "95 convergence tests",
+      "command": "npm run test:unit",
+      "revision": "5b8a372"
+    },
+    {
+      "stableId": "HV-ID-LIFECYCLE-002",
+      "evidenceClass": "EXECUTABLE_CLIENT",
+      "state": "PASS",
+      "counts": "95 convergence tests",
+      "command": "npm run test:unit",
+      "revision": "5b8a372"
+    },
+    {
+      "stableId": "HV-ID-SECURITY-001",
+      "evidenceClass": "EXECUTABLE_STATIC",
+      "state": "PASS",
+      "counts": "0 findings",
+      "command": "npm run identity-happypath:secret-scan",
+      "revision": "5b8a372"
+    },
+    {
+      "stableId": "HV-ID-EPIC-001",
+      "evidenceClass": "EXECUTABLE_STATIC",
+      "state": "PASS",
+      "counts": "1/1",
+      "command": "npm run identity-happypath:coverage",
+      "revision": "5b8a372"
+    },
+    {
+      "stableId": "MT-QUAL-UBUNTU-011-001",
+      "evidenceClass": "MANUAL",
+      "state": "NOT_SUPPLIED",
+      "counts": null,
+      "command": null,
+      "revision": null
+    },
+    {
+      "stableId": "MT-QUAL-ANDROID-011-001",
+      "evidenceClass": "MANUAL",
+      "state": "NOT_SUPPLIED",
+      "counts": null,
+      "command": null,
+      "revision": null
+    },
+    {
+      "stableId": "EXT-CORPUS-011-001",
+      "evidenceClass": "EXTERNAL",
+      "state": "NOT_SUPPLIED",
+      "counts": null,
+      "command": null,
+      "revision": null
+    },
+    {
+      "stableId": "EXT-SECURITY-011-001",
+      "evidenceClass": "EXTERNAL",
+      "state": "NOT_SUPPLIED",
+      "counts": null,
+      "command": null,
+      "revision": null
+    }
+  ]
+}
