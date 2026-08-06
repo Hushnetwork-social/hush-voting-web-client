@@ -28,7 +28,8 @@ export type DownstreamOperationKind =
   | 'removeLocalUser' // FEAT-010 tombstone-backed removal
   | 'verifyOnline' // worker-owned exact identity verification
   | 'revealMnemonic' // purpose-scoped transient reveal
-  | 'exportEncryptedFile'; // FEAT-011 separately approved encrypted output
+  | 'createFullIdentity' // FEAT-011 operation-scoped canonical FullIdentity signing + seal
+  | 'exportEncryptedFile'; // legacy separately approved encrypted output (not activated by FEAT-011)
 
 export interface DownstreamOperationSpec {
   readonly kind: DownstreamOperationKind;
@@ -107,6 +108,15 @@ export const DOWNSTREAM_OPERATION_REGISTRY: Readonly<Record<DownstreamOperationK
     requiresFreshPasswordCapability: true,
     cancellable: false,
     resultSurface: 'typed-outcome',
+  },
+  createFullIdentity: {
+    kind: 'createFullIdentity',
+    version: 1,
+    requiredCapabilityPhase: 'provisioning',
+    purpose: 'FEAT-011 missing-profile registration: one-use operation-scoped canonical FullIdentity signing and exact-byte seal',
+    requiresFreshPasswordCapability: false,
+    cancellable: true,
+    resultSurface: 'digest-only-report',
   },
   verifyOnline: {
     kind: 'verifyOnline',

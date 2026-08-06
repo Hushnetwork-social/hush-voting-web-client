@@ -29,6 +29,7 @@ describe('downstream operation registry — exhaustive and closed', () => {
       'removeLocalUser',
       'verifyOnline',
       'revealMnemonic',
+      'createFullIdentity', // FEAT-011 additive operation-scoped signing seam
       'exportEncryptedFile',
     ];
     expect([...DOWNSTREAM_OPERATION_KINDS].sort()).toEqual([...expectedKinds].sort());
