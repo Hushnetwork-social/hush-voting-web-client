@@ -27,6 +27,7 @@ import java.security.KeyStore
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
+import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.GCMParameterSpec
 
 /** Exact key-policy constants (one authority shared with Rust). */
@@ -121,7 +122,10 @@ class KeystoreBridge(private val context: Context) {
         ks.load(null)
         val key = ks.getKey(alias, null) as? SecretKey ?: return null
         return try {
-            key.getKeyInfo(alias) // android.security.keystore.KeyInfo
+            // android.security.keystore.KeyInfo is obtained through the
+            // AndroidKeyStore SecretKeyFactory, never via a key method.
+            val factory = SecretKeyFactory.getInstance(key.algorithm, ANDROID_KEYSTORE)
+            factory.getKeySpec(key, KeyInfo::class.java) as KeyInfo
         } catch (e: Exception) {
             null
         }

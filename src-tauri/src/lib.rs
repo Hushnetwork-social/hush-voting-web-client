@@ -25,16 +25,23 @@ fn application_icon() -> tauri::Result<Image<'static>> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
-        // Exactly one HushVoting process per Ubuntu user session: a second
-        // launch focuses the existing main window and performs no vault or
-        // keyring action. Arbitrary command-line/deep-link input is never
-        // forwarded into authenticated state.
-        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+    // Exactly one HushVoting process per Ubuntu user session: a second
+    // launch focuses the existing main window and performs no vault or
+    // keyring action. Arbitrary command-line/deep-link input is never
+    // forwarded into authenticated state. The plugin crate is a no-op on
+    // Android/iOS (its source is cfg-gated empty there), so registration is
+    // desktop-only to keep the mobile target compiling.
+    #[cfg(desktop)]
+    let builder =
+        tauri::Builder::default().plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.set_focus();
             }
-        }))
+        }));
+    #[cfg(not(desktop))]
+    let builder = tauri::Builder::default();
+
+    builder
         .manage(VaultState::default())
         .invoke_handler(tauri::generate_handler![
             hush_vault_handshake,
@@ -42,6 +49,8 @@ pub fn run() {
             target_descriptor::native_target_descriptor
         ])
         .setup(|app| {
+            #[cfg(mobile)]
+            let _ = &app; // setup is desktop-only for now; keep the closure compile-clean on mobile
             #[cfg(desktop)]
             if let Some(window) = app.get_webview_window("main") {
                 window.set_icon(application_icon()?)?;

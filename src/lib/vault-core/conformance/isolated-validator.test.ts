@@ -9,7 +9,7 @@
  * - resource bounds (vector counts, record fields) are enforced.
  */
 import { describe, expect, it, beforeAll } from 'vitest';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { runIsolatedValidation, verifyManifestIndependently, isCorpusHealthy, type IsolatedReport } from './isolated-validator';
@@ -68,20 +68,24 @@ describe('FEAT-003 isolated TypeScript/Node conformance', () => {
 
   it('fails closed on a tampered manifest or missing corpus file', () => {
     // A manifest listing a nonexistent file must fail integrity verification.
+    // Runs against an isolated temp fixture so the shared committed corpus
+    // manifest is never mutated (mutating it raced with other workers that
+    // verify the same manifest concurrently).
     const fake = {
       contractVersion: '1.0.0',
       corpusVersion: '1.0.0',
       files: [{ path: 'vectors/does-not-exist.json', bytes: 1, sha256: '0'.repeat(64) }],
     };
-    const manifestPath = join('conformance', 'vault', 'v1', 'manifest.json');
-    const backup = readFileSync(manifestPath);
+    const fixtureRoot = join(process.cwd(), 'tmp', 'vault-manifest-tamper-fixture');
+    rmSync(fixtureRoot, { recursive: true, force: true });
     try {
-      writeFileSync(manifestPath, JSON.stringify(fake));
-      const { records } = verifyManifestIndependently(join(process.cwd(), 'conformance', 'vault', 'v1'));
+      mkdirSync(fixtureRoot, { recursive: true });
+      writeFileSync(join(fixtureRoot, 'manifest.json'), JSON.stringify(fake));
+      const { records } = verifyManifestIndependently(fixtureRoot);
       const missing = records.find((r) => r.id === 'integrity:vectors/does-not-exist.json');
       expect(missing?.ok).toBe(false);
     } finally {
-      writeFileSync(manifestPath, backup);
+      rmSync(fixtureRoot, { recursive: true, force: true });
     }
   });
 

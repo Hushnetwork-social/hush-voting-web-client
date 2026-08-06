@@ -99,7 +99,10 @@ describe('FEAT-003 conformance reproducibility', () => {
     const manifestBytes = readFileSync(join('conformance', 'vault', 'v1', 'manifest.json'));
     const { createHash } = await import('node:crypto');
     expect(report.manifestSha256).toBe(createHash('sha256').update(manifestBytes).digest('hex'));
-    // The committed isolated report artifact matches a fresh run.
+    // The isolated report artifact matches a fresh run. Written in this worker
+    // (deterministic bytes) so a parallel worker's beforeAll can never race it.
+    mkdirSync(join('conformance', 'reports'), { recursive: true });
+    writeFileSync(join('conformance', 'reports', 'vault-ts-isolated.json'), JSON.stringify(report, null, 2) + '\n', 'utf8');
     const committed = JSON.parse(readFileSync(join('conformance', 'reports', 'vault-ts-isolated.json'), 'utf8'));
     expect(committed).toEqual(report);
   });

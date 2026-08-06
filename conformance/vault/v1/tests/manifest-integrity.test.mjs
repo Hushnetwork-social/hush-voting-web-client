@@ -5,7 +5,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { cpSync, mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -46,13 +46,15 @@ test('committed manifest matches disk (no drift)', () => {
 });
 
 test('tampered or unexpected file fails integrity verification', () => {
+  // Runs against an isolated temp copy so the shared committed corpus manifest
+  // is never mutated (node --test runs these files as parallel child processes;
+  // handoff.test.mjs verifies the committed manifest digest concurrently).
   const dir = mkdtempSync(join(tmpdir(), 'vault-manifest-'));
-  const backup = readFileSync(MANIFEST_PATH);
   try {
-    writeFileSync(MANIFEST_PATH, serializeManifest({ contractVersion: '1.0.0', corpusVersion: '1.0.0', files: [{ path: 'schemas/envelope.schema.json', bytes: 1, sha256: '0'.repeat(64) }] }));
-    assert.throws(() => verifyManifestAgainstDisk(), /manifest drift/);
+    cpSync(ROOT, dir, { recursive: true });
+    writeFileSync(join(dir, 'manifest.json'), serializeManifest({ contractVersion: '1.0.0', corpusVersion: '1.0.0', files: [{ path: 'schemas/envelope.schema.json', bytes: 1, sha256: '0'.repeat(64) }] }));
+    assert.throws(() => verifyManifestAgainstDisk(dir), /manifest drift/);
   } finally {
-    writeFileSync(MANIFEST_PATH, backup);
     rmSync(dir, { recursive: true, force: true });
   }
 });

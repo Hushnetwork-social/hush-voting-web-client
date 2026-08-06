@@ -25,20 +25,20 @@ const DATA_DIRS = ['schemas', 'vectors'];
 const ROOT_DATA_FILES = ['metadata.json'];
 
 /** Collect every manifest-tracked data file in stable sorted order. */
-export function collectDataFiles() {
+export function collectDataFiles(root = ROOT) {
   const files = [];
   for (const dir of DATA_DIRS) {
-    const dirPath = join(ROOT, dir);
+    const dirPath = join(root, dir);
     if (!existsSync(dirPath)) throw new Error(`missing corpus directory: ${dir}`);
     for (const entry of readdirSync(dirPath).sort()) {
       const p = join(dirPath, entry);
       if (!statSync(p).isFile()) continue;
       if (!entry.endsWith('.json')) continue;
-      files.push(relative(ROOT, p).split(sep).join('/'));
+      files.push(relative(root, p).split(sep).join('/'));
     }
   }
   for (const f of ROOT_DATA_FILES) {
-    if (!existsSync(join(ROOT, f))) throw new Error(`missing corpus file: ${f}`);
+    if (!existsSync(join(root, f))) throw new Error(`missing corpus file: ${f}`);
     files.push(f);
   }
   return files.sort();
@@ -50,9 +50,9 @@ export function digest(path) {
 }
 
 /** Generate the manifest object deterministically. */
-export function generateManifest() {
-  const files = collectDataFiles().map((p) => {
-    const abs = join(ROOT, p);
+export function generateManifest(root = ROOT) {
+  const files = collectDataFiles(root).map((p) => {
+    const abs = join(root, p);
     const bytes = statSync(abs).size;
     const sha256 = digest(abs);
     return { path: p, bytes, sha256 };
@@ -65,9 +65,9 @@ export function serializeManifest(manifest) {
   return `${JSON.stringify(manifest, null, 2)}\n`;
 }
 
-export function verifyManifestAgainstDisk() {
-  const committed = JSON.parse(readFileSync(MANIFEST_PATH, 'utf8'));
-  const current = generateManifest();
+export function verifyManifestAgainstDisk(root = ROOT) {
+  const committed = JSON.parse(readFileSync(join(root, 'manifest.json'), 'utf8'));
+  const current = generateManifest(root);
   if (serializeManifest(committed) !== serializeManifest(current)) {
     const expected = new Set(committed.files.map((f) => f.path));
     const actual = new Set(current.files.map((f) => f.path));
