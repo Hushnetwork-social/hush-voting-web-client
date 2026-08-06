@@ -1,0 +1,23 @@
+{
+  "schema": "feat010-platform-evidence-v1",
+  "matrices": [
+    {
+      "target": "web",
+      "result": "NOT_EXECUTED",
+      "digests": "pending: real-root Web matrix requires the FEAT-002-port adapter (recorded Phase 6 precondition); harness-only evidence is not substitution",
+      "note": "AC-010-092 target-owned; adapter seam tracked in phase-6 notes"
+    },
+    {
+      "target": "ubuntu",
+      "result": "NOT_EXECUTED",
+      "digests": "pending: physical Ubuntu Tauri functional procedure requires GUI session + Secret Service provider state",
+      "note": "AC-010-093 target-owned; package build gate attempted separately"
+    },
+    {
+      "target": "android-physical",
+      "result": "NOT_EXECUTED",
+      "digests": "pending: no physical Android device available to the autonomous executor",
+      "note": "AC-010-094 target-owned; NOT_EXECUTED is a documented blocker, never emulator substitution"
+    }
+  ]
+}

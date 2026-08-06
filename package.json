@@ -84,7 +84,12 @@
     "test:credential-file-restore:bdd": "playwright test --config playwright.credential-file-restore.config.ts",
     "credential-file-restore:faults": "node scripts/credential-file-restore/fault-orchestration.mjs",
     "credential-file-restore:quality": "node scripts/credential-file-restore/quality-gates.mjs",
-    "auth-lifecycle:production-exclusion": "node scripts/auth-lifecycle/production-exclusion.mjs"
+    "auth-lifecycle:production-exclusion": "node scripts/auth-lifecycle/production-exclusion.mjs",
+    "auth-lifecycle:coverage": "node scripts/auth-lifecycle/coverage.mjs",
+    "auth-lifecycle:secret-scan": "node scripts/auth-lifecycle/secret-scan.mjs",
+    "auth-lifecycle:quality": "node scripts/auth-lifecycle/quality.mjs",
+    "auth-lifecycle:quality:selftest": "node scripts/auth-lifecycle/quality-selftest.mjs",
+    "auth-lifecycle:coverage:selftest": "node scripts/auth-lifecycle/coverage-selftest.mjs"
   },
   "dependencies": {
     "@noble/hashes": "2.2.0",

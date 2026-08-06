@@ -1,0 +1,13 @@
+{
+  "schema": "feat010-external-blockers-v1",
+  "entries": [
+    { "id": "EXT-010-001", "owner": "hush-server-node", "state": "NOT_SUPPLIED", "releaseImpact": "HushServerNode signature admission + atomic key reservation hardening" },
+    { "id": "EXT-010-002", "owner": "hush-server-node", "state": "NOT_SUPPLIED", "releaseImpact": "Focused identity-validation TwinTests (valid/forged/wrong-key/duplicate/reconnect)" },
+    { "id": "EXT-010-003", "owner": "external corpus owner", "state": "NOT_SUPPLIED", "releaseImpact": "Controlled legacy .dat corpus aggregate qualification" },
+    { "id": "EXT-010-004", "owner": "ubuntu release", "state": "NOT_SUPPLIED", "releaseImpact": "Ubuntu provider/package/Orca/performance qualification" },
+    { "id": "EXT-010-005", "owner": "android release", "state": "NOT_SUPPLIED", "releaseImpact": "Physical Android TEE/API + signed release package qualification" },
+    { "id": "EXT-010-006", "owner": "physical web devices", "state": "NOT_SUPPLIED", "releaseImpact": "Broad physical WebAuthn PRF target matrix" },
+    { "id": "EXT-010-007", "owner": "security governance", "state": "NOT_SUPPLIED", "releaseImpact": "Independent security review (no unresolved High/Critical)" },
+    { "id": "EXT-010-008", "owner": "FEAT-011", "state": "NOT_SUPPLIED", "releaseImpact": "FEAT-011 authenticated export + cross-runtime round-trip evidence" }
+  ]
+}
