@@ -1109,8 +1109,16 @@ export function createWebOnboardingPorts(ctx: ChildBridgeContext): Record<Onboar
         switch (outcome.outcome) {
           case 'OK':
             return { code: 'VERIFY_SUCCESS' } as VerificationResult;
-          case 'PROFILE_MISSING':
-            return { code: 'VERIFY_PROFILE_MISSING', safeCandidate: { alias: 'Unknown', abbreviatedSigningAddress: '…' } } as VerificationResult;
+          case 'PROFILE_MISSING': {
+            // The worker forwards the real safe candidate (alias + abbreviated
+            // signing address) in the outcome payload; never fabricate a
+            // placeholder on a security-relevant confirmation surface.
+            const payload = outcome.payload as { alias?: unknown; abbreviatedSigningAddress?: unknown } | undefined;
+            const alias = typeof payload?.alias === 'string' ? payload.alias : 'Unknown';
+            const abbreviatedSigningAddress =
+              typeof payload?.abbreviatedSigningAddress === 'string' ? payload.abbreviatedSigningAddress : '…';
+            return { code: 'VERIFY_PROFILE_MISSING', safeCandidate: { alias, abbreviatedSigningAddress } } as VerificationResult;
+          }
           case 'SIGNING_KEY_MISMATCH':
             return { code: 'VERIFY_SIGNING_KEY_MISMATCH' } as VerificationResult;
           case 'ENCRYPTION_KEY_MISMATCH':
