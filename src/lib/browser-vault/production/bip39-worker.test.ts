@@ -39,10 +39,14 @@ describe('worker-safe BIP-39', () => {
     expect(validateMnemonic(mnemonic)).toBe(true);
 
     expect(validateMnemonicWorker('abandon abandon abandon')).toBe(false);
-    // Flip one word → checksum fails.
+    // Flip one word and assert EXACT equivalence with the pinned library.
+    // BIP-39 checksums are weak (8 bits for 24 words): a flipped phrase
+    // coincidentally validates with probability ~1/256, so a hardcoded
+    // `false` here is inherently flaky. The contract is worker == pinned.
     const words = mnemonic.split(' ');
     words[0] = words[0] === 'abandon' ? 'ability' : 'abandon';
-    expect(validateMnemonicWorker(words.join(' '))).toBe(false);
+    const flipped = words.join(' ');
+    expect(validateMnemonicWorker(flipped)).toBe(validateMnemonic(flipped));
     // Unknown word.
     expect(validateMnemonicWorker('notaword '.repeat(24).trim())).toBe(false);
   });
