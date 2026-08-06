@@ -22,8 +22,13 @@
 /**
  * Exact protocol compatibility version. Any change to a message shape, handshake
  * field, or semantic rule MUST bump this value; mixed versions never interop.
+ *
+ * v2 (FEAT-010 additive): adds the sealed candidate lifecycle operations, the
+ * out-of-band secret-transfer message, closed operation payloads, and the safe
+ * outcome payload field. v1 messages remain valid under v2 (additive only;
+ * sealed v1 meanings are untouched).
  */
-export const BROWSER_PROTOCOL_VERSION = 1 as const;
+export const BROWSER_PROTOCOL_VERSION = 2 as const;
 
 /** Application build compatibility string (short immutable build digest). */
 export interface AppBuildIdentity {
@@ -107,7 +112,18 @@ export type BrowserOperationKind =
   | 'lockAll'
   | 'removeLocalUser'
   | 'revealMnemonic'
-  | 'exportEncryptedFile';
+  | 'exportEncryptedFile'
+  // FEAT-010 v2 additive: sealed candidate lifecycle + startup inspection.
+  | 'createCandidate'
+  | 'revealCandidateWords'
+  | 'concealCandidate'
+  | 'destroyCandidate'
+  | 'deriveWordsCandidate'
+  | 'importFileCandidate'
+  | 'retainTransactionDigest'
+  | 'submitIdentityTransaction'
+  | 'promoteLifecycle'
+  | 'inspectStartup';
 
 /**
  * Operation request. Carries NO secret payload: password/mnemonic/file bytes are
@@ -123,6 +139,11 @@ export interface OperationRequest {
   readonly operationId: string;
   /** Purpose-bound fresh capability token id when the operation requires one. */
   readonly freshCapabilityId?: string;
+  /**
+   * v2 additive: closed PUBLIC payload (never secret-bearing; validated per
+   * operation kind). Secrets travel ONLY through `secret-transfer`.
+   */
+  readonly payload?: Readonly<Record<string, unknown>>;
 }
 
 /** Cancel an in-flight operation (epoch invalidation is authority-owned). */
@@ -141,12 +162,72 @@ export interface PageLifecycleSignal {
   readonly authorityEpoch: number;
 }
 
+/**
+ * v2 additive: out-of-band SECRET transfer (the ONLY secret-bearing page →
+ * worker message). Delivered directly by the FEAT-002 SecretSubmissionSink to
+ * the authenticated MessagePort; the authority stores it under the operation
+ * id and consumes it once inside the sealed engine. Never logged, echoed, or
+ * telemetrized. Byte material (file bytes) is base64url-encoded.
+ */
+export interface SecretTransferMessage {
+  readonly kind: 'secret-transfer';
+  readonly operationId: string;
+  readonly clientChannel: string;
+  readonly authorityEpoch: number;
+  readonly purpose: 'devicePassword' | 'mnemonic' | 'filePassword' | 'fileBytes';
+  readonly value: string;
+}
+
+/** Closed union of page → authority messages. */
+/** Lifecycle signal from the page (best-effort; correctness never depends on it). */
+export interface PageLifecycleSignal {
+  readonly kind: 'lifecycle';
+  readonly signal: 'pagehide' | 'visibility-hidden' | 'disconnect' | 'heartbeat';
+  readonly clientChannel: string;
+  readonly authorityEpoch: number;
+}
+
+/** v2 additive: request a fresh one-use purpose-bound capability (≤60 s). */
+export interface IssueCapabilityRequest {
+  readonly kind: 'issue-capability';
+  readonly purpose: 'provision' | 'changePassword' | 'removeLocalUser' | 'revealMnemonic' | 'exportEncryptedFile';
+  readonly clientChannel: string;
+  readonly authorityEpoch: number;
+}
+
+/** v2 additive: capability issued (safe metadata only; never a secret). */
+export interface CapabilityIssued {
+  readonly kind: 'capability-issued';
+  readonly clientChannel: string;
+  readonly capabilityId: string;
+  readonly purpose: 'provision' | 'changePassword' | 'removeLocalUser' | 'revealMnemonic' | 'exportEncryptedFile';
+  readonly expiresAtMs: number;
+}
+
+/**
+ * v2 additive: out-of-band SECRET transfer (the ONLY secret-bearing page →
+ * worker message). Delivered directly by the FEAT-002 SecretSubmissionSink to
+ * the authenticated MessagePort; the authority stores it under the operation
+ * id and consumes it once inside the sealed engine. Never logged, echoed, or
+ * telemetrized. Byte material (file bytes) is base64url-encoded.
+ */
+export interface SecretTransferMessage {
+  readonly kind: 'secret-transfer';
+  readonly operationId: string;
+  readonly clientChannel: string;
+  readonly authorityEpoch: number;
+  readonly purpose: 'devicePassword' | 'mnemonic' | 'filePassword' | 'fileBytes';
+  readonly value: string;
+}
+
 /** Closed union of page → authority messages. */
 export type BrowserClientMessage =
   | HandshakeRequest
   | OperationRequest
   | OperationCancel
-  | PageLifecycleSignal;
+  | PageLifecycleSignal
+  | SecretTransferMessage
+  | IssueCapabilityRequest;
 
 /** Safe typed result/event from the authority → page. */
 export interface OperationOutcome {
@@ -159,6 +240,8 @@ export interface OperationOutcome {
   readonly allowedActions: readonly string[];
   readonly retryDeadlineMs?: number;
   readonly supportCode?: string;
+  /** v2 additive: safe closed payload (never secret-shaped; see validation). */
+  readonly payload?: unknown;
 }
 
 /** Global invalidation event (Lock, removal, takeover, update, cleanup). */
@@ -169,7 +252,7 @@ export interface GlobalInvalidation {
 }
 
 /** Closed union of authority → page events. */
-export type BrowserWorkerEvent = OperationOutcome | GlobalInvalidation | HandshakeAccepted | HandshakeRejected;
+export type BrowserWorkerEvent = OperationOutcome | GlobalInvalidation | HandshakeAccepted | HandshakeRejected | CapabilityIssued;
 
 /**
  * Runtime schema validation — the ONLY admission gate for inbound messages.
@@ -194,10 +277,92 @@ export function validateClientMessage(value: unknown): BrowserClientMessage | nu
       return validateCancel(record);
     case 'lifecycle':
       return validateLifecycle(record);
+    case 'secret-transfer':
+      return validateSecretTransfer(record);
+    case 'issue-capability':
+      return validateIssueCapability(record);
     default:
       // Unknown message kind: fail closed.
       return null;
   }
+}
+
+/** Closed payload allowlist per v2 operation kind (public fields only). */
+const OPERATION_PAYLOAD_SCHEMAS: Readonly<Record<string, readonly string[]>> = {
+  provisionFromValidatedBundle: ['candidateRef', 'alias', 'visibility'],
+  unlockPassword: [],
+  changeDevicePassword: [],
+  verifyOnlineIdentity: [],
+  lockAll: [],
+  removeLocalUser: [],
+  revealMnemonic: [],
+  exportEncryptedFile: [],
+  createCandidate: [],
+  revealCandidateWords: ['candidateRef'],
+  concealCandidate: ['candidateRef'],
+  destroyCandidate: ['candidateRef'],
+  deriveWordsCandidate: ['producerId', 'wordCount'],
+  importFileCandidate: [],
+  retainTransactionDigest: ['digest'],
+  submitIdentityTransaction: ['alias', 'visibility'],
+  promoteLifecycle: ['status'],
+  inspectStartup: [],
+};
+
+/** Secret-shaped field names that may never appear in operation payloads. */
+const FORBIDDEN_PAYLOAD_MARKERS = ['password', 'mnemonic', 'secret', 'key', 'salt', 'nonce', 'decrypted', 'bundle', 'private', 'fileBytes', 'bytes'];
+
+function hasSecretShapedField(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return false;
+  }
+  const record = value as Record<string, unknown>;
+  for (const key of Object.keys(record)) {
+    if (FORBIDDEN_PAYLOAD_MARKERS.some((token) => key.toLowerCase().includes(token))) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Max serialized payload size (public operation data is small). */
+const MAX_PAYLOAD_BYTES = 4096 as const;
+
+function validateOperationPayload(payload: unknown, operation: string): Record<string, unknown> | null {
+  if (payload === undefined) {
+    return {};
+  }
+  if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
+    return null;
+  }
+  if (hasSecretShapedField(payload)) {
+    return null;
+  }
+  const allowed = OPERATION_PAYLOAD_SCHEMAS[operation];
+  if (allowed === undefined) {
+    return null;
+  }
+  const record = payload as Record<string, unknown>;
+  const keys = Object.keys(record);
+  if (keys.length > allowed.length || !keys.every((key) => allowed.includes(key))) {
+    return null;
+  }
+  let size = 0;
+  try {
+    size = new TextEncoder().encode(JSON.stringify(record)).byteLength;
+  } catch {
+    return null;
+  }
+  if (size > MAX_PAYLOAD_BYTES) {
+    return null;
+  }
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean') {
+      return null;
+    }
+  }
+  return record;
 }
 
 function isBoundedString(value: unknown): value is string {
@@ -240,7 +405,7 @@ function validateHandshake(record: Record<string, unknown>): HandshakeRequest | 
 }
 
 function validateOperation(record: Record<string, unknown>): OperationRequest | null {
-  if (!hasNoUnknownFields(record, ['kind', 'operation', 'operationVersion', 'clientChannel', 'authorityEpoch', 'operationId', 'freshCapabilityId'])) {
+  if (!hasNoUnknownFields(record, ['kind', 'operation', 'operationVersion', 'clientChannel', 'authorityEpoch', 'operationId', 'freshCapabilityId', 'payload'])) {
     return null;
   }
   if (!isBoundedString(record.operation) || !OPERATION_KINDS.has(record.operation)) {
@@ -255,6 +420,10 @@ function validateOperation(record: Record<string, unknown>): OperationRequest | 
   if (record.freshCapabilityId !== undefined && !isBoundedString(record.freshCapabilityId)) {
     return null;
   }
+  const payload = validateOperationPayload(record.payload, record.operation);
+  if (payload === null) {
+    return null;
+  }
   const request: OperationRequest = {
     kind: 'operation',
     operation: record.operation as BrowserOperationKind,
@@ -263,6 +432,7 @@ function validateOperation(record: Record<string, unknown>): OperationRequest | 
     authorityEpoch: record.authorityEpoch,
     operationId: record.operationId,
     ...(record.freshCapabilityId !== undefined ? { freshCapabilityId: record.freshCapabilityId as string } : {}),
+    ...(Object.keys(payload).length > 0 ? { payload } : {}),
   };
   return request;
 }
@@ -276,7 +446,65 @@ const OPERATION_KINDS: ReadonlySet<string> = new Set<BrowserOperationKind>([
   'removeLocalUser',
   'revealMnemonic',
   'exportEncryptedFile',
+  // FEAT-010 v2 additive.
+  'createCandidate',
+  'revealCandidateWords',
+  'concealCandidate',
+  'destroyCandidate',
+  'deriveWordsCandidate',
+  'importFileCandidate',
+  'retainTransactionDigest',
+  'submitIdentityTransaction',
+  'promoteLifecycle',
+  'inspectStartup',
 ]);
+
+function validateSecretTransfer(record: Record<string, unknown>): SecretTransferMessage | null {
+  if (!hasNoUnknownFields(record, ['kind', 'operationId', 'clientChannel', 'authorityEpoch', 'purpose', 'value'])) {
+    return null;
+  }
+  if (!isBoundedString(record.operationId) || !isBoundedString(record.clientChannel) || !isBoundedNumber(record.authorityEpoch)) {
+    return null;
+  }
+  if (record.purpose !== 'devicePassword' && record.purpose !== 'mnemonic' && record.purpose !== 'filePassword' && record.purpose !== 'fileBytes') {
+    return null;
+  }
+  if (typeof record.value !== 'string' || record.value.length === 0) {
+    return null;
+  }
+  // Bounded secret payloads (passwords/mnemonics ≤ 4 KiB; file bytes ≤ 1 MiB
+  // base64url). Oversized transfers fail closed and never reach the engine.
+  const maxBytes = record.purpose === 'fileBytes' ? 1_400_000 : 4096;
+  if (record.value.length > maxBytes) {
+    return null;
+  }
+  return {
+    kind: 'secret-transfer',
+    operationId: record.operationId,
+    clientChannel: record.clientChannel,
+    authorityEpoch: record.authorityEpoch,
+    purpose: record.purpose,
+    value: record.value,
+  };
+}
+
+function validateIssueCapability(record: Record<string, unknown>): IssueCapabilityRequest | null {
+  if (!hasNoUnknownFields(record, ['kind', 'purpose', 'clientChannel', 'authorityEpoch'])) {
+    return null;
+  }
+  if (record.purpose !== 'provision' && record.purpose !== 'changePassword' && record.purpose !== 'removeLocalUser' && record.purpose !== 'revealMnemonic' && record.purpose !== 'exportEncryptedFile') {
+    return null;
+  }
+  if (!isBoundedString(record.clientChannel) || !isBoundedNumber(record.authorityEpoch)) {
+    return null;
+  }
+  return {
+    kind: 'issue-capability',
+    purpose: record.purpose,
+    clientChannel: record.clientChannel,
+    authorityEpoch: record.authorityEpoch,
+  };
+}
 
 function validateCancel(record: Record<string, unknown>): OperationCancel | null {
   if (!hasNoUnknownFields(record, ['kind', 'operationId', 'clientChannel', 'authorityEpoch'])) {
@@ -320,6 +548,8 @@ export function assertNoSecretField(message: BrowserClientMessage): void {
       throw new Error(`protocol message carries secret-shaped field: ${key}`);
     }
   }
+  // The secret-transfer message is the ONE sanctioned secret-bearing channel;
+  // its value field is excluded from the generic secret-shape scan by design.
 }
 
 /** Approximate serialized size guard used by transport layers before dispatch. */

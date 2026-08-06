@@ -87,6 +87,15 @@ export const FRESH_CAPABILITY_REQUIRED_BY_OPERATION: Readonly<Record<string, Fre
   unlockPassword: null,
   verifyOnlineIdentity: null,
   lockAll: null,
+  // FEAT-010 v2 additive: sealed candidate lifecycle + startup inspection.
+  createCandidate: null,
+  revealCandidateWords: null,
+  concealCandidate: null,
+  destroyCandidate: null,
+  deriveWordsCandidate: null,
+  importFileCandidate: null,
+  retainTransactionDigest: null,
+  inspectStartup: null,
 } as const;
 
 /** Safe session projection vocabulary for clients (never secrets). */

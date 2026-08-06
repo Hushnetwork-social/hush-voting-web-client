@@ -13,15 +13,18 @@
 import type { OnboardingChild } from './OnboardingHost';
 
 const publications = new Map<string, OnboardingChild>();
+const listeners = new Set<() => void>();
 
 /** Publish the current child view for a kind (child authority adapters). */
 export function publishChildView(kind: string, child: OnboardingChild): void {
   publications.set(kind, child);
+  notify();
 }
 
 /** Clear a publication (child cleanup/back). */
 export function clearChildView(kind: string): void {
   publications.delete(kind);
+  notify();
 }
 
 /** Resolve the closed child slot for the active onboarding kind. */
@@ -32,7 +35,22 @@ export function resolveOnboardingChild(kind: string | null | undefined): Onboard
   return publications.get(kind) ?? null;
 }
 
+/** Subscribe to child-view publications (renderer re-render trigger). */
+export function subscribeChildViews(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+function notify(): void {
+  for (const listener of listeners) {
+    listener();
+  }
+}
+
 /** Reset all publications (test isolation / authority teardown). */
 export function resetChildViews(): void {
   publications.clear();
+  notify();
 }

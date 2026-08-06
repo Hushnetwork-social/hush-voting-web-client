@@ -53,3 +53,7 @@ temp/
 *.tmp
 conformance/reports/
 conformance/archive/
+
+# Playwright-bdd generated specs
+.features-gen/
+.features-gen-auth-lifecycle/

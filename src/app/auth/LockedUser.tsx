@@ -23,9 +23,17 @@ interface LockedUserProps {
   readonly onForgotPassword: () => void;
   readonly onRemoveLocalUser: () => void;
   readonly disabled?: boolean;
+  /** Typed outcome error from the authority (e.g. the combined error). */
+  readonly outcomeError?: string | null;
 }
 
-export function LockedUser({ onSubmitSecret, onForgotPassword, onRemoveLocalUser, disabled = false }: LockedUserProps) {
+export function LockedUser({ onSubmitSecret, onForgotPassword, onRemoveLocalUser, disabled = false, outcomeError = null }: LockedUserProps) {
+  // The authority's typed outcome error (e.g. the exact combined credential
+  // error) is displayed above the form when present (AC-010-036).
+  const [displayedOutcome, setDisplayedOutcome] = useState<string | null>(outcomeError);
+  if (outcomeError !== null && displayedOutcome !== outcomeError) {
+    setDisplayedOutcome(outcomeError);
+  }
   const inputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -58,6 +66,11 @@ export function LockedUser({ onSubmitSecret, onForgotPassword, onRemoveLocalUser
           aria-describedby={error !== null ? 'device-password-error' : undefined}
           disabled={disabled}
         />
+        {displayedOutcome !== null && (
+          <p className="field-error" role="alert" data-testid="locked-outcome-error">
+            {displayedOutcome}
+          </p>
+        )}
         {error !== null && (
           <p id="device-password-error" className="field-error" role="alert">
             {error}

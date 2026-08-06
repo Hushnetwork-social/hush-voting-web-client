@@ -20,8 +20,25 @@ import { LockedUser } from './LockedUser';
 import { RemovalConfirmation } from './RemovalConfirmation';
 import { ErrorSurface, RecoveryNavigation, TemporaryMode } from './ErrorSurfaces';
 import { OnboardingHost } from './onboarding/OnboardingHost';
-import { resolveOnboardingChild } from './onboarding/onboarding-registry';
-import { useState } from 'react';
+import { resolveOnboardingChild, subscribeChildViews } from './onboarding/onboarding-registry';
+import { useState, useSyncExternalStore } from 'react';
+
+/** Map the locked-state outcome to the exact privacy-safe user copy. */
+function lockedOutcomeError(outcomeCode: string | null): string | null {
+  if (outcomeCode === 'UNLOCK_WRONG_PASSWORD_OR_DAMAGED') {
+    return 'The password is incorrect or the protected data is damaged.';
+  }
+  return null;
+}
+
+/** Re-render when a child authority publishes a new view (real flows). */
+function useChildView(kind: string | null | undefined): ReturnType<typeof resolveOnboardingChild> {
+  return useSyncExternalStore(
+    subscribeChildViews,
+    () => resolveOnboardingChild(kind),
+    () => resolveOnboardingChild(kind),
+  );
+}
 
 export interface AuthGateHandlers {
   readonly dispatch: (intent: AuthIntent) => void;
@@ -46,6 +63,8 @@ export function AuthGate({ projection, handlers }: AuthGateProps) {
   const { authState } = projection;
   const [showRecovery, setShowRecovery] = useState(false);
   const [showTemporary, setShowTemporary] = useState(false);
+  // Unconditional hook: child-view subscription for the onboarding surface.
+  const activeChildView = useChildView(projection.onboardingKind);
 
   // Surface selection is purely a projection of machine state.
   let surface: React.ReactNode;
@@ -77,7 +96,7 @@ export function AuthGate({ projection, handlers }: AuthGateProps) {
       // error — placeholder onboarding copy is never a completion substitute (AC-010-012).
       surface = (
         <OnboardingHost
-          child={resolveOnboardingChild(projection.onboardingKind)}
+          child={activeChildView}
           onBack={() => handlers.dispatch({ type: 'INTENT.BACK_FROM_ONBOARDING' })}
         />
       );
@@ -94,6 +113,7 @@ export function AuthGate({ projection, handlers }: AuthGateProps) {
           onSubmitSecret={handlers.submitSecret}
           onForgotPassword={() => setShowRecovery(true)}
           onRemoveLocalUser={() => handlers.dispatch({ type: 'INTENT.REMOVE_LOCAL_USER' })}
+          outcomeError={lockedOutcomeError(projection.outcomeCode)}
         />
       );
       break;

@@ -205,9 +205,9 @@ export function validateVerificationOnlyCompletion(
     binding === null ||
     typeof binding !== 'object' ||
     typeof binding.signingAddress !== 'string' ||
-    !/^[A-Za-z0-9]{40,64}$/.test(binding.signingAddress) ||
+    !/^[A-Za-z0-9]{40,130}$/.test(binding.signingAddress) ||
     typeof binding.encryptionAddress !== 'string' ||
-    !/^[A-Za-z0-9]{40,64}$/.test(binding.encryptionAddress)
+    !/^[A-Za-z0-9]{40,130}$/.test(binding.encryptionAddress)
   ) {
     diagnostics.push({ code: 'FORBIDDEN_FIELD' });
   }

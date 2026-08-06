@@ -41,11 +41,19 @@ export interface AuthorityEnvironment {
   /** The authority's own exact build identity (bound by every handshake). */
   readonly appIdentity: { readonly appVersion: string; readonly buildDigest: string };
   /** Execute one approved operation inside the secret boundary. */
-  readonly executeOperation: (request: OperationRequest, epoch: number) => Promise<{ readonly outcome: string; readonly retryable: boolean; readonly allowedActions: readonly string[]; readonly retryDeadlineMs?: number; readonly supportCode?: string }>;
+  readonly executeOperation: (request: OperationRequest, epoch: number) => Promise<{ readonly outcome: string; readonly retryable: boolean; readonly allowedActions: readonly string[]; readonly retryDeadlineMs?: number; readonly supportCode?: string; readonly payload?: unknown }>;
   /** Deliver one event to one client channel. */
   readonly deliver: (clientChannel: string, event: BrowserWorkerEvent) => void;
   /** Broadcast a global invalidation to every connected client. */
   readonly broadcast: (event: BrowserWorkerEvent) => void;
+  /** v2 additive: receive an out-of-band secret transfer (never logged). */
+  readonly onSecretTransfer?: (transfer: {
+    readonly operationId: string;
+    readonly clientChannel: string;
+    readonly authorityEpoch: number;
+    readonly purpose: 'devicePassword' | 'mnemonic' | 'filePassword' | 'fileBytes';
+    readonly value: string;
+  }) => void;
   /** Bounded cleanup acknowledgement deadline (ms). */
   readonly cleanupBoundMs?: number;
   /** Forced cleanup of the owning worker when the bound cannot be proven. */
@@ -109,7 +117,47 @@ export class WorkerAuthority {
         return this.handleCancel(validated);
       case 'lifecycle':
         return this.handleLifecycle(validated);
+      case 'secret-transfer':
+        return this.handleSecretTransfer(validated);
+      case 'issue-capability':
+        return this.handleIssueCapability(validated);
     }
+  }
+
+  /** v2: issue a fresh one-use purpose-bound capability (≤60 s, channel-bound). */
+  private handleIssueCapability(request: Extract<BrowserClientMessage, { kind: 'issue-capability' }>): { readonly accepted: boolean; readonly outcome: string } {
+    if (!this.isKnownChannel(request.clientChannel)) {
+      return { accepted: false, outcome: 'CAPABILITY_UNKNOWN_CHANNEL' };
+    }
+    if (request.authorityEpoch !== this.epoch) {
+      return { accepted: false, outcome: 'CAPABILITY_STALE_EPOCH' };
+    }
+    const capability = this.issueCapability({ purpose: request.purpose, clientChannel: request.clientChannel });
+    if (capability === null) {
+      return { accepted: false, outcome: 'CAPABILITY_REJECTED' };
+    }
+    this.env.deliver(request.clientChannel, {
+      kind: 'capability-issued',
+      clientChannel: request.clientChannel,
+      capabilityId: capability.id,
+      purpose: capability.purpose,
+      expiresAtMs: capability.expiresAtMs,
+    });
+    return { accepted: true, outcome: 'CAPABILITY_ISSUED' };
+  }
+
+  /** v2: out-of-band secret transfer admission (channel/epoch bound). */
+  private handleSecretTransfer(request: Extract<BrowserClientMessage, { kind: 'secret-transfer' }>): { readonly accepted: boolean; readonly outcome: string } {
+    if (!this.isKnownChannel(request.clientChannel)) {
+      return { accepted: false, outcome: 'SECRET_UNKNOWN_CHANNEL' };
+    }
+    if (request.authorityEpoch !== this.epoch) {
+      return { accepted: false, outcome: 'SECRET_STALE_EPOCH' };
+    }
+    if (this.env.onSecretTransfer) {
+      this.env.onSecretTransfer(request);
+    }
+    return { accepted: true, outcome: 'SECRET_ACCEPTED' };
   }
 
   private handleHandshake(request: Extract<BrowserClientMessage, { kind: 'handshake' }>): { readonly accepted: boolean; readonly outcome: string } {
@@ -190,6 +238,7 @@ export class WorkerAuthority {
         allowedActions: result.allowedActions,
         ...(result.retryDeadlineMs !== undefined ? { retryDeadlineMs: result.retryDeadlineMs } : {}),
         ...(result.supportCode !== undefined ? { supportCode: result.supportCode } : {}),
+        ...(result.payload !== undefined ? { payload: result.payload } : {}),
       });
     } finally {
       if (this.activeOperationId === request.operationId) {

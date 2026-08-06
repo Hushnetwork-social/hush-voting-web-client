@@ -10,12 +10,12 @@
   "scripts": {
     "clean": "rimraf .next .next-web .next-tauri .next-static out coverage",
     "clean:native": "rimraf src-tauri/target",
-    "dev": "next dev --port 3201",
+    "dev": "npm run build:worker && next dev --port 3201",
     "dev:tauri": "cross-env TAURI_DEV=true next dev --port 3202",
     "dev:harness": "cross-env NEXT_PUBLIC_HUSH_TEST_HARNESS=1 next dev --port 3201",
     "build": "npm run build:web",
-    "build:web": "cross-env STANDALONE_BUILD=true next build",
-    "build:static": "cross-env STATIC_EXPORT=true next build",
+    "build:web": "npm run build:worker && cross-env STANDALONE_BUILD=true next build",
+    "build:static": "npm run build:worker && cross-env STATIC_EXPORT=true next build",
     "brand:sync": "node scripts/brand/sync-from-website.mjs",
     "desktop:identity:install": "node scripts/dev/install-linux-desktop-entry.mjs",
     "start": "next start --port 3201",
@@ -89,7 +89,9 @@
     "auth-lifecycle:secret-scan": "node scripts/auth-lifecycle/secret-scan.mjs",
     "auth-lifecycle:quality": "node scripts/auth-lifecycle/quality.mjs",
     "auth-lifecycle:quality:selftest": "node scripts/auth-lifecycle/quality-selftest.mjs",
-    "auth-lifecycle:coverage:selftest": "node scripts/auth-lifecycle/coverage-selftest.mjs"
+    "auth-lifecycle:coverage:selftest": "node scripts/auth-lifecycle/coverage-selftest.mjs",
+    "build:worker": "node scripts/build-worker.mjs",
+    "test:auth-lifecycle:bdd": "playwright test --config playwright.auth-lifecycle.config.ts"
   },
   "dependencies": {
     "@noble/hashes": "2.2.0",

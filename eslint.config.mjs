@@ -5,6 +5,11 @@ import nextTypeScript from 'eslint-config-next/typescript';
 export default defineConfig([
   ...nextCoreWebVitals,
   ...nextTypeScript,
+  {
+    rules: {
+      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+    },
+  },
   globalIgnores([
     'node_modules/**',
     '.next/**',
@@ -16,6 +21,7 @@ export default defineConfig([
     'src-tauri/target/**',
     'src-tauri/gen/**',
     'next-env.d.ts',
+    'public/workers/**',
     'conformance/identity/v1/scripts/vendor/**',
   ]),
 ]);

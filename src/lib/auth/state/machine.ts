@@ -442,7 +442,10 @@ export const authMachine = setup({
           },
         },
         locked: {
-          entry: ['clearActiveOperation', 'clearOutcome', 'clearSupportCode'],
+          // The wrong-password/damage outcome MUST stay visible on the locked
+          // screen (AC-010-036 combined error); the outcome is cleared at
+          // every OTHER transition INTO locked (below) and on INTENT.UNLOCK.
+          entry: ['clearActiveOperation', 'clearSupportCode'],
           on: {
             'INTENT.UNLOCK': [
               { target: 'unlocking', guard: 'hasSecretAuthority', actions: 'clearOutcome' },
@@ -593,13 +596,13 @@ export const authMachine = setup({
         authenticated: {
           entry: ['clearActiveOperation', 'clearOutcome', 'clearSupportCode'],
           on: {
-            'INTENT.LOCK': { target: 'locked', actions: 'incrementEpoch' },
-            'TIMER.IDLE_TIMEOUT': { target: 'locked', actions: 'incrementEpoch' },
-            'TIMER.BACKGROUND_TIMEOUT': { target: 'locked', actions: 'incrementEpoch' },
-            'SESSION.INVALIDATED': { target: 'locked', actions: 'incrementEpoch' },
-            'SESSION.AUTHORITY_LOST': { target: 'locked', actions: 'incrementEpoch' },
+            'INTENT.LOCK': { target: 'locked', actions: ['incrementEpoch', 'clearOutcome'] },
+            'TIMER.IDLE_TIMEOUT': { target: 'locked', actions: ['incrementEpoch', 'clearOutcome'] },
+            'TIMER.BACKGROUND_TIMEOUT': { target: 'locked', actions: ['incrementEpoch', 'clearOutcome'] },
+            'SESSION.INVALIDATED': { target: 'locked', actions: ['incrementEpoch', 'clearOutcome'] },
+            'SESSION.AUTHORITY_LOST': { target: 'locked', actions: ['incrementEpoch', 'clearOutcome'] },
             'INTENT.REMOVE_LOCAL_USER': { target: 'removingLocalUser', actions: 'incrementEpoch' },
-            'INTENT.REAUTHENTICATION_REQUIRED': { target: 'locked', actions: 'incrementEpoch' },
+            'INTENT.REAUTHENTICATION_REQUIRED': { target: 'locked', actions: ['incrementEpoch', 'clearOutcome'] },
           },
         },
         recoverableError: {
@@ -624,7 +627,7 @@ export const authMachine = setup({
                   context.outcomeCode === null,
               },
             ],
-            'INTENT.LOCK': { target: 'locked', actions: 'incrementEpoch' },
+            'INTENT.LOCK': { target: 'locked', actions: ['incrementEpoch', 'clearOutcome'] },
             'INTENT.REMOVE_LOCAL_USER': { target: 'removingLocalUser', actions: 'incrementEpoch' },
           },
         },

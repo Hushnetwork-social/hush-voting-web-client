@@ -15,6 +15,9 @@ import { AuthGate } from './AuthGate';
 /** Telemetry preference: only an already-recorded explicit opt-in enables emission. */
 const TELEMETRY_PREFERENCE = { explicitOptIn: false };
 
+/** Module-level secret sink (set by buildMachineInput; read by the adapter). */
+let activeSecretSink: ((operationId: string, secret: string) => void) | null = null;
+
 const FIRST_RUN_INTENTS = new Set<AuthIntent['type']>([
   'INTENT.CREATE_USER',
   'INTENT.RESTORE_CREDENTIAL_FILE',
@@ -107,13 +110,43 @@ async function buildMachineInput(): Promise<AuthMachineInput> {
   // Real registrations: browser vault slots are real FEAT-004 actors; native
   // targets declare their qualified capability classes (FEAT-005/006).
   const registrations = buildRealRegistrations(handshake);
+
+  // Web target: assemble the real actor graph over the sealed vault client
+  // (Task 7.3). Native targets keep honest fail-closed providers until their
+  // bridge adapters register (partial-registration contract, AC-010-004).
+  let webComposition: { readonly actors: import('../../lib/auth/ports').AuthActors } | null = null;
+  if (handshake === null) {
+    try {
+      const webModule = await import('../../lib/auth/web/web-composition');
+      webComposition = webModule.getWebComposition(manifest);
+      activeSecretSink = webModule.submitWebSecret;
+    } catch {
+      webComposition = null;
+    }
+  }
+
   const verdict = createTargetComposition({
     manifest,
     handshake,
     pinnedContractVersion: manifest.contractVersions.adapter,
     extension: { kind: 'absent' },
     registrations,
-    actorProvider: (capability) => realActorProvider(capability, handshake),
+    actorProvider: (capability) => {
+      if (webComposition === null) {
+        return null;
+      }
+      const actors = webComposition.actors;
+      switch (capability) {
+        case 'onboardingCreateUser':
+          return actors.onboarding.createUser;
+        case 'onboardingRestoreCredentialFile':
+          return actors.onboarding.restoreCredentialFile;
+        case 'onboardingRestoreRecoveryWords':
+          return actors.onboarding.restoreRecoveryWords;
+        default:
+          return (actors as unknown as Record<string, unknown>)[capability] ?? null;
+      }
+    },
   });
   if (!verdict.ok) {
     return blockedMachineInput();
@@ -147,16 +180,6 @@ function buildRealRegistrations(handshake: TrustedTargetDescriptor | null): Targ
   ];
 }
 
-/** Real actor providers (FEAT-004 browser vault for web; native bridge adapters for native). */
-function realActorProvider(capability: string, handshake: TrustedTargetDescriptor | null): unknown {
-  // Web: FEAT-004 browser vault authority supplies the storage/secret ports.
-  // Native: the Rust authorities expose the ports through the bridge; the
-  // adapter modules register their operations per FEAT-005/006 handoffs.
-  void capability;
-  void handshake;
-  return null;
-}
-
 export interface AuthRootProps {
   /**
    * Optional machine-input provider (harness/testing entry). Defaults to the
@@ -171,6 +194,7 @@ export default function AuthRoot({ machineInputProvider }: AuthRootProps = {}) {
   // history entry rebuilds the authority so it re-detects the correct entry
   // state without persisting authentication state in browser history.
   const [adapter, setAdapter] = useState<AuthAdapter | null>(null);
+
   const [authorityGeneration, setAuthorityGeneration] = useState(0);
   const entryHistoryTokenRef = useRef<string | null>(null);
   const flowHistoryTokensRef = useRef(new Set<string>());
@@ -188,7 +212,7 @@ export default function AuthRoot({ machineInputProvider }: AuthRootProps = {}) {
     let createdAdapter: AuthAdapter | null = null;
     void (machineInputProvider ?? buildMachineInput)().then((input) => {
       if (!cancelled) {
-        createdAdapter = new AuthAdapter(input);
+        createdAdapter = new AuthAdapter(input, { secretSink: activeSecretSink ?? undefined });
         setAdapter(createdAdapter);
       }
     });

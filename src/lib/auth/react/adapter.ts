@@ -78,13 +78,23 @@ export function createAuthAdapter(input: AuthMachineInput): AuthAdapter {
   return new AuthAdapter(input);
 }
 
+/** Adapter options (production composition wires the real secret sink). */
+export interface AuthAdapterOptions {
+  /** SecretSubmissionSink: direct secret transfer to the sealed authority. */
+  readonly secretSink?: (operationId: string, secret: string) => void;
+}
+
 /** Thin adapter wrapping one actor instance. */
 export class AuthAdapter {
   private readonly actor: Actor<typeof authMachine>;
   private cachedProjection: AuthRenderProjection | null = null;
+  private readonly secretSink: ((operationId: string, secret: string) => void) | null;
+  private activeUnlockOperationId: string | null = null;
+  private pendingSecret: string | null = null;
 
   /** Build from machine input (production/composition path) or an existing actor (tests). */
-  constructor(inputOrActor: AuthMachineInput | Actor<typeof authMachine>) {
+  constructor(inputOrActor: AuthMachineInput | Actor<typeof authMachine>, options: AuthAdapterOptions = {}) {
+    this.secretSink = options.secretSink ?? null;
     if ('send' in (inputOrActor as Actor<typeof authMachine>)) {
       this.actor = inputOrActor as Actor<typeof authMachine>;
     } else {
@@ -93,7 +103,29 @@ export class AuthAdapter {
     }
     // Refresh the cached projection whenever the actor snapshot changes.
     this.actor.subscribe(() => {
-      this.cachedProjection = projectSnapshot(this.actor.getSnapshot());
+      const snapshot = this.actor.getSnapshot();
+      this.cachedProjection = projectSnapshot(snapshot);
+      // Track the active unlock operation so the sink can address the secret
+      // to the exact operation the sealed authority consumes.
+      const context = (snapshot.context ?? {}) as { activeOperationId?: string | null };
+      if (this.cachedProjection.authState === 'unlocking' && typeof context.activeOperationId === 'string') {
+        this.activeUnlockOperationId = context.activeOperationId;
+        // Flush a secret buffered before the operation id was known.
+        if (this.pendingSecret !== null && this.secretSink !== null) {
+          const secret = this.pendingSecret;
+          this.pendingSecret = null;
+          this.secretSink(this.activeUnlockOperationId, secret);
+        }
+      }
+      // Connectivity signal: typed network outcomes drive the connectivity
+      // region (offline stays retryable; exact success reports online).
+      const outcome = this.cachedProjection.outcomeCode;
+      const connectivity = this.cachedProjection.connectivity;
+      if ((outcome === 'VERIFY_TIMEOUT' || outcome === 'VERIFY_NETWORK_UNAVAILABLE') && connectivity !== 'offline') {
+        this.actor.send({ type: 'CONNECTIVITY.CHANGE', state: 'offline' });
+      } else if (outcome === 'VERIFY_SUCCESS' && connectivity !== 'online') {
+        this.actor.send({ type: 'CONNECTIVITY.CHANGE', state: 'online' });
+      }
     });
   }
 
@@ -109,8 +141,19 @@ export class AuthAdapter {
    * then the secret is discarded after the UI clears its input.
    */
   submitSecret(secret: string): void {
-    // The machine only learns an opaque operation result; the secret itself
-    // travels via SecretSubmissionSink owned by the vault/session actor.
+    if (this.secretSink !== null) {
+      // The intent first: the machine transitions to `unlocking` and its
+      // actor invokes the sealed authority, which issues the operation id
+      // asynchronously. The secret is buffered and flushed by the snapshot
+      // subscription the moment the operation id is known — it travels
+      // DIRECTLY to the sealed authority under that exact id (the machine
+      // only ever learns the opaque typed outcome).
+      this.pendingSecret = secret;
+      this.send({ type: 'INTENT.UNLOCK' });
+      return;
+    }
+    // No sink (tests/legacy): the machine only learns an opaque operation
+    // result; the secret is discarded after the UI clears its input.
     void secret;
     this.send({ type: 'INTENT.UNLOCK' });
   }

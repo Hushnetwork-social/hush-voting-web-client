@@ -38,7 +38,7 @@ function makeEnv(overrides: Partial<AuthorityEnvironment> = {}): AuthorityEnviro
 function validHandshake(channel = 'chan-1') {
   return {
     kind: 'handshake' as const,
-    protocolVersion: 1,
+    protocolVersion: 2,
     appVersion: '0.1.0',
     buildDigest: 'a1b2c3d4e5f6',
     clientChannel: channel,
@@ -72,7 +72,7 @@ describe('worker authority — handshake', () => {
     const env = makeEnv();
     const authority = new WorkerAuthority(env, 'locked', 1);
     // Wrong protocol versions are rejected by the single runtime validation gate.
-    const badVersion = authority.handle({ ...validHandshake(), protocolVersion: 2 });
+    const badVersion = authority.handle({ ...validHandshake(), protocolVersion: 99 });
     expect(badVersion.accepted).toBe(false);
     expect(badVersion.outcome).toBe('MESSAGE_REJECTED');
     expect(authority.handle(validHandshake('chan-1')).accepted).toBe(true);
