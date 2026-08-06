@@ -94,6 +94,8 @@
     "test:auth-lifecycle:bdd": "playwright test --config playwright.auth-lifecycle.config.ts"
   },
   "dependencies": {
+    "@grpc/grpc-js": "^1.14.4",
+    "@grpc/proto-loader": "^0.8.1",
     "@noble/hashes": "2.2.0",
     "@noble/secp256k1": "^3.1.0",
     "@tauri-apps/api": "^2.11.1",

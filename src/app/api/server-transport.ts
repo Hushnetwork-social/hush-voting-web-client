@@ -27,6 +27,7 @@ import {
   type BffSubmitRequest,
 } from '../../lib/identity-creation/transport';
 import type { GetIdentityReply, SubmitSignedTransactionReply } from '../../lib/identity-creation/wire';
+import { BinaryGrpcTransport, parseGrpcEndpoint } from './binary-grpc-transport';
 
 /** Endpoint configuration source (server-side only, never NEXT_PUBLIC). */
 export const HUSHSERVER_ENDPOINT_ENV = 'HUSHSERVER_NODE_ENDPOINT' as const;
@@ -35,14 +36,26 @@ export const HUSHSERVER_ENDPOINT_ENV = 'HUSHSERVER_NODE_ENDPOINT' as const;
 const LOOKUP_PATH = '/hushIdentity/GetIdentity' as const;
 const SUBMIT_PATH = '/hushBlockchain/SubmitSignedTransaction' as const;
 
-/** Create the server transport; null when the endpoint is not configured. */
+/**
+ * FEAT-011 Task 6.1: create the server transport. The PRODUCTION endpoint is
+ * the binary gRPC `host:port` (server-side only). Legacy `http(s)://` URLs
+ * still resolve to the JSON mapping for FEAT-007-era fixtures/tests; the
+ * production contract is binary gRPC, and anything unparseable fails closed.
+ */
 export function createServerTransport(env: NodeJS.ProcessEnv): HushServerTransportPort | null {
-  const endpoint = env[HUSHSERVER_ENDPOINT_ENV];
-  if (typeof endpoint !== 'string' || endpoint.length === 0) {
-    return null;
+  const raw = env[HUSHSERVER_ENDPOINT_ENV];
+  const grpcEndpoint = parseGrpcEndpoint(raw);
+  if (grpcEndpoint !== null) {
+    try {
+      return new BinaryGrpcTransport(grpcEndpoint);
+    } catch {
+      return null; // pinned proto verification failure or load error -> fail closed
+    }
   }
-  const base = endpoint.replace(/\/+$/, '');
-  return new ManifestBoundHttpTransport(base);
+  if (typeof raw === 'string' && /^https?:\/\//.test(raw)) {
+    return new ManifestBoundHttpTransport(raw.replace(/\/+$/, '')); // legacy test/fixture path
+  }
+  return null;
 }
 
 /** Real bounded HTTP transport bound to the configured server endpoint. */
