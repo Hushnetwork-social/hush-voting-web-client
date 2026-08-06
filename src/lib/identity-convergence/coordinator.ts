@@ -22,7 +22,6 @@
  */
 
 import {
-  classifyLookupDecision,
   type ConvergenceEpoch,
   type ExactIdentityProof,
   type IdentityLookupDecision,
@@ -129,7 +128,14 @@ export class IdentityConvergenceCoordinator {
     }
 
     // 1. Seal before submit (exact bytes + digest persisted atomically).
-    const sealed = await this.ports.sealAndSign(review, this.state.epoch);
+    //    Retries REUSE the sealed record byte-for-byte — never re-sign, so the
+    //    authoritative exact transaction can never drift (transition-fault-
+    //    matrix T10/T16).
+    const existing = await this.ports.store.read();
+    const sealed =
+      existing !== null && matchesBinding(existing, this.state.epoch, this.networkBinding)
+        ? existing
+        : await this.ports.sealAndSign(review, this.state.epoch);
     const ref = await this.ports.store.write(sealed);
     this.state = { ...this.state, review, sealedRef: ref };
 
@@ -222,12 +228,28 @@ export class IdentityConvergenceCoordinator {
       this.state = { ...this.state, sealedRef: null, acceptedSinceMs: null };
       return { kind: 'confirmed', proof: lookup.proof };
     }
-    if (lookup.kind === 'explicitNotfound' && eligible && this.state.acceptedSinceMs !== null) {
-      return { kind: 'waiting' };
+    if (lookup.kind === 'explicitNotfound' && eligible) {
+      // Byte-identical re-submission of the exact sealed transaction
+      // (lookup-first satisfied); the sealed bytes never change.
+      const submit = await this.ports.submit(record);
+      switch (submit.outcome) {
+        case 'accepted':
+        case 'pending':
+          this.state = { ...this.state, acceptedSinceMs: this.ports.now() };
+          return { kind: 'waiting' };
+        case 'alreadyExists':
+          return { kind: 'alreadyExists' };
+        case 'rejectedTerminal':
+          await this.ports.store.clear();
+          this.state = { ...this.state, sealedRef: null };
+          return { kind: 'rejectedTerminal' };
+        default:
+          return { kind: 'retryable' };
+      }
     }
     // Sealed bytes remain authoritative; a transport ambiguity never creates
     // a replacement transaction.
-    return lookup.kind === 'explicitNotfound' ? { kind: 'waiting' } : { kind: 'retryable' };
+    return { kind: 'retryable' };
   }
 
   /** Other-device confirmation: synchronize chain metadata and discard the unused local transaction. */

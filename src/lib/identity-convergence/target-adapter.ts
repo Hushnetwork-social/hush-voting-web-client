@@ -32,9 +32,6 @@ export type TargetValidationResult =
   | { readonly ok: true }
   | { readonly ok: false; readonly code: 'UNKNOWN_TARGET' | 'MISSING_OPERATION' | 'FORBIDDEN_OPERATION' | 'SIGNING_UNSUPPORTED' | 'SYNTHETIC_IN_PRODUCTION' | 'DIGEST_MISMATCH' | 'UNSUPPORTED_VERSION' };
 
-/** Operations that require native custody (never acceptable from page crypto). */
-const SIGNING_OPERATIONS: ReadonlySet<ConvergenceOperationId> = new Set(['localProof', 'sealAndSubmit', 'confirmMissingProfile']);
-
 /** Digest of the handoff JSON (sha-256 hex via the canonical FEAT-001 primitive). */
 export function computeHandoffDigest(handoff: Omit<TargetCoordinatorHandoff, 'handoffDigest'>): string {
   const { handoffDigest: _, ...rest } = handoff as TargetCoordinatorHandoff;
@@ -75,16 +72,8 @@ export function validateTargetHandoff(
       return { ok: false, code: 'FORBIDDEN_OPERATION' };
     }
   }
-  // Native targets must own signing/custody: any missing signing operation is
-  // already caught by the MISSING_OPERATION check above; a web-target handoff
-  // declaring native signing operations is a contradiction that fails closed.
-  if (handoff.targetClass !== 'web') {
-    for (const operation of SIGNING_OPERATIONS) {
-      if (!handoff.operations.includes(operation)) {
-        return { ok: false, code: 'MISSING_OPERATION' };
-      }
-    }
-  }
+  // Native targets own signing/custody through the mandatory operations above;
+  // any missing operation (including signing) fails as MISSING_OPERATION.
   return { ok: true };
 }
 

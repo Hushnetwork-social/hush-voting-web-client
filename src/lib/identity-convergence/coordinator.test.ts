@@ -40,13 +40,17 @@ interface HarnessState {
   submitOutcomes: ConvergenceSubmitOutcome[];
   submitCodes: (string | null)[];
   now: number;
+  sealCalls?: number;
+  submittedBytes?: string[];
 }
 
 function makeHarness(state: HarnessState) {
   const store = new InMemorySealedPendingStore();
   const ports: ConvergencePorts = {
     lookup: async () => state.lookupResults.shift() ?? { kind: 'transportAmbiguity' },
-    sealAndSign: async (review) => ({
+    sealAndSign: async (review) => {
+      state.sealCalls = (state.sealCalls ?? 0) + 1;
+      return {
       schemaVersion: 2,
       transaction: { exactJson: JSON.stringify({ review }), digest: digestOf(JSON.stringify({ review })) },
       transactionId: 'tx-1',
@@ -56,9 +60,10 @@ function makeHarness(state: HarnessState) {
       epochBinding: EPOCH,
       networkBinding: 'isolated-local-devnet-v1',
       rollbackState: 'postSeal',
-    }),
+    };
+    },
     submit: async (record) => {
-      void record;
+      state.submittedBytes = [...(state.submittedBytes ?? []), record.transaction.exactJson];
       return { outcome: state.submitOutcomes.shift() ?? 'accepted', validationCode: state.submitCodes.shift() ?? null };
     },
     store,
@@ -219,3 +224,65 @@ describe('restart and lifecycle (Task 4.6)', () => {
     expect(await store.read()).toBeNull();
   });
 });
+
+describe('byte-identical retry and restart resubmit (Task 4.6 review fixes)', () => {
+  it('retries REUSE the sealed exact bytes — sealAndSign runs exactly once', async () => {
+    const harness = makeHarness({
+      lookupResults: [{ kind: 'explicitNotfound' }, { kind: 'explicitNotfound' }, { kind: 'explicitNotfound' }],
+      submitOutcomes: ['transportUncertain', 'accepted'],
+      submitCodes: [null, null],
+      now: 0,
+    });
+    harness.coordinator.enterReview(REVIEW);
+
+    await harness.coordinator.confirmMissingProfile('CONFIRM_MISSING_PROFILE', EPOCH);
+    const retry = await harness.coordinator.confirmMissingProfile('CONFIRM_MISSING_PROFILE', EPOCH);
+
+    expect(retry).toEqual({ kind: 'waiting' });
+    expect(harness.state.sealCalls).toBe(1);
+    expect(new Set(harness.state.submittedBytes ?? []).size).toBe(1); // identical bytes both times
+  });
+
+  it('resume performs a byte-identical re-submission after lookup-first', async () => {
+    const harness = makeHarness({
+      lookupResults: [{ kind: 'explicitNotfound' }, { kind: 'explicitNotfound' }],
+      submitOutcomes: ['accepted'],
+      submitCodes: [null],
+      now: 5000,
+    });
+    harness.coordinator.enterReview(REVIEW);
+    await harness.coordinator.confirmMissingProfile('CONFIRM_MISSING_PROFILE', EPOCH);
+    const firstBytes = harness.state.submittedBytes?.[0];
+
+    // Simulate restart: fresh coordinator instance over the same store state.
+    const restarted = new IdentityConvergenceCoordinator(
+      { ...harnessStatePorts(harness) },
+      'isolated-local-devnet-v1',
+      EPOCH,
+    );
+    restarted.enterReview(REVIEW);
+
+    const result = await restarted.resume(EPOCH, true);
+
+    expect(result).toEqual({ kind: 'waiting' });
+    const allBytes = harness.state.submittedBytes ?? [];
+    expect(allBytes[allBytes.length - 1]).toBe(firstBytes); // byte-identical
+  });
+});
+
+function harnessStatePorts(harness: ReturnType<typeof makeHarness>): ConvergencePorts {
+  const { coordinator } = harness;
+  void coordinator;
+  return {
+    lookup: async () => ({ kind: 'explicitNotfound' }),
+    sealAndSign: async () => {
+      throw new Error('must not re-seal on resume');
+    },
+    submit: async (record) => {
+      harness.state.submittedBytes = [...(harness.state.submittedBytes ?? []), record.transaction.exactJson];
+      return { outcome: harness.state.submitOutcomes.shift() ?? 'accepted', validationCode: null };
+    },
+    store: harness.store,
+    now: () => harness.state.now,
+  };
+}
