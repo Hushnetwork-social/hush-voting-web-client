@@ -65,6 +65,7 @@ export interface ConvergencePorts {
 
 /** Closed coordinator reactions. */
 export type CoordinatorResult =
+  | { readonly kind: 'reviewing' } // explicit review surface entered; NO side effects yet
   | { readonly kind: 'waiting' } // ACCEPTED/PENDING; poll loop active
   | { readonly kind: 'confirmed'; readonly proof: ExactIdentityProof } // exact indexed confirmation
   | { readonly kind: 'delayed' } // 3-minute boundary
@@ -107,7 +108,7 @@ export class IdentityConvergenceCoordinator {
   /** Enter (or resume) the explicit review surface. No side effects. */
   enterReview(review: MissingProfileReview): CoordinatorResult {
     this.state = { ...this.state, review };
-    return { kind: 'waiting' };
+    return { kind: 'reviewing' };
   }
 
   /**

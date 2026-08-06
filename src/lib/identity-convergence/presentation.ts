@@ -283,12 +283,18 @@ export function projectAuthenticated(identity: PublicIdentityProjection): Conver
 }
 
 /** Map a coordinator result to its truthful screen. */
-export function projectCoordinatorResult(result: { readonly kind: string }, identity: PublicIdentityProjection | null): ConvergenceViewProjection {
+export function projectCoordinatorResult(
+  result: { readonly kind: string },
+  identity: PublicIdentityProjection | null,
+  review?: { readonly origin: MissingProfileOrigin; readonly alias: string; readonly visibility: 'private' | 'public' },
+): ConvergenceViewProjection {
   switch (result.kind) {
     case 'confirmed':
       return identity !== null ? projectExistingProfile(identity) : projectAuthenticatedFallback();
     case 'delayed':
       return projectWaiting(true);
+    case 'reviewing':
+      return projectMissingProfileReview(review?.origin ?? 'words', { alias: review?.alias ?? '', visibility: review?.visibility ?? 'private' });
     case 'waiting':
       return projectWaiting(false);
     case 'retryable':

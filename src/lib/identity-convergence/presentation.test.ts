@@ -120,6 +120,7 @@ describe('coordinator result mapping (Task 5.6)', () => {
   it('maps every result to its truthful screen', () => {
     expect(projectCoordinatorResult({ kind: 'confirmed' }, IDENTITY).screen).toBe('existingProfile');
     expect(projectCoordinatorResult({ kind: 'waiting' }, null).screen).toBe('waiting');
+    expect(projectCoordinatorResult({ kind: 'reviewing' }, null, { origin: 'words', alias: '', visibility: 'private' }).screen).toBe('missingProfileReview');
     expect(projectCoordinatorResult({ kind: 'delayed' }, null).screen).toBe('delayed');
     expect(projectCoordinatorResult({ kind: 'retryable' }, null).screen).toBe('retryable');
     expect(projectCoordinatorResult({ kind: 'alreadyExists' }, null).screen).toBe('lookupProgress');
