@@ -9,6 +9,8 @@
  * Reveal", "Worker protocol"; FEAT-003 session kernel.
  */
 
+import type { BrowserOperationKind } from '../contracts/protocol';
+
 /** Authority capability phases (safe projection vocabulary). */
 export type AuthorityPhase = 'noLocalUser' | 'locked' | 'verificationOnly' | 'authenticated' | 'removalInProgress';
 
@@ -78,7 +80,7 @@ export function consumeFreshCapability(
 }
 
 /** Fresh capabilities required per closed operation kind. */
-export const FRESH_CAPABILITY_REQUIRED_BY_OPERATION: Readonly<Record<string, FreshCapabilityPurpose | null>> = {
+export const FRESH_CAPABILITY_REQUIRED_BY_OPERATION: Readonly<Record<BrowserOperationKind, FreshCapabilityPurpose | null>> = {
   provisionFromValidatedBundle: 'provision',
   changeDevicePassword: 'changePassword',
   removeLocalUser: 'removeLocalUser',
@@ -95,6 +97,8 @@ export const FRESH_CAPABILITY_REQUIRED_BY_OPERATION: Readonly<Record<string, Fre
   deriveWordsCandidate: null,
   importFileCandidate: null,
   retainTransactionDigest: null,
+  submitIdentityTransaction: null,
+  promoteLifecycle: null,
   inspectStartup: null,
 } as const;
 

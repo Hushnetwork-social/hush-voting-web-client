@@ -7,7 +7,7 @@
  * Unknown/malformed outcomes fail closed; secrets never enter results.
  */
 import { describe, expect, it, beforeEach } from 'vitest';
-import { BrowserVaultClient, type MessagePortLike } from './client';
+import { BrowserVaultClient, versionedWorkerUrl, workerNameForUrl, type MessagePortLike } from './client';
 import { createWebLocalUserAuthority, createWebSecretAuthority, createWebIdentityVerification, createWebBrowserCoordination } from '../../auth/web/web-actors';
 
 /** Fake port that records outbound messages and lets tests push events. */
@@ -23,6 +23,21 @@ class FakePort implements MessagePortLike {
     this.onmessage?.({ data });
   }
 }
+
+describe('versioned SharedWorker identity', () => {
+  it('binds URL and worker name to the exact bundle digest', () => {
+    const url = versionedWorkerUrl('/workers/vault-shared-worker.js', 'a1b2c3d4e5f6');
+    expect(url).toBe('/workers/vault-shared-worker.js?build=a1b2c3d4e5f6');
+    expect(workerNameForUrl(url)).toBe('hushvoting-vault-authority-a1b2c3d4e5f6');
+  });
+
+  it('preserves existing query parameters without accepting an unbounded name', () => {
+    const url = versionedWorkerUrl('/workers/vault-shared-worker.js?runtime=local', 'ABCDEF123456');
+    expect(url).toContain('&build=ABCDEF123456');
+    expect(workerNameForUrl(url)).toBe('hushvoting-vault-authority-abcdef123456');
+    expect(workerNameForUrl('/workers/vault-shared-worker.js?build=not-safe')).toBe('hushvoting-vault-authority-unversioned');
+  });
+});
 
 let idCounter = 0;
 
@@ -231,6 +246,55 @@ describe('web actor outcome mapping', () => {
     const operation3 = await waitForOperation(port, operation2?.operationId);
     port.push({ kind: 'operation-outcome', operationId: operation3?.operationId, clientChannel: sentChannel(port), outcome: 'OK', retryable: false, allowedActions: [] });
     expect(await op3.result).toEqual({ code: 'UNLOCK_SUCCESS' });
+  });
+
+  it('does not invalidate the authority when XState cleans up a completed actor', async () => {
+    const port = new FakePort();
+    const client = createClient(port);
+    await primeClient(client, port);
+    const verification = createWebIdentityVerification(client);
+
+    const completed = verification.verifyOnline(1 as never, 'ref' as never);
+    const completedMessage = await waitForOperation(port);
+    port.push({
+      kind: 'operation-outcome',
+      operationId: completedMessage?.operationId,
+      clientChannel: sentChannel(port),
+      outcome: 'OK',
+      retryable: false,
+      allowedActions: [],
+      payload: { profileName: 'Alice', signingAddress: '02abcdef', encryptionAddress: '03abcdef' },
+    });
+    expect(await completed.result).toEqual({
+      code: 'VERIFY_SUCCESS',
+      identity: { alias: 'Alice', publicSigningKey: '02abcdef', publicEncryptionKey: '03abcdef' },
+    });
+    verification.cancel(completed.operationId);
+    expect(port.sent.some((message) => (message as { kind?: string }).kind === 'cancel')).toBe(false);
+
+    const interrupted = verification.verifyOnline(1 as never, 'ref' as never);
+    await waitForOperation(port, completedMessage?.operationId);
+    verification.cancel(interrupted.operationId);
+    expect(port.sent.some((message) => (message as { kind?: string }).kind === 'cancel')).toBe(true);
+  });
+
+  it('keeps authenticated proof valid when an older live worker omits additive menu metadata', async () => {
+    const port = new FakePort();
+    const client = createClient(port);
+    await primeClient(client, port);
+    const verification = createWebIdentityVerification(client);
+    const op = verification.verifyOnline(1 as never, 'ref' as never);
+    const operation = await waitForOperation(port);
+    port.push({
+      kind: 'operation-outcome',
+      operationId: operation?.operationId,
+      clientChannel: sentChannel(port),
+      outcome: 'OK',
+      retryable: false,
+      allowedActions: [],
+      payload: { profileName: 'Alice' },
+    });
+    expect(await op.result).toEqual({ code: 'VERIFY_SUCCESS' });
   });
 
   it('maps verification outcomes (exact, missing, mismatch, timeout, offline)', async () => {

@@ -129,6 +129,8 @@ export interface UnlockedSession {
   readonly signingPrivateKey: string;
   readonly encryptionPrivateKey: string;
   readonly dek: Uint8Array;
+  /** Device-password-derived KEK retained only for the unlocked session. */
+  readonly kek: Uint8Array;
   readonly record: CurrentRecordPlaintext;
   readonly preview: VaultPreviewV1;
 }
@@ -326,6 +328,8 @@ export class SealedVaultEngine {
 
   /** Wipe every in-worker secret (Lock/removal/authority loss). */
   wipeSecrets(): void {
+    this.session?.dek.fill(0);
+    this.session?.kek.fill(0);
     this.session = null;
     for (const key of this.candidates.keys()) {
       this.candidates.delete(key);
@@ -615,6 +619,7 @@ export class SealedVaultEngine {
       signingPrivateKey: candidate.signingPrivateKey,
       encryptionPrivateKey: candidate.encryptionPrivateKey,
       dek,
+      kek,
       record: plaintext,
       preview,
     };
@@ -727,10 +732,49 @@ export class SealedVaultEngine {
     }
 
     let dek: Uint8Array;
+    let requiresLegacyWrapperRepair = false;
     try {
       dek = await this.suite.aes256GcmDecrypt({ key: kek, nonce: wrappingNonce, ciphertext: unwrapParts.ciphertext, tag: unwrapParts.tag, aad: aadBytes });
     } catch {
-      return recordFailure();
+      if (envelope.records.generation.active <= 1 || record.generation <= 1) {
+        return recordFailure();
+      }
+      // Compatibility repair for the bounded FEAT-010 development defect:
+      // earlier mutations retained the original generation-1 DEK wrapper
+      // while correctly authenticating current ciphertext under current AAD.
+      const provisioningPreview: VaultPreviewV1 = {
+        ...envelope.preview,
+        lifecycleStatus: 'PendingRegistration',
+      };
+      const provisioningAad = buildAadMetadata({
+        envelopeFormatVersion: envelope.envelopeFormatVersion,
+        parameterSuiteVersion: envelope.parameterSuiteVersion,
+        recordSchemaVersion: envelope.recordSchemaVersion,
+        platformWrapperVersion: envelope.platformWrapperVersion,
+        suiteId: envelope.suite.id,
+        kdfParameters: { algorithm: envelope.suite.kdf.algorithm, memoryKiB: envelope.suite.kdf.minMemoryKiB, iterations: envelope.suite.kdf.iterations, parallelism: envelope.suite.kdf.parallelism },
+        adapterBinding: 'browser',
+        preview: provisioningPreview,
+        vaultGeneration: 1,
+        recordGeneration: 1,
+        recordPurpose: 'ordinary',
+        producerId: record.producerId,
+        producerVersion: record.producerVersion,
+        signingAddress: `${provisioningPreview.signingAddressPrefix}${provisioningPreview.signingAddressSuffix}`,
+        criticalExtensions: [],
+      });
+      try {
+        dek = await this.suite.aes256GcmDecrypt({
+          key: kek,
+          nonce: wrappingNonce,
+          ciphertext: unwrapParts.ciphertext,
+          tag: unwrapParts.tag,
+          aad: canonicalizeJsonBytes(provisioningAad),
+        });
+        requiresLegacyWrapperRepair = true;
+      } catch {
+        return recordFailure();
+      }
     }
 
     const ciphertext = unb64url(record.ciphertext);
@@ -781,10 +825,19 @@ export class SealedVaultEngine {
       signingPrivateKey: current.signingPrivateKey,
       encryptionPrivateKey: current.encryptionPrivateKey,
       dek,
+      kek,
       record: current,
       preview: envelope.preview,
     };
     this.phase = 'verificationOnly';
+
+    if (requiresLegacyWrapperRepair) {
+      const repair = await this.reencryptCurrentRecord(current);
+      if (repair.code !== 'OK') {
+        this.wipeSecrets();
+        return { code: 'UNKNOWN_FAILURE', supportCode: this.randomId('sc-') };
+      }
+    }
 
     // Reset the throttle on successful unlock (FEAT-003 rule).
     await this.storage.writeRecord('operationalSidecars', THROTTLE_KEY, { failedPasswordCount: 0, cooldownDeadline: 0 });
@@ -800,7 +853,7 @@ export class SealedVaultEngine {
   // ---------------------------------------------------------------------
 
   /** Fresh exact online verification: worker-owned BFF lookup, both keys equal. */
-  async verifyOnline(): Promise<SealedOutcome & { readonly detail?: { readonly profileName: string } }> {
+  async verifyOnline(): Promise<SealedOutcome & { readonly detail?: { readonly profileName: string; readonly signingAddress: string; readonly encryptionAddress: string } }> {
     if (this.session === null || this.phase === 'locked' || this.phase === 'noLocalUser') {
       return { code: 'UNKNOWN_FAILURE', supportCode: this.randomId('sc-') };
     }
@@ -815,7 +868,14 @@ export class SealedVaultEngine {
           return { code: 'ENCRYPTION_KEY_MISMATCH' };
         }
         this.phase = 'authenticated';
-        return { code: 'OK', detail: { profileName: lookup.profileName ?? this.session.record.alias } };
+        return {
+          code: 'OK',
+          detail: {
+            profileName: lookup.profileName ?? this.session.record.alias,
+            signingAddress: binding.signingAddress,
+            encryptionAddress: binding.encryptionAddress,
+          },
+        };
       }
       case 'missing':
         return {
@@ -953,6 +1013,15 @@ export class SealedVaultEngine {
       criticalExtensions: [],
     });
     const aadBytes = canonicalizeJsonBytes(aad);
+    // AAD binds both the encrypted record and the wrapped DEK. Every metadata
+    // or generation mutation must therefore rewrite BOTH layers atomically.
+    const wrappingNonce = this.suite.randomBytes(12);
+    const rewrapped = await this.suite.aes256GcmEncrypt({
+      key: this.session.kek,
+      nonce: wrappingNonce,
+      plaintext: this.session.dek,
+      aad: aadBytes,
+    });
     const encryptionNonce = this.suite.randomBytes(12);
     const reencrypted = await this.suite.aes256GcmEncrypt({
       key: this.session.dek,
@@ -969,6 +1038,10 @@ export class SealedVaultEngine {
         ordinary: {
           ...record,
           generation: nextGeneration,
+          keyPackage: {
+            wrappedDataKey: b64url(joinCipherAndTag(rewrapped.ciphertext, rewrapped.tag)),
+            wrappingNonce: b64url(wrappingNonce),
+          },
           ciphertext: b64url(joinCipherAndTag(reencrypted.ciphertext, reencrypted.tag)),
           encryptionNonce: b64url(encryptionNonce),
         },

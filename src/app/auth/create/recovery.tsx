@@ -28,6 +28,19 @@ export interface RecoveryProps {
 /** Wireframe 3 — Save recovery words (semantic ordered list, responsive). */
 export function RecoveryScreen({ words, onCopy, onRegenerateRequest, onContinue, onBack, acknowledged, onAcknowledge, timeoutMessage }: RecoveryProps) {
   const visible = words !== null;
+  const [copyOutcome, setCopyOutcome] = useState<'idle' | 'copied' | 'unavailable'>('idle');
+
+  const copyWords = async () => {
+    if (words === null) return;
+    try {
+      await navigator.clipboard.writeText(words.join(' '));
+      onCopy();
+      setCopyOutcome('copied');
+    } catch {
+      setCopyOutcome('unavailable');
+    }
+  };
+
   return (
     <SurfacePanel title={RECOVERY.title}>
       <p className="mb-3 text-sm text-[var(--text-muted)]">{RECOVERY.detail}</p>
@@ -42,14 +55,17 @@ export function RecoveryScreen({ words, onCopy, onRegenerateRequest, onContinue,
             ))}
           </ol>
           <div className="mt-3 flex flex-wrap gap-3">
-            <ActionButton variant="secondary" onClick={onCopy}>
-              {RECOVERY.copy}
+            <ActionButton onClick={() => void copyWords()}>
+              {copyOutcome === 'copied' ? 'Copied' : RECOVERY.copy}
             </ActionButton>
             <ActionButton variant="danger" onClick={onRegenerateRequest}>
               {RECOVERY.regenerate}
             </ActionButton>
           </div>
           <p className="mt-2 text-xs text-[var(--text-muted)]">{RECOVERY.copyWarning}</p>
+          <div className={copyOutcome === 'unavailable' ? 'mt-2 text-xs text-[var(--warning)]' : 'sr-only'} role="status" aria-live="polite">
+            {copyOutcome === 'copied' ? 'Recovery words copied.' : copyOutcome === 'unavailable' ? 'Clipboard copy is unavailable. Save the visible words manually.' : ''}
+          </div>
           <label className="mt-3 flex items-start gap-2 text-sm text-[var(--text)]">
             <input
               type="checkbox"
@@ -65,7 +81,7 @@ export function RecoveryScreen({ words, onCopy, onRegenerateRequest, onContinue,
       )}
       <div className="mt-4 flex items-center gap-3">
         <BackButton onClick={onBack} />
-        <ActionButton onClick={onContinue} disabled={!visible || !acknowledged}>
+        <ActionButton onClick={onContinue} disabled={!visible || !acknowledged} fullWidth>
           Continue
         </ActionButton>
       </div>

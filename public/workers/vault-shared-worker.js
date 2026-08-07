@@ -21872,7 +21872,7 @@ var require_src = __commonJS({
     function salt(password) {
       return "mnemonic" + (password || "");
     }
-    function mnemonicToSeedSync2(mnemonic, password) {
+    function mnemonicToSeedSync(mnemonic, password) {
       const mnemonicBuffer = Uint8Array.from(Buffer.from(normalize(mnemonic), "utf8"));
       const saltBuffer = Uint8Array.from(Buffer.from(salt(normalize(password)), "utf8"));
       const res = pbkdf2_1.pbkdf2(sha512_1.sha512, mnemonicBuffer, saltBuffer, {
@@ -21881,7 +21881,7 @@ var require_src = __commonJS({
       });
       return Buffer.from(res);
     }
-    exports.mnemonicToSeedSync = mnemonicToSeedSync2;
+    exports.mnemonicToSeedSync = mnemonicToSeedSync;
     function mnemonicToSeed2(mnemonic, password) {
       const mnemonicBuffer = Uint8Array.from(Buffer.from(normalize(mnemonic), "utf8"));
       const saltBuffer = Uint8Array.from(Buffer.from(salt(normalize(password)), "utf8"));
@@ -22327,6 +22327,8 @@ var FRESH_CAPABILITY_REQUIRED_BY_OPERATION = {
   deriveWordsCandidate: null,
   importFileCandidate: null,
   retainTransactionDigest: null,
+  submitIdentityTransaction: null,
+  promoteLifecycle: null,
   inspectStartup: null
 };
 
@@ -22444,6 +22446,7 @@ var WorkerAuthority = class {
       return { accepted: false, outcome: "OPERATION_UNKNOWN_CHANNEL" };
     }
     if (this.activeOperationId !== null) {
+      this.deliverOperationRejection(request, "AUTHORITY_BUSY");
       return { accepted: false, outcome: "OPERATION_BUSY" };
     }
     const requiredPurpose = FRESH_CAPABILITY_REQUIRED_BY_OPERATION[request.operation];
@@ -22453,6 +22456,7 @@ var WorkerAuthority = class {
         { purpose: requiredPurpose, clientChannel: request.clientChannel, authorityEpoch: this.epoch, nowMs: this.env.nowMs() }
       );
       if (!consumption.ok) {
+        this.deliverOperationRejection(request, "AUTHORITY_REJECTED");
         return { accepted: false, outcome: `OPERATION_CAPABILITY_${consumption.reason.toUpperCase()}` };
       }
       this.freshCapabilities.set(consumption.capability.id, consumption.capability);
@@ -22460,6 +22464,17 @@ var WorkerAuthority = class {
     this.activeOperationId = request.operationId;
     void this.runOperation(request);
     return { accepted: true, outcome: "OPERATION_STARTED" };
+  }
+  /** Known current channels always receive a terminal typed rejection. */
+  deliverOperationRejection(request, outcome) {
+    this.env.deliver(request.clientChannel, {
+      kind: "operation-outcome",
+      operationId: request.operationId,
+      clientChannel: request.clientChannel,
+      outcome,
+      retryable: outcome === "AUTHORITY_BUSY",
+      allowedActions: outcome === "AUTHORITY_BUSY" ? ["retry"] : []
+    });
   }
   async runOperation(request) {
     const startEpoch = this.epoch;
@@ -24356,7 +24371,7 @@ function verifyManifestCatalog() {
 var MANIFEST_CATALOG_SELF_CHECK = verifyManifestCatalog();
 
 // src/lib/browser-vault/production/bip39-worker.ts
-var import_bip392 = __toESM(require_src(), 1);
+var import_bip39 = __toESM(require_src(), 1);
 
 // node_modules/@noble/hashes/sha2.js
 var SHA256_K = /* @__PURE__ */ Uint32Array.from([
@@ -24840,9 +24855,6 @@ function pbkdf2(hash, password, salt, opts) {
   }
   return pbkdf2Output(PRF, PRFSalt, DK, prfW, u);
 }
-
-// src/lib/identity-compatibility/crypto.ts
-var import_bip39 = __toESM(require_src(), 1);
 
 // node_modules/@noble/hashes/hkdf.js
 function extract(hash, ikm, salt) {
@@ -25456,7 +25468,9 @@ function hexToBytesStrict(hex) {
   return hexToBytes(hex);
 }
 function mnemonicToSeed(mnemonic) {
-  return new Uint8Array((0, import_bip39.mnemonicToSeedSync)(mnemonic));
+  const normalizedMnemonic = mnemonic.normalize("NFKD");
+  const salt = "mnemonic".normalize("NFKD");
+  return pbkdf2(sha512, ENCODER.encode(normalizedMnemonic), ENCODER.encode(salt), { c: 2048, dkLen: 64 });
 }
 function hkdfSha256(ikm, info, length = 32) {
   return hkdf(sha256, ikm, void 0, ENCODER.encode(info), length);
@@ -25492,7 +25506,7 @@ function compactToDer(rBytes, sBytes) {
 }
 
 // src/lib/browser-vault/production/bip39-worker.ts
-var WORDLIST = import_bip392.wordlists.english;
+var WORDLIST = import_bip39.wordlists.english;
 function toBinaryString(bytes) {
   let binary = "";
   for (const byte of bytes) {
@@ -26083,13 +26097,13 @@ async function decodeDatV1(envelope, password) {
 }
 
 // src/lib/identity-compatibility/mnemonic.ts
-var import_bip393 = __toESM(require_src(), 1);
-var ENGLISH_WORDS = new Set(import_bip393.wordlists.english);
+var import_bip392 = __toESM(require_src(), 1);
+var ENGLISH_WORDS = new Set(import_bip392.wordlists.english);
 function checksumMatches(words) {
   const bitsPerWord = 11;
   let bits = "";
   for (const w of words) {
-    const idx = import_bip393.wordlists.english.indexOf(w);
+    const idx = import_bip392.wordlists.english.indexOf(w);
     if (idx < 0) return false;
     bits += idx.toString(2).padStart(bitsPerWord, "0");
   }
@@ -26367,6 +26381,8 @@ var SealedVaultEngine = class {
   }
   /** Wipe every in-worker secret (Lock/removal/authority loss). */
   wipeSecrets() {
+    this.session?.dek.fill(0);
+    this.session?.kek.fill(0);
     this.session = null;
     for (const key of this.candidates.keys()) {
       this.candidates.delete(key);
@@ -26632,6 +26648,7 @@ var SealedVaultEngine = class {
       signingPrivateKey: candidate.signingPrivateKey,
       encryptionPrivateKey: candidate.encryptionPrivateKey,
       dek,
+      kek,
       record: plaintext,
       preview
     };
@@ -26733,10 +26750,46 @@ var SealedVaultEngine = class {
       return recordFailure();
     }
     let dek;
+    let requiresLegacyWrapperRepair = false;
     try {
       dek = await this.suite.aes256GcmDecrypt({ key: kek, nonce: wrappingNonce, ciphertext: unwrapParts.ciphertext, tag: unwrapParts.tag, aad: aadBytes });
     } catch {
-      return recordFailure();
+      if (envelope.records.generation.active <= 1 || record.generation <= 1) {
+        return recordFailure();
+      }
+      const provisioningPreview = {
+        ...envelope.preview,
+        lifecycleStatus: "PendingRegistration"
+      };
+      const provisioningAad = buildAadMetadata({
+        envelopeFormatVersion: envelope.envelopeFormatVersion,
+        parameterSuiteVersion: envelope.parameterSuiteVersion,
+        recordSchemaVersion: envelope.recordSchemaVersion,
+        platformWrapperVersion: envelope.platformWrapperVersion,
+        suiteId: envelope.suite.id,
+        kdfParameters: { algorithm: envelope.suite.kdf.algorithm, memoryKiB: envelope.suite.kdf.minMemoryKiB, iterations: envelope.suite.kdf.iterations, parallelism: envelope.suite.kdf.parallelism },
+        adapterBinding: "browser",
+        preview: provisioningPreview,
+        vaultGeneration: 1,
+        recordGeneration: 1,
+        recordPurpose: "ordinary",
+        producerId: record.producerId,
+        producerVersion: record.producerVersion,
+        signingAddress: `${provisioningPreview.signingAddressPrefix}${provisioningPreview.signingAddressSuffix}`,
+        criticalExtensions: []
+      });
+      try {
+        dek = await this.suite.aes256GcmDecrypt({
+          key: kek,
+          nonce: wrappingNonce,
+          ciphertext: unwrapParts.ciphertext,
+          tag: unwrapParts.tag,
+          aad: canonicalizeJsonBytes(provisioningAad)
+        });
+        requiresLegacyWrapperRepair = true;
+      } catch {
+        return recordFailure();
+      }
     }
     const ciphertext = unb64url(record.ciphertext);
     const encryptionNonce = unb64url(record.encryptionNonce);
@@ -26771,10 +26824,18 @@ var SealedVaultEngine = class {
       signingPrivateKey: current.signingPrivateKey,
       encryptionPrivateKey: current.encryptionPrivateKey,
       dek,
+      kek,
       record: current,
       preview: envelope.preview
     };
     this.phase = "verificationOnly";
+    if (requiresLegacyWrapperRepair) {
+      const repair = await this.reencryptCurrentRecord(current);
+      if (repair.code !== "OK") {
+        this.wipeSecrets();
+        return { code: "UNKNOWN_FAILURE", supportCode: this.randomId("sc-") };
+      }
+    }
     await this.storage.writeRecord("operationalSidecars", THROTTLE_KEY, { failedPasswordCount: 0, cooldownDeadline: 0 });
     return {
       code: "OK",
@@ -26800,7 +26861,14 @@ var SealedVaultEngine = class {
           return { code: "ENCRYPTION_KEY_MISMATCH" };
         }
         this.phase = "authenticated";
-        return { code: "OK", detail: { profileName: lookup.profileName ?? this.session.record.alias } };
+        return {
+          code: "OK",
+          detail: {
+            profileName: lookup.profileName ?? this.session.record.alias,
+            signingAddress: binding.signingAddress,
+            encryptionAddress: binding.encryptionAddress
+          }
+        };
       }
       case "missing":
         return {
@@ -26931,6 +26999,13 @@ var SealedVaultEngine = class {
       criticalExtensions: []
     });
     const aadBytes = canonicalizeJsonBytes(aad);
+    const wrappingNonce = this.suite.randomBytes(12);
+    const rewrapped = await this.suite.aes256GcmEncrypt({
+      key: this.session.kek,
+      nonce: wrappingNonce,
+      plaintext: this.session.dek,
+      aad: aadBytes
+    });
     const encryptionNonce = this.suite.randomBytes(12);
     const reencrypted = await this.suite.aes256GcmEncrypt({
       key: this.session.dek,
@@ -26947,6 +27022,10 @@ var SealedVaultEngine = class {
         ordinary: {
           ...record,
           generation: nextGeneration,
+          keyPackage: {
+            wrappedDataKey: b64url(joinCipherAndTag(rewrapped.ciphertext, rewrapped.tag)),
+            wrappingNonce: b64url(wrappingNonce)
+          },
           ciphertext: b64url(joinCipherAndTag(reencrypted.ciphertext, reencrypted.tag)),
           encryptionNonce: b64url(encryptionNonce)
         }
@@ -27257,6 +27336,12 @@ function parseCurrentRecord(text, expectedGeneration) {
 var BFF_IDENTITY_LOOKUP_PATH = "/api/identity";
 var BFF_BLOCKCHAIN_SUBMIT_PATH = "/api/blockchain";
 var LOOKUP_TIMEOUT_MS = 1e4;
+function classifyWorkerException(error) {
+  if (error instanceof ReferenceError) return "WORKER_REFERENCE_ERROR";
+  if (error instanceof TypeError) return "WORKER_TYPE_ERROR";
+  if (typeof DOMException !== "undefined" && error instanceof DOMException && error.name === "OperationError") return "WORKER_CRYPTO_OPERATION_ERROR";
+  return "WORKER_UNEXPECTED_EXCEPTION";
+}
 function outcomeFromSealed(result) {
   switch (result.code) {
     case "OK":
@@ -27351,7 +27436,7 @@ function createWorkerBffIdentityLookup(fetchImpl = fetch) {
       }
       const payload = await response.json();
       const reply = payload.reply;
-      if (reply === null || reply === void 0) {
+      if (reply === null || reply === void 0 || reply.successfull === false) {
         return { kind: "missing" };
       }
       const signing = reply.publicSigningAddress;
@@ -27376,21 +27461,30 @@ function createWorkerBffIdentityLookup(fetchImpl = fetch) {
     }
   };
 }
-function createProductionWorkerEnvironment(params) {
-  const manifestResolution = resolveManifestForRuntimeConfig(params.runtimeConfigId);
-  const secrets = /* @__PURE__ */ new Map();
+function createSecretTransferBook() {
+  const operations = /* @__PURE__ */ new Map();
   const store = (transfer) => {
-    secrets.set(transfer.operationId, transfer);
+    const operation = operations.get(transfer.operationId) ?? /* @__PURE__ */ new Map();
+    operation.set(transfer.kind, transfer);
+    operations.set(transfer.operationId, operation);
   };
   const take = (operationId, kind) => {
-    const transfer = secrets.get(operationId);
-    if (!transfer || transfer.kind !== kind || transfer.consumed) {
+    const operation = operations.get(operationId);
+    const transfer = operation?.get(kind);
+    if (!operation || !transfer || transfer.consumed) {
       return null;
     }
     transfer.consumed = true;
-    secrets.delete(operationId);
+    operation.delete(kind);
+    if (operation.size === 0) operations.delete(operationId);
     return transfer.value;
   };
+  return { store, take };
+}
+function createProductionWorkerEnvironment(params) {
+  const manifestResolution = resolveManifestForRuntimeConfig(params.runtimeConfigId);
+  const secretBook = createSecretTransferBook();
+  const { store, take } = secretBook;
   const waitForSecret = (operationId, kind, timeoutMs = 6e4) => new Promise((resolve) => {
     const deadline = Date.now() + timeoutMs;
     const poll = () => {
@@ -27448,8 +27542,9 @@ function createProductionWorkerEnvironment(params) {
       emitDiagnosticBeacon({ kind: "operation-done", operation, outcome: result.outcome });
       return result;
     } catch (error) {
-      emitDiagnosticBeacon({ kind: "operation-error", operation, outcome: `error: ${String(error)}` });
-      return { outcome: "UNKNOWN_FAILURE", retryable: false, allowedActions: [], supportCode: void 0 };
+      const reason = classifyWorkerException(error);
+      emitDiagnosticBeacon({ kind: "operation-error", operation, outcome: reason });
+      return { outcome: "UNKNOWN_FAILURE", retryable: false, allowedActions: [], supportCode: void 0, payload: { reason } };
     }
   };
   async function dispatchOperation(request, payload) {

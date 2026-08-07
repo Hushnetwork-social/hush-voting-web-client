@@ -22,12 +22,23 @@ test.describe('auth-block-1 initial no-user and three-choice entry', () => {
   });
 });
 
-test.describe('auth-block-2 locked startup and unlock/online verification', () => {
-  test('unlock flow reaches the authenticated shell', async ({ page }) => {
+test.describe('auth-block-2 same-URL authentication history', () => {
+  test('browser Back is inert after authentication; explicit Lock returns to password gate', async ({ page }) => {
     await openApp(page);
-    // Dev composition: first-run. This block validates the shell renders
-    // without protected content and the URL stays root-only.
     await expect(page.getByRole('button', { name: /create user/i })).toBeVisible();
+
+    await page.getByRole('button', { name: /create user/i }).click();
+    await expect(page.getByTestId('authenticated-shell')).toBeVisible();
+    await expectRootOnlyUrl(page);
+
+    await page.goBack();
+    await expect(page.getByTestId('authenticated-shell')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Demo User' })).toBeVisible();
+    await expectRootOnlyUrl(page);
+
+    await page.getByRole('button', { name: 'Demo User' }).click();
+    await page.getByRole('button', { name: 'Lock' }).click();
+    await expect(page.getByLabel('Device password')).toBeVisible();
     await expect(page.getByTestId('authenticated-shell')).toHaveCount(0);
     await expectRootOnlyUrl(page);
   });

@@ -36,6 +36,7 @@ import { validateVerificationOnlyCompletion } from '../child-flow';
 import { publishChildView, clearChildView } from '../../../app/auth/onboarding/onboarding-registry';
 import type { OnboardingChild } from '../../../app/auth/onboarding/OnboardingHost';
 import type { DeploymentManifest } from '../../runtime/deployment';
+import { authenticatedIdentityFromPayload } from './web-actors';
 
 /** Public BFF lookup outcome used by the runtimes (never secrets). */
 export type BridgeLookupOutcome =
@@ -787,7 +788,22 @@ export class RecoveryWordsChildRuntime implements ChildRuntime {
       kind: 'recoveryWords',
       props: {
         view,
-        wordGrid: null,
+        wordGrid: s.stage === 'wordEntry' || s.stage === 'verifying' || s.stage === 'deriving'
+          ? {
+              selectedWordCount: s.wordCount,
+              invalidPositions: [],
+              countValid: true,
+              vocabularyValid: true,
+              checksumState: s.stage === 'wordEntry' ? 'notRun' : 'pending',
+              allConcealed: false,
+              busy: s.stage !== 'wordEntry',
+              canVerify: s.stage === 'wordEntry',
+              errorSummary: s.error?.code === 'WRONG_COUNT'
+                ? [{ code: 'WRONG_COUNT' as const, positions: [] }]
+                : [],
+              pasteReplacementPending: false,
+            }
+          : null,
         candidateReview: null,
         protection: null,
         stagedPreview: null,
@@ -836,6 +852,65 @@ interface FileRuntimeState {
 }
 
 /** Real Credential File child runtime. */
+const SAFE_IMPORT_DIAGNOSTIC_REASONS = new Set([
+  'DAT_WRONG_PASSWORD',
+  'DAT_MALFORMED',
+  'DAT_INVALID_MAGIC',
+  'DAT_UNSUPPORTED_VERSION',
+  'DAT_DUPLICATE_FIELD',
+  'DAT_UNKNOWN_FIELD',
+  'DAT_MISSING_FIELD',
+  'DAT_INVALID_FIELD',
+  'DAT_KEY_MISMATCH',
+  'DAT_MNEMONIC_KEY_MISMATCH',
+  'missing-file-material',
+  'file-encoding',
+  'WORKER_REFERENCE_ERROR',
+  'WORKER_TYPE_ERROR',
+  'WORKER_CRYPTO_OPERATION_ERROR',
+  'WORKER_UNEXPECTED_EXCEPTION',
+]);
+
+function safeImportDiagnosticReason(payload: unknown): string {
+  if (typeof payload !== 'object' || payload === null) return 'UNCLASSIFIED';
+  const reason = (payload as { reason?: unknown }).reason;
+  return typeof reason === 'string' && SAFE_IMPORT_DIAGNOSTIC_REASONS.has(reason) ? reason : 'UNCLASSIFIED';
+}
+
+/** Map only closed worker outcomes/reasons; never parse free-form messages. */
+export function mapCredentialImportFailure(outcome: string, payload: unknown): string {
+  const reason = safeImportDiagnosticReason(payload);
+  if (outcome === 'WRONG_PASSWORD_OR_DAMAGED' || reason === 'DAT_WRONG_PASSWORD' || reason === 'DAT_MALFORMED') return 'AUTHENTICATION_FAILED';
+  if (reason === 'DAT_INVALID_MAGIC') return 'INVALID_MAGIC';
+  if (reason === 'DAT_UNSUPPORTED_VERSION') return 'UNSUPPORTED_VERSION';
+  if (reason === 'DAT_DUPLICATE_FIELD') return 'PAYLOAD_DUPLICATE_FIELD';
+  if (reason === 'DAT_UNKNOWN_FIELD') return 'PAYLOAD_UNKNOWN_FIELD';
+  if (reason === 'DAT_MISSING_FIELD') return 'PAYLOAD_MISSING_FIELD';
+  if (reason === 'DAT_INVALID_FIELD') return 'PAYLOAD_INVALID_FIELD';
+  if (reason === 'DAT_KEY_MISMATCH') return 'KEY_PROOF_FAILED';
+  if (reason === 'DAT_MNEMONIC_KEY_MISMATCH') return 'MNEMONIC_KEY_MISMATCH';
+  return 'UNKNOWN_OUTCOME';
+}
+
+function reportCredentialImportFailure(outcome: string, payload: unknown): void {
+  const safeOutcome = ['INVALID_INPUT', 'WRONG_PASSWORD_OR_DAMAGED', 'UNKNOWN_FAILURE', 'TRANSPORT_UNAVAILABLE'].includes(outcome) ? outcome : 'UNCLASSIFIED';
+  const reason = safeImportDiagnosticReason(payload);
+  // Codes only: never filename, password, bytes, profile, address, or key data.
+  console.warn(`[HushVoting][credential-file-restore] stage=import outcome=${safeOutcome} code=${reason}`);
+}
+
+function reportCredentialLifecycleFailure(stage: 'capability' | 'provision' | 'submit-profile' | 'verify' | 'promote', outcome: string, payload?: unknown): void {
+  const allowed = new Set([
+    'INVALID_INPUT', 'UNKNOWN_FAILURE', 'TRANSPORT_UNAVAILABLE', 'NETWORK_UNAVAILABLE',
+    'PROFILE_MISSING', 'SIGNING_KEY_MISMATCH', 'ENCRYPTION_KEY_MISMATCH',
+    'VERIFY_TIMEOUT', 'AUTHORITY_INVALIDATED', 'AUTHORITY_BUSY',
+    'AUTHORITY_REJECTED', 'CAPABILITY_UNAVAILABLE',
+  ]);
+  const safeOutcome = allowed.has(outcome) ? outcome : 'UNCLASSIFIED';
+  const reason = safeImportDiagnosticReason(payload);
+  console.warn(`[HushVoting][credential-file-restore] stage=${stage} outcome=${safeOutcome} code=${reason}`);
+}
+
 export class CredentialFileChildRuntime implements ChildRuntime {
   readonly kind = 'restoreCredentialFile' as const;
   private state: FileRuntimeState = {
@@ -849,12 +924,27 @@ export class CredentialFileChildRuntime implements ChildRuntime {
   };
   private completion: VerificationOnlyCompletion | null = null;
   private completionResolvers: Array<(completion: VerificationOnlyCompletion) => void> = [];
-  private filePassword = '';
+  private importOperationId: string | null = null;
+  private passwordVisible = false;
+  private emptyPassword = false;
+  private readGeneration = 0;
+  private profileStatus: 'unknown' | 'exact' | 'missing' = 'unknown';
+  private vaultProvisioned = false;
 
   constructor(private readonly ctx: ChildBridgeContext) {}
 
   async start(): Promise<void> {
+    this.importOperationId = null;
+    this.passwordVisible = false;
+    this.emptyPassword = false;
+    this.profileStatus = 'unknown';
+    this.vaultProvisioned = false;
+    this.readGeneration += 1;
     this.state = { ...this.state, stage: 'capabilityPreflight', error: null };
+    this.publishView();
+    // The real browser picker remains user-gesture initiated; preflight only
+    // establishes that the isolated authority is available.
+    this.state = { ...this.state, stage: 'picker', error: null };
     this.publishView();
   }
 
@@ -868,10 +958,16 @@ export class CredentialFileChildRuntime implements ChildRuntime {
   }
 
   async cleanup(): Promise<{ readonly kind: 'CHILD_CLEANUP_COMPLETE' }> {
+    this.readGeneration += 1;
+    if (this.importOperationId !== null) {
+      this.ctx.client.cancel(this.importOperationId);
+      this.importOperationId = null;
+    }
     if (this.state.candidateRef !== null) {
       await this.ctx.client.dispatch('destroyCandidate', { candidateRef: this.state.candidateRef });
     }
-    this.filePassword = '';
+    this.passwordVisible = false;
+    this.emptyPassword = false;
     clearChildView(this.kind);
     return { kind: 'CHILD_CLEANUP_COMPLETE' };
   }
@@ -880,29 +976,58 @@ export class CredentialFileChildRuntime implements ChildRuntime {
     void this.cleanup();
   }
 
-  async onChooseFile(): Promise<void> {
-    this.state = { ...this.state, stage: 'picker' };
+  /** User-gesture browser selection followed by one bounded snapshot transfer. */
+  async onChooseFile(file: File): Promise<void> {
+    const generation = ++this.readGeneration;
+    this.importOperationId = null;
+    this.passwordVisible = false;
+    this.emptyPassword = false;
+    this.state = { ...this.state, stage: 'reading', error: null };
     this.publishView();
-  }
 
-  /** File bytes + backup password handoff: read is bounded, then transferred. */
-  async onSubmitFile(file: File, password: string): Promise<void> {
     if (file.size > 1_048_576) {
-      this.state = { ...this.state, stage: 'terminal', error: { code: 'FILE_TOO_LARGE', message: 'The credential file is too large.' } };
+      this.state = { ...this.state, stage: 'picker', error: { code: 'FILE_TOO_LARGE', message: 'The credential file is too large.' } };
       this.publishView();
       return;
     }
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    this.filePassword = password;
-    this.state = { ...this.state, stage: 'reading' };
+
+    try {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      if (generation !== this.readGeneration) {
+        bytes.fill(0);
+        return;
+      }
+      const operationId = `file-${this.ctx.randomId('op-')}`;
+      this.ctx.client.submitSecret(operationId, 'fileBytes', bytes);
+      bytes.fill(0);
+      this.importOperationId = operationId;
+      this.state = { ...this.state, stage: 'password', error: null };
+      this.publishView();
+    } catch {
+      if (generation === this.readGeneration) {
+        this.state = { ...this.state, stage: 'picker', error: { code: 'READ_UNAVAILABLE', message: 'The credential file could not be read.' } };
+        this.publishView();
+      }
+    }
+  }
+
+  /** Backup password handoff consumes the already-transferred worker snapshot. */
+  async onSubmitPassword(password: string): Promise<void> {
+    const operationId = this.importOperationId;
+    if (operationId === null) {
+      this.state = { ...this.state, stage: 'picker', error: { code: 'READ_UNAVAILABLE', message: 'Choose the credential file again.' } };
+      this.publishView();
+      return;
+    }
+    this.state = { ...this.state, stage: 'decrypting', error: null };
     this.publishView();
-    const operationId = `file-${this.ctx.randomId('op-')}`;
     this.ctx.client.submitSecret(operationId, 'filePassword', password);
-    this.ctx.client.submitSecret(operationId, 'fileBytes', bytes);
-    const importOp = this.ctx.client.dispatch('importFileCandidate', undefined, undefined, operationId);
-    const outcome = await importOp;
+    const outcome = await this.ctx.client.dispatch('importFileCandidate', undefined, undefined, operationId);
+    this.importOperationId = null;
     if (outcome.outcome !== 'OK') {
-      this.state = { ...this.state, stage: 'terminal', error: { code: 'DAT_WRONG_PASSWORD', message: 'The backup could not be opened.' } };
+      const code = mapCredentialImportFailure(outcome.outcome, outcome.payload);
+      reportCredentialImportFailure(outcome.outcome, outcome.payload);
+      this.state = { ...this.state, stage: 'picker', error: { code, message: 'The credential file could not be imported.' } };
       this.publishView();
       return;
     }
@@ -942,18 +1067,64 @@ export class CredentialFileChildRuntime implements ChildRuntime {
       this.publishView();
       return;
     }
-    this.state = { ...this.state, stage: 'protection' };
+    if (outcome.kind === 'authoritativeAbsent') {
+      this.profileStatus = 'missing';
+      this.state = { ...this.state, stage: 'profileReview', error: null };
+      this.publishView();
+      return;
+    }
+    this.profileStatus = 'exact';
+    this.state = {
+      ...this.state,
+      profileName: outcome.profileName,
+      visibility: outcome.isPublic ? 'public' : 'private',
+      stage: 'protection',
+      error: null,
+    };
     this.publishView();
   }
 
-  /** Protection choice: the already-entered backup password is the initial device password (single entry). */
-  async onChooseProtection(mode: string): Promise<void> {
-    if (mode !== 'devicePassword') {
+  /** Explicit missing-profile confirmation precedes local provisioning/submission. */
+  onCreateIdentity(): void {
+    if (this.profileStatus !== 'missing') return;
+    this.state = { ...this.state, stage: 'protection', error: null };
+    this.publishView();
+  }
+
+  /** Protection uses a separately entered Device password, never the backup password. */
+  async onChooseProtection(mode: string, devicePassword?: string): Promise<void> {
+    if (mode !== 'devicePassword' || devicePassword === undefined) {
       this.state = { ...this.state, stage: 'terminal', error: { code: 'UNSUPPORTED_PROTECTION_MODE', message: 'This protection mode is not available on this device.' } };
       this.publishView();
       return;
     }
-    await this.onProtect(this.filePassword);
+    await this.onProtect(devicePassword);
+  }
+
+  onTogglePasswordVisibility(): void {
+    this.passwordVisible = !this.passwordVisible;
+    this.publishView();
+  }
+
+  onToggleEmptyPassword(enabled: boolean): void {
+    this.emptyPassword = enabled;
+    this.publishView();
+  }
+
+  onChooseDifferentFile(): void {
+    this.readGeneration += 1;
+    if (this.importOperationId !== null) {
+      this.ctx.client.cancel(this.importOperationId);
+      this.importOperationId = null;
+    }
+    this.passwordVisible = false;
+    this.emptyPassword = false;
+    this.state = { ...this.state, stage: 'picker', error: null };
+    this.publishView();
+  }
+
+  onCancelRead(): void {
+    this.onChooseDifferentFile();
   }
 
   async onProtect(password: string): Promise<void> {
@@ -974,32 +1145,90 @@ export class CredentialFileChildRuntime implements ChildRuntime {
       const issued = await this.ctx.client.issueCapability('provision');
       capabilityId = issued.capabilityId;
     } catch {
+      reportCredentialLifecycleFailure('capability', 'CAPABILITY_UNAVAILABLE');
       this.state = { ...this.state, stage: 'terminal', error: { code: 'ENCRYPTED_STAGE_FAILURE', message: 'Restore could not start.' } };
       this.publishView();
       return;
     }
     const operationId = `prov-${this.ctx.randomId('op-')}`;
     this.ctx.client.submitSecret(operationId, 'devicePassword', password);
-    const provision = this.ctx.client.dispatch('provisionFromValidatedBundle', {
+    const outcome = await this.ctx.client.dispatch('provisionFromValidatedBundle', {
       candidateRef: this.state.candidateRef,
       alias: this.state.profileName,
       visibility: this.state.visibility,
     }, capabilityId, operationId);
-    const outcome = await provision;
     if (outcome.outcome !== 'OK') {
+      reportCredentialLifecycleFailure('provision', outcome.outcome, outcome.payload);
       this.state = { ...this.state, stage: 'terminal', error: { code: 'ENCRYPTED_STAGE_FAILURE', message: 'Restore could not complete.' } };
       this.publishView();
       return;
     }
-    this.state = { ...this.state, stage: 'activating' };
+    this.vaultProvisioned = true;
+    if (this.profileStatus === 'missing') {
+      await this.submitMissingProfile();
+      return;
+    }
+    await this.verifyAndComplete();
+  }
+
+  private async submitMissingProfile(): Promise<void> {
+    this.state = { ...this.state, stage: 'activating', error: null };
+    this.publishView();
+    const submission = await this.ctx.client.dispatch('submitIdentityTransaction', {
+      alias: this.state.profileName,
+      visibility: this.state.visibility,
+    });
+    if (submission.outcome !== 'OK') {
+      reportCredentialLifecycleFailure('submit-profile', submission.outcome, submission.payload);
+      this.state = { ...this.state, stage: 'terminal', error: { code: 'NETWORK_UNAVAILABLE', message: 'The identity could not be submitted.' } };
+      this.publishView();
+      return;
+    }
+    const status = (submission.payload as { status?: unknown } | undefined)?.status;
+    if (status !== 'accepted' && status !== 'pending' && status !== 'alreadyExists') {
+      reportCredentialLifecycleFailure('submit-profile', 'UNKNOWN_FAILURE', submission.payload);
+      this.state = { ...this.state, stage: 'terminal', error: { code: 'SERVER_PROOF_REJECTED', message: 'The identity was not accepted.' } };
+      this.publishView();
+      return;
+    }
+    const generation = this.readGeneration;
+    for (let attempt = 0; attempt < 60 && generation === this.readGeneration; attempt += 1) {
+      const lookup = await this.ctx.lookupIdentity(this.state.signingAddress);
+      if (lookup.kind === 'exact') {
+        if (lookup.encryptionAddress !== this.state.encryptionAddress) {
+          this.state = { ...this.state, stage: 'terminal', error: { code: 'SIGNING_ENCRYPTION_MISMATCH', message: 'The identity could not be confirmed.' } };
+          this.publishView();
+          return;
+        }
+        this.profileStatus = 'exact';
+        await this.verifyAndComplete();
+        return;
+      }
+      if (attempt < 59) await new Promise((resolve) => setTimeout(resolve, 3_000));
+    }
+    if (generation === this.readGeneration) {
+      this.state = { ...this.state, stage: 'terminal', error: { code: 'VERIFY_TIMEOUT', message: 'Confirmation is delayed. Try again later.' } };
+      this.publishView();
+    }
+  }
+
+  private async verifyAndComplete(): Promise<void> {
+    this.state = { ...this.state, stage: 'activating', error: null };
     this.publishView();
     const verify = await this.ctx.client.dispatch('verifyOnlineIdentity');
     if (verify.outcome !== 'OK') {
+      reportCredentialLifecycleFailure('verify', verify.outcome, verify.payload);
       this.state = { ...this.state, stage: 'terminal', error: { code: 'PROFILE_DISAPPEARED', message: 'The identity could not be confirmed yet.' } };
       this.publishView();
       return;
     }
-    await this.ctx.client.dispatch('promoteLifecycle', { status: 'Active' });
+    const promote = await this.ctx.client.dispatch('promoteLifecycle', { status: 'Active' });
+    if (promote.outcome !== 'OK') {
+      reportCredentialLifecycleFailure('promote', promote.outcome, promote.payload);
+      this.state = { ...this.state, stage: 'terminal', error: { code: 'ENCRYPTED_STAGE_FAILURE', message: 'The restored identity could not be activated.' } };
+      this.publishView();
+      return;
+    }
     this.state = { ...this.state, stage: 'success', error: null };
     this.publishView();
     const completion: VerificationOnlyCompletion = {
@@ -1010,9 +1239,7 @@ export class CredentialFileChildRuntime implements ChildRuntime {
     const validated = validateVerificationOnlyCompletion(completion);
     if (validated.ok && validated.completion) {
       this.completion = validated.completion;
-      for (const resolve of this.completionResolvers) {
-        resolve(validated.completion);
-      }
+      for (const resolve of this.completionResolvers) resolve(validated.completion);
       this.completionResolvers = [];
     } else {
       this.state = { ...this.state, stage: 'terminal', error: { code: 'UNKNOWN_OUTCOME', message: 'Restore could not be confirmed.' } };
@@ -1031,7 +1258,7 @@ export class CredentialFileChildRuntime implements ChildRuntime {
       progress: null,
       failureCode: s.error?.code ?? null,
       backoffRemainingSeconds: 0,
-      passwordField: s.stage === 'password' || s.stage === 'decrypting' ? { visible: false, emptyOptionChecked: false, emptyOptionEnabled: false } : null,
+      passwordField: s.stage === 'password' || s.stage === 'decrypting' ? { visible: this.passwordVisible, emptyOptionChecked: this.emptyPassword, emptyOptionEnabled: true } : null,
       protectionChoices: s.stage === 'protection' ? ['devicePassword'] : null,
       profile: s.stage === 'profileReview' || s.stage === 'protection' || s.stage === 'staging'
         ? { alias: s.profileName, isPublic: s.visibility === 'public', signingAddressAbbreviated: abbreviate(s.signingAddress), encryptionAddressAbbreviated: abbreviate(s.encryptionAddress), networkLabel: 'HushLocal', source: 'importedReview', aliasEditable: false, publicAcknowledgementRequired: false }
@@ -1044,14 +1271,14 @@ export class CredentialFileChildRuntime implements ChildRuntime {
       props: {
         view: composed.view,
         sessionOnlyOnly: false,
-        onChooseFile: () => void this.onChooseFile(),
-        onCancelRead: () => undefined,
-        onSubmitPassword: () => undefined,
-        onToggleVisibility: () => undefined,
-        onToggleEmptyOption: () => undefined,
-        onChooseDifferentFile: () => undefined,
-        onChooseProtection: (mode) => void this.onChooseProtection(mode),
-        onCreateIdentity: () => undefined,
+        onChooseFile: (file) => void this.onChooseFile(file),
+        onCancelRead: () => this.onCancelRead(),
+        onSubmitPassword: (password) => void this.onSubmitPassword(password),
+        onToggleVisibility: () => this.onTogglePasswordVisibility(),
+        onToggleEmptyOption: (enabled) => this.onToggleEmptyPassword(enabled),
+        onChooseDifferentFile: () => this.onChooseDifferentFile(),
+        onChooseProtection: (mode, devicePassword) => void this.onChooseProtection(mode, devicePassword),
+        onCreateIdentity: () => this.onCreateIdentity(),
         onReveal: () => undefined,
         onUnlockResume: () => undefined,
         onCancelStage: () => undefined,
@@ -1071,6 +1298,7 @@ export class CredentialFileChildRuntime implements ChildRuntime {
 /** Build the three onboarding ports over the runtimes. */
 export function createWebOnboardingPorts(ctx: ChildBridgeContext): Record<OnboardingKind, OnboardingPort> {
   const runtimes = new Map<OnboardingKind, ChildRuntime>();
+  const settledOperations = new Set<OperationId>();
 
   const startRuntime = (kind: OnboardingKind): ChildRuntime => {
     let runtime = runtimes.get(kind);
@@ -1081,19 +1309,32 @@ export function createWebOnboardingPorts(ctx: ChildBridgeContext): Record<Onboar
     return runtime;
   };
 
+  const cancelIfInFlight = (kind: OnboardingKind, operationId: OperationId): void => {
+    // XState runs invoke cleanup after a successful result too. That cleanup
+    // is not a user cancellation and must not globally invalidate the worker
+    // before root-owned verification starts.
+    if (settledOperations.delete(operationId)) {
+      clearChildView(kind);
+      runtimes.delete(kind);
+      return;
+    }
+    runtimes.get(kind)?.cancel();
+    ctx.client.cancel(operationId);
+  };
+
   const makePort = (kind: OnboardingKind): OnboardingPort => ({
     cancel(operationId: OperationId) {
-      runtimes.get(kind)?.cancel();
-      ctx.client.cancel(operationId);
+      cancelIfInFlight(kind, operationId);
     },
     start(_kind: OnboardingKind, epoch: SessionEpoch) {
       const runtime = startRuntime(kind);
       const operationId = `onb-${kind}-${epoch}-${Date.now().toString(36)}` as OperationId;
-      const result: Promise<OnboardingResult> = runtime.start().then(async () => {
+      const untracked: Promise<OnboardingResult> = runtime.start().then(async () => {
         const completion = await runtime.awaitCompletion();
         return { code: 'ONBOARDING_COMPLETED', localUserRef: completion.capability } as OnboardingResult;
       });
-      return { operationId, result, cancel: () => runtime.cancel() };
+      const result = untracked.finally(() => settledOperations.add(operationId));
+      return { operationId, result, cancel: () => cancelIfInFlight(kind, operationId) };
     },
     cleanup(epoch: SessionEpoch) {
       const operationId = `onb-clean-${kind}-${epoch}-${Date.now().toString(36)}` as OperationId;
@@ -1107,8 +1348,12 @@ export function createWebOnboardingPorts(ctx: ChildBridgeContext): Record<Onboar
       const operationId = `onb-cmp-${kind}-${epoch}-${Date.now().toString(36)}` as OperationId;
       const result: Promise<VerificationResult> = ctx.client.dispatch('verifyOnlineIdentity').then((outcome) => {
         switch (outcome.outcome) {
-          case 'OK':
-            return { code: 'VERIFY_SUCCESS' } as VerificationResult;
+          case 'OK': {
+            const identity = authenticatedIdentityFromPayload(outcome.payload);
+            return identity === null
+              ? { code: 'VERIFY_SUCCESS' } as VerificationResult
+              : { code: 'VERIFY_SUCCESS', identity } as VerificationResult;
+          }
           case 'PROFILE_MISSING': {
             // The worker forwards the real safe candidate (alias + abbreviated
             // signing address) in the outcome payload; never fabricate a

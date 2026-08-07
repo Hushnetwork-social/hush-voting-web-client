@@ -16,6 +16,7 @@ import type { VaultStorageSession } from '../storage/wrapper';
 import type { VaultResult } from '../../vault-core/contracts/results';
 import { success, failure } from '../../vault-core/contracts/results';
 import { ISOLATED_DEVNET_MANIFEST } from '../../runtime/manifests';
+import { canonicalizeJsonBytes } from '../../vault-core/canonical/jcs';
 
 /** Deterministic in-memory vault storage session (same wrapper contract). */
 class MemoryVaultStorage implements VaultStorageSession {
@@ -84,6 +85,26 @@ class MemoryVaultStorage implements VaultStorageSession {
   async readJournal(): Promise<VaultResult<{ readonly journal: { generation: number; activeSlot: 'slot-a' | 'slot-b' } | null }>> {
     const value = this.store('vaultJournal').get('current');
     return value === undefined ? success({ journal: null }) : success({ journal: structuredClone(value) as { generation: number; activeSlot: 'slot-a' | 'slot-b' } });
+  }
+
+  activeEnvelope(): Record<string, unknown> {
+    const journal = this.store('vaultJournal').get('current') as { activeSlot?: string } | undefined;
+    if (journal?.activeSlot !== 'slot-a' && journal?.activeSlot !== 'slot-b') throw new Error('no active journal');
+    const slot = this.store('vaultSlots').get(journal.activeSlot) as { bytes?: unknown } | undefined;
+    if (typeof slot?.bytes !== 'object' || slot.bytes === null) throw new Error('no active slot');
+    const raw = slot.bytes as Uint8Array | Record<string, number>;
+    const bytes = raw instanceof Uint8Array
+      ? raw
+      : Uint8Array.from(Object.keys(raw).filter((key) => /^\d+$/.test(key)).sort((a, b) => Number(a) - Number(b)).map((key) => raw[key]));
+    return JSON.parse(new TextDecoder().decode(bytes)) as Record<string, unknown>;
+  }
+
+  replaceActiveEnvelope(envelope: Record<string, unknown>): void {
+    const journal = this.store('vaultJournal').get('current') as { activeSlot?: string } | undefined;
+    if (journal?.activeSlot !== 'slot-a' && journal?.activeSlot !== 'slot-b') throw new Error('no active journal');
+    const slot = this.store('vaultSlots').get(journal.activeSlot) as { slotKey: string; generation: number; bytes: unknown } | undefined;
+    if (!slot) throw new Error('no active slot');
+    this.store('vaultSlots').set(journal.activeSlot, { ...slot, bytes: canonicalizeJsonBytes(envelope) });
   }
 
   close(): void {
@@ -276,6 +297,84 @@ describe('sealed vault lifecycle', () => {
       expect(after.detail).toMatchObject({ surface: 'verifiedAbsent' });
     }
   });
+
+  it('rewraps the DEK whenever retained digest or lifecycle AAD changes', async () => {
+    let signingAddress = '';
+    let encryptionAddress = '';
+    engine = createEngine(storage, async () => ({
+      kind: 'exact',
+      profileName: 'Alice',
+      signingAddress,
+      encryptionAddress,
+      visibility: 'private',
+    }));
+    const candidate = engine.createCandidate({ wordCount: 24 });
+    if (candidate.code !== 'OK' || candidate.detail === undefined) throw new Error('candidate generation failed');
+    const provision = await engine.provision({
+      candidateRef: String((candidate.detail as { ref?: unknown }).ref),
+      devicePassword: PASSWORD,
+      alias: 'Alice',
+      visibility: 'private',
+      configurationId: ISOLATED_DEVNET_MANIFEST.configurationId,
+      networkBinding: { canonicalNetworkId: ISOLATED_DEVNET_MANIFEST.canonicalNetworkId, networkMagic: ISOLATED_DEVNET_MANIFEST.networkMagic, configurationId: ISOLATED_DEVNET_MANIFEST.configurationId },
+      producerId: 'P-01',
+    });
+    expect(provision.code).toBe('OK');
+    signingAddress = String((provision.detail as { signingAddress?: unknown }).signingAddress);
+    encryptionAddress = String((provision.detail as { encryptionAddress?: unknown }).encryptionAddress);
+
+    expect((await engine.retainTransactionDigest('a'.repeat(64))).code).toBe('OK');
+    expect((await engine.verifyOnline()).code).toBe('OK');
+    expect((await engine.promoteLifecycle('Active')).code).toBe('OK');
+    engine.lock();
+
+    const returning = createEngine(storage, async () => ({ kind: 'exact', profileName: 'Alice', signingAddress, encryptionAddress, visibility: 'private' }));
+    expect((await returning.unlock({ devicePassword: PASSWORD, configurationId: ISOLATED_DEVNET_MANIFEST.configurationId })).code).toBe('OK');
+  }, 120_000);
+
+  it('repairs the bounded legacy generation-1 wrapper defect after proving current ciphertext', async () => {
+    let signingAddress = '';
+    let encryptionAddress = '';
+    engine = createEngine(storage, async () => ({ kind: 'exact', profileName: 'Alice', signingAddress, encryptionAddress, visibility: 'private' }));
+    const candidate = engine.createCandidate({ wordCount: 24 });
+    if (candidate.code !== 'OK' || candidate.detail === undefined) throw new Error('candidate generation failed');
+    const provision = await engine.provision({
+      candidateRef: String((candidate.detail as { ref?: unknown }).ref),
+      devicePassword: PASSWORD,
+      alias: 'Alice',
+      visibility: 'private',
+      configurationId: ISOLATED_DEVNET_MANIFEST.configurationId,
+      networkBinding: { canonicalNetworkId: ISOLATED_DEVNET_MANIFEST.canonicalNetworkId, networkMagic: ISOLATED_DEVNET_MANIFEST.networkMagic, configurationId: ISOLATED_DEVNET_MANIFEST.configurationId },
+      producerId: 'P-01',
+    });
+    expect(provision.code).toBe('OK');
+    signingAddress = String((provision.detail as { signingAddress?: unknown }).signingAddress);
+    encryptionAddress = String((provision.detail as { encryptionAddress?: unknown }).encryptionAddress);
+    const generationOne = storage.activeEnvelope();
+    const originalKeyPackage = structuredClone(
+      (((generationOne.records as { ordinary: { keyPackage: unknown } }).ordinary).keyPackage),
+    );
+
+    expect((await engine.retainTransactionDigest('b'.repeat(64))).code).toBe('OK');
+    expect((await engine.verifyOnline()).code).toBe('OK');
+    expect((await engine.promoteLifecycle('Active')).code).toBe('OK');
+
+    // Reproduce the shipped defect: current ciphertext/AAD with the untouched
+    // provisioning wrapper. This is the exact shape already in local browsers.
+    const broken = storage.activeEnvelope();
+    ((broken.records as { ordinary: { keyPackage: unknown } }).ordinary).keyPackage = originalKeyPackage;
+    storage.replaceActiveEnvelope(broken);
+    engine.lock();
+
+    const repairing = createEngine(storage, async () => ({ kind: 'exact', profileName: 'Alice', signingAddress, encryptionAddress, visibility: 'private' }));
+    expect((await repairing.unlock({ devicePassword: PASSWORD, configurationId: ISOLATED_DEVNET_MANIFEST.configurationId })).code).toBe('OK');
+    repairing.lock();
+
+    // Repair is persisted atomically; the compatibility fallback is no longer
+    // needed by subsequent returning-user unlocks.
+    const stable = createEngine(storage);
+    expect((await stable.unlock({ devicePassword: PASSWORD, configurationId: ISOLATED_DEVNET_MANIFEST.configurationId })).code).toBe('OK');
+  }, 180_000);
 
   it('enforces the cooldown schedule after repeated failures', async () => {
     const candidate = engine.createCandidate({ wordCount: 24 });

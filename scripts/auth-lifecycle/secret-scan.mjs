@@ -57,6 +57,8 @@ const ALLOWED_PATTERNS = [
   /evil\.example/,
   /example\.com/,
   /127\.0\.0\.1/,
+  /localhost/,
+  /opens the native browser file chooser and forwards exactly one selected file/,
   /https:\/\/x/,
   /election\.example/,
 ];

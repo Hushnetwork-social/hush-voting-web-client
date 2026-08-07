@@ -8,8 +8,8 @@
  * ever receives it.
  *
  * Shows only: alias, abbreviated signing address, device-password entry,
- * Unlock, Forgot device password? (recovery navigation), and a separate
- * Remove local user action. No avatar, full-address copy, server-login
+ * Unlock, and Remove local user. Recovery begins only after the separately
+ * confirmed destructive removal flow. No avatar, full-address copy, server-login
  * language, or authenticated navigation is mounted.
  *
  * Normative source: FeatureDescription "Locked-user screen",
@@ -20,14 +20,13 @@ import { useRef, useState } from 'react';
 
 interface LockedUserProps {
   readonly onSubmitSecret: (password: string) => void;
-  readonly onForgotPassword: () => void;
   readonly onRemoveLocalUser: () => void;
   readonly disabled?: boolean;
   /** Typed outcome error from the authority (e.g. the combined error). */
   readonly outcomeError?: string | null;
 }
 
-export function LockedUser({ onSubmitSecret, onForgotPassword, onRemoveLocalUser, disabled = false, outcomeError = null }: LockedUserProps) {
+export function LockedUser({ onSubmitSecret, onRemoveLocalUser, disabled = false, outcomeError = null }: LockedUserProps) {
   // The authority's typed outcome error (e.g. the exact combined credential
   // error) is displayed above the form when present (AC-010-036).
   const [displayedOutcome, setDisplayedOutcome] = useState<string | null>(outcomeError);
@@ -79,19 +78,13 @@ export function LockedUser({ onSubmitSecret, onForgotPassword, onRemoveLocalUser
       </div>
 
       <div className="locked-actions">
+        <button type="button" className="button-danger-ghost" onClick={onRemoveLocalUser} disabled={disabled}>
+          {'Remove local user'}
+        </button>
         <button type="submit" className="button-primary" disabled={disabled}>
           {'Unlock HushVoting!'}
         </button>
-        <button type="button" className="link-button" onClick={onForgotPassword} disabled={disabled}>
-          {'Forgot device password?'}
-        </button>
       </div>
-
-      <hr className="separator" />
-
-      <button type="button" className="button-danger-ghost" onClick={onRemoveLocalUser} disabled={disabled}>
-        {'Remove local user'}
-      </button>
     </form>
   );
 }

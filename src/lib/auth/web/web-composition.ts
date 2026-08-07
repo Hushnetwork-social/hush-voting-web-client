@@ -93,6 +93,13 @@ export function submitWebSecret(operationId: string, secret: string): void {
   }
 }
 
+/** Authenticated Lock: wipe the worker-held session before closing the UI gate. */
+export async function lockWebSession(): Promise<boolean> {
+  if (singleton === null) return false;
+  const outcome = await singleton.client.dispatch('lockAll');
+  return outcome.outcome === 'OK';
+}
+
 /** Reset the singleton (test isolation). */
 export function resetWebComposition(): void {
   singleton?.client.close();

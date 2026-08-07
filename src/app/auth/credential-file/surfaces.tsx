@@ -8,6 +8,7 @@
  * authority sink (never React state).
  */
 import type { ReactNode } from 'react';
+import { useInlineOnboardingBack } from '../onboarding/back-context';
 
 /** Exact required copy (single source; matches presentation EXACT_COPY). */
 export const COPY = {
@@ -21,6 +22,8 @@ export const COPY = {
     choose: 'Choose a file',
     different: 'Choose a different file',
     selected: 'Credential file selected',
+    selectedLabel: 'Selected credential file',
+    selectedFallback: 'File name unavailable',
   },
   reading: {
     title: 'Reading credential file…',
@@ -86,9 +89,9 @@ export const COPY = {
 export function RestorePanel({ title, children, aside }: { readonly title: string; readonly children: ReactNode; readonly aside?: ReactNode }) {
   return (
     <section className="mx-auto w-full max-w-xl px-4 py-8" data-testid="restore-panel">
-      <div className="rounded-2xl bg-[var(--surface-strong)] p-6 shadow-sm">
+      <div className="restore-surface bg-[var(--surface-strong)] p-6 shadow-sm">
         <div className="mb-4 flex items-start justify-between gap-3">
-          <h1 className="text-xl font-semibold text-[var(--text)]">{title}</h1>
+          <h2 className="w-full max-w-none text-xl font-semibold leading-snug text-[var(--text)]">{title}</h2>
           {aside}
         </div>
         {children}
@@ -99,6 +102,8 @@ export function RestorePanel({ title, children, aside }: { readonly title: strin
 
 /** Back control (in-app Back shares one authority with browser/Android Back). */
 export function RestoreBackButton({ onBack, label = 'Back' }: { readonly onBack: () => void; readonly label?: string }) {
+  const showInlineBack = useInlineOnboardingBack();
+  if (!showInlineBack) return null;
   return (
     <button type="button" onClick={onBack} className="rounded-lg px-3 py-2 text-sm font-medium text-[var(--text-muted)] hover:text-[var(--text)]" data-testid="restore-back">
       {label}
@@ -111,19 +116,23 @@ export function RestorePrimaryButton({
   children,
   onClick,
   disabled = false,
+  fullWidth = false,
+  type = 'button',
   testId,
 }: {
   readonly children: ReactNode;
-  readonly onClick: () => void;
+  readonly onClick?: () => void;
   readonly disabled?: boolean;
+  readonly fullWidth?: boolean;
+  readonly type?: 'button' | 'submit';
   readonly testId: string;
 }) {
   return (
     <button
-      type="button"
+      type={type}
       onClick={onClick}
       disabled={disabled}
-      className="min-h-11 rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-[var(--accent-contrast)] disabled:opacity-50"
+      className={`button-default ${fullWidth ? 'w-full' : ''}`}
       data-testid={testId}
     >
       {children}
@@ -131,7 +140,7 @@ export function RestorePrimaryButton({
   );
 }
 
-/** Safe status region (text + status semantics; never filename-based). */
+/** Safe status region (text + status semantics). */
 export function RestoreStatusRegion({ children, role = 'status' }: { readonly children: ReactNode; readonly role?: 'status' | 'alert' }) {
   return (
     <p role={role} className="mt-3 text-sm font-medium text-[var(--text)]" data-testid="restore-status">

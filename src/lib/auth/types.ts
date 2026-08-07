@@ -76,7 +76,7 @@ export type AuthStateCode =
   | 'removingLocalUser';
 
 /** Connectivity region state codes (parallel region; never erases auth context). */
-export type ConnectivityStateCode = 'unknown' | 'online' | 'offline' | 'reconnecting';
+export type ConnectivityStateCode = 'unknown' | 'online' | 'paused' | 'offline' | 'reconnecting';
 
 /** Onboarding child-flow kinds — the ONLY three first-run entry paths. */
 export type OnboardingKind = 'createUser' | 'restoreCredentialFile' | 'restoreRecoveryWords';
@@ -87,6 +87,13 @@ export type TypedDestinationKind =
   | 'electionDashboard'
   | 'electionPage'
   | 'rootFallback';
+
+/** Public identity metadata available only after exact authenticated verification. */
+export interface AuthenticatedIdentityMetadata {
+  readonly alias: string;
+  readonly publicSigningKey: string;
+  readonly publicEncryptionKey: string;
+}
 
 /** Bounded safe public identity metadata shown while locked. */
 export interface SafeIdentityMetadata {
@@ -197,6 +204,7 @@ export interface AuthMachineContext {
   readonly registeredCapabilities: ReadonlySet<CapabilityId>;
   readonly safeCoordination: boolean;
   readonly safeIdentity: SafeIdentityMetadata | null;
+  readonly authenticatedIdentity: AuthenticatedIdentityMetadata | null;
   readonly environment: EnvironmentContext | null;
   readonly cooldownDeadlineMs: number | null;
   readonly navigationToken: NavigationToken | null;

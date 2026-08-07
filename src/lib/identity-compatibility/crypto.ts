@@ -6,9 +6,9 @@
  * ranges as the historical Hush Feeds web client) so the API derives the same
  * keys the historical producers derived. No DOM, storage, or transport.
  */
-import { mnemonicToSeedSync } from 'bip39';
 import { hkdf } from '@noble/hashes/hkdf.js';
-import { sha256 } from '@noble/hashes/sha2.js';
+import { pbkdf2 } from '@noble/hashes/pbkdf2.js';
+import { sha256, sha512 } from '@noble/hashes/sha2.js';
 import { hmac } from '@noble/hashes/hmac.js';
 import * as secp from '@noble/secp256k1';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
@@ -37,13 +37,15 @@ export function hexToBytesStrict(hex: string): Uint8Array {
 }
 
 /**
- * BIP-39 seed: PBKDF2-HMAC-SHA512, 2048 iterations, salt "mnemonic".
- * The raw bip39 result can be a Buffer (Node/bundler polyfills); copy into a
- * plain Uint8Array so noble v2's strict isBytes() check accepts it in every
- * runtime and test realm.
+ * BIP-39 seed: NFKD + PBKDF2-HMAC-SHA512, 2048 iterations, empty passphrase,
+ * salt "mnemonic". Implemented with browser-safe noble primitives rather
+ * than bip39's Node-oriented Buffer path so it runs identically inside the
+ * production SharedWorker.
  */
 export function mnemonicToSeed(mnemonic: string): Uint8Array {
-  return new Uint8Array(mnemonicToSeedSync(mnemonic));
+  const normalizedMnemonic = mnemonic.normalize('NFKD');
+  const salt = 'mnemonic'.normalize('NFKD');
+  return pbkdf2(sha512, ENCODER.encode(normalizedMnemonic), ENCODER.encode(salt), { c: 2048, dkLen: 64 });
 }
 
 /**

@@ -58,50 +58,65 @@ export function decidePaste(pasted: string, selectedCount: '12' | '24' | null, a
 }
 
 export function WordEntryScreen({ grid, onSelectCount, onPastePhrase, onConfirmPasteReplacement, onClearAll, onVerify, onBack }: WordEntryProps) {
-  const [draft, setDraft] = useState<ReadonlyArray<string>>([]);
+  const [filledPositions, setFilledPositions] = useState<ReadonlySet<number>>(() => new Set());
   const [concealed, setConcealed] = useState(grid.allConcealed);
   const [replacementPrompt, setReplacementPrompt] = useState(false);
   const pendingPasteRef = useRef<{ phrase: string; count: number } | null>(null);
-  const count = grid.selectedWordCount;
+  const inputElementsRef = useRef(new Map<number, HTMLInputElement>());
+  const count = grid.selectedWordCount ?? '24';
 
   const inputs = useMemo(() => {
-    const size = count === '12' ? 12 : count === '24' ? 24 : 0;
+    const size = count === '12' ? 12 : 24;
     return Array.from({ length: size }, (_, index): { id: string; label: string; position: number } => {
       const position = index + 1;
       return { id: `rw-${position}`, label: WORD_ENTRY.wordLabel(position, size), position };
     });
   }, [count]);
 
-  const anyFieldFilled = draft.some((value) => value.trim().length > 0);
+  const anyFieldFilled = filledPositions.size > 0;
+  const allFieldsFilled = filledPositions.size === inputs.length;
 
-  const handlePaste = (position: number, pastedText: string) => {
+  const fillGrid = (phrase: string) => {
+    const words = phrase.split(' ');
+    words.forEach((word, index) => {
+      const input = inputElementsRef.current.get(index + 1);
+      if (input) input.value = word;
+    });
+    setFilledPositions(new Set(words.map((_, index) => index + 1)));
+    onPastePhrase(phrase);
+    setConcealed(false);
+  };
+
+  const clearGrid = () => {
+    for (const input of inputElementsRef.current.values()) input.value = '';
+    setFilledPositions(new Set());
+    setConcealed(grid.allConcealed);
+    onClearAll();
+  };
+
+  const handlePaste = (pastedText: string) => {
     const decision = decidePaste(pastedText, count, anyFieldFilled);
     if (decision.kind === 'fillGrid') {
-      const words = decision.phrase.split(' ');
-      setDraft(words);
-      onPastePhrase(decision.phrase);
-      setConcealed(true);
+      fillGrid(decision.phrase);
     } else if (decision.kind === 'replacementRequired') {
-      // Explicit whole-grid replacement confirmation; existing values preserved
-      // until the user decides.
+      // Existing values remain untouched until explicit whole-grid replacement.
       pendingPasteRef.current = { phrase: decision.phrase, count: decision.count };
       setReplacementPrompt(true);
     }
     // countMismatch/emptyPaste: reject entirely; existing fields preserved.
-    void position;
   };
 
   const confirmReplacement = (confirm: boolean) => {
     const pending = pendingPasteRef.current;
-    if (pending && confirm) {
-      const words = pending.phrase.split(' ');
-      setDraft(words);
-      onPastePhrase(pending.phrase);
-      setConcealed(true);
-    }
+    if (pending && confirm) fillGrid(pending.phrase);
     pendingPasteRef.current = null;
     setReplacementPrompt(false);
     onConfirmPasteReplacement(confirm);
+  };
+
+  const selectCount = (selected: '12' | '24') => {
+    clearGrid();
+    onSelectCount(selected);
   };
 
   const invalidPositions = new Set(grid.invalidPositions);
@@ -114,42 +129,40 @@ export function WordEntryScreen({ grid, onSelectCount, onPastePhrase, onConfirmP
         <legend className="mb-2 text-sm font-medium text-[var(--text)]">Word count</legend>
         <div className="flex flex-wrap gap-3">
           {(['12', '24'] as const).map((option) => (
-            <label key={option} className="flex min-h-11 items-center gap-2 rounded-xl bg-[var(--surface-strong)] px-3 py-2 text-sm text-[var(--text)]">
-              <input type="radio" name="word-count" checked={count === option} onChange={() => onSelectCount(option)} data-testid={`count-${option}`} />
+            <label key={option} className="flex min-h-11 items-center gap-2 rounded-[0.85rem] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)]">
+              <input type="radio" name="word-count" checked={count === option} onChange={() => selectCount(option)} data-testid={`count-${option}`} />
               {option === '12' ? WORD_ENTRY.twelve : WORD_ENTRY.twentyFour}
             </label>
           ))}
         </div>
       </fieldset>
 
-      {count !== null && (
-        <>
+      <>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3" data-testid="word-grid">
             {inputs.map((input) => {
-              const value = draft[input.position - 1] ?? '';
+              const filled = filledPositions.has(input.position);
               const invalid = invalidPositions.has(input.position);
               return (
                 <div key={input.id} className="flex flex-col gap-1">
                   <WordInput
                     id={input.id}
                     label={input.label}
-                    concealed={concealed && value.length > 0 && !invalid}
+                    concealed={concealed && filled && !invalid}
                     invalid={invalid}
+                    inputRef={(element) => {
+                      if (element) inputElementsRef.current.set(input.position, element);
+                      else inputElementsRef.current.delete(input.position);
+                    }}
                     onValue={(value) => {
-                      setDraft((current) => {
-                        const next = [...current];
-                        next[input.position - 1] = value;
+                      setFilledPositions((current) => {
+                        const next = new Set(current);
+                        if (value.trim().length > 0) next.add(input.position);
+                        else next.delete(input.position);
                         return next;
                       });
                     }}
-                  />
-                  <input
-                    aria-hidden="true"
-                    tabIndex={-1}
-                    data-paste-target={input.position}
-                    className="sr-only"
                     onPaste={(event) => {
-                      handlePaste(input.position, event.clipboardData.getData('text'));
+                      handlePaste(event.clipboardData.getData('text'));
                       event.preventDefault();
                     }}
                   />
@@ -162,16 +175,15 @@ export function WordEntryScreen({ grid, onSelectCount, onPastePhrase, onConfirmP
             <RecoveryActionButton variant="secondary" onClick={() => setConcealed((current) => !current)}>
               {concealed ? WORD_ENTRY.showAll : WORD_ENTRY.hideAll}
             </RecoveryActionButton>
-            <RecoveryActionButton variant="secondary" onClick={onClearAll} disabled={!anyFieldFilled}>
+            <RecoveryActionButton variant="secondary" onClick={clearGrid} disabled={!anyFieldFilled}>
               {WORD_ENTRY.clearAll}
             </RecoveryActionButton>
           </div>
           <p className="mt-2 text-xs text-[var(--text-muted)]">{WORD_ENTRY.shoulderSurfing}</p>
-        </>
-      )}
+      </>
 
       {(grid.pasteReplacementPending || replacementPrompt) && (
-        <div role="alertdialog" aria-label="Replace words" className="mt-4 rounded-xl bg-[var(--surface-strong)] p-4">
+        <div role="alertdialog" aria-label="Replace words" className="mt-4 rounded-[0.85rem] bg-[var(--surface)] p-4">
           <p className="text-sm text-[var(--text)]">{WORD_ENTRY.replacePrompt}</p>
           <div className="mt-3 flex gap-3">
             <RecoveryActionButton variant="primary" onClick={() => confirmReplacement(true)}>
@@ -205,13 +217,12 @@ export function WordEntryScreen({ grid, onSelectCount, onPastePhrase, onConfirmP
         <RecoveryBackButton onClick={onBack} label={grid.allConcealed ? BACK.staged : BACK.beforeVerify} />
         <RecoveryActionButton
           variant="primary"
-          disabled={!grid.canVerify || grid.busy}
+          fullWidth
+          disabled={!allFieldsFilled || !grid.canVerify || grid.busy}
           busy={grid.busy}
           onClick={() => {
-            const phrase = draft.join(' ').trim();
-            if (phrase.length > 0) {
-              onVerify(phrase);
-            }
+            const phrase = inputs.map((input) => inputElementsRef.current.get(input.position)?.value.trim() ?? '').join(' ');
+            if (phrase.trim().length > 0) onVerify(phrase);
           }}
         >
           {grid.busy ? WORD_ENTRY.busyVerifying : WORD_ENTRY.verify}

@@ -8,12 +8,13 @@
  */
 
 import { useId } from 'react';
+import { useInlineOnboardingBack } from '../onboarding/back-context';
 
 /** Shared complementary surface panel (never heavy-card-in-card). */
 export function SurfacePanel({ title, children }: { title: string; children: React.ReactNode }) {
   const titleId = useId();
   return (
-    <section aria-labelledby={titleId} className="rounded-2xl bg-[var(--surface)] px-5 py-4 shadow-sm" data-testid="create-surface">
+    <section aria-labelledby={titleId} className="rounded-[0.85rem] bg-[var(--surface-strong)] p-6 shadow-sm" data-testid="create-surface">
       <h2 id={titleId} className="mb-2 text-base font-semibold text-[var(--text)]">
         {title}
       </h2>
@@ -29,22 +30,30 @@ export function ActionButton({
   variant = 'primary',
   disabled = false,
   busy = false,
+  fullWidth = false,
 }: {
   children: React.ReactNode;
   onClick: () => void;
   variant?: 'primary' | 'secondary' | 'danger';
   disabled?: boolean;
   busy?: boolean;
+  fullWidth?: boolean;
 }) {
   const base =
-    'inline-flex min-h-11 items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-50';
+    'inline-flex min-h-11 items-center justify-center px-4 py-2 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-50';
   const styles = {
-    primary: 'bg-[var(--accent)] text-white hover:bg-[var(--accent-strong)]',
-    secondary: 'bg-[var(--surface-strong)] text-[var(--text)] hover:bg-[var(--surface-stronger)]',
-    danger: 'bg-[var(--danger)] text-white hover:bg-[var(--danger-strong)]',
+    primary: 'button-default',
+    secondary: 'rounded-[0.85rem] bg-[var(--surface-stronger)] text-[var(--text)] hover:bg-[var(--surface-highest)]',
+    danger: 'rounded-[0.85rem] bg-[var(--danger)] text-white hover:bg-[var(--danger-strong)]',
   };
   return (
-    <button type="button" onClick={onClick} disabled={disabled || busy} className={`${base} ${styles[variant]}`} data-testid="create-action">
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled || busy}
+      className={`${base} ${styles[variant]}${fullWidth ? ' w-full' : ''}`}
+      data-testid="create-action"
+    >
       {busy ? '…' : children}
     </button>
   );
@@ -52,6 +61,8 @@ export function ActionButton({
 
 /** Back control (hidden at the safe root). */
 export function BackButton({ onClick, label = 'Back' }: { onClick: () => void; label?: string }) {
+  const showInlineBack = useInlineOnboardingBack();
+  if (!showInlineBack) return null;
   return (
     <button
       type="button"

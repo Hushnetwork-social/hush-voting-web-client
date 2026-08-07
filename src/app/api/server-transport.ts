@@ -18,7 +18,7 @@
  * server hardening artifact (external release blocker); the JSON mapping here
  * preserves the canonical field names and sealed reply shapes.
  */
-import type { HushServerTransportPort, LookupTransportResult, SubmitTransportResult } from '../../lib/identity-creation/transport';
+import type { BlockchainIndexTransportResult, HushServerTransportPort, LookupTransportResult, SubmitTransportResult } from '../../lib/identity-creation/transport';
 import { RPC_TIMEOUT_MS } from '../../lib/identity-creation/transport';
 import {
   parseBffLookupResponse,
@@ -33,6 +33,7 @@ import { BinaryGrpcTransport, parseGrpcEndpoint } from './binary-grpc-transport'
 export const HUSHSERVER_ENDPOINT_ENV = 'HUSHSERVER_NODE_ENDPOINT' as const;
 
 /** gRPC-Web-style method paths (unchanged RPC names). */
+const BLOCKCHAIN_INDEX_PATH = '/hushBlockchain/GetBlockchainHeight' as const;
 const LOOKUP_PATH = '/hushIdentity/GetIdentity' as const;
 const SUBMIT_PATH = '/hushBlockchain/SubmitSignedTransaction' as const;
 
@@ -61,6 +62,27 @@ export function createServerTransport(env: NodeJS.ProcessEnv): HushServerTranspo
 /** Real bounded HTTP transport bound to the configured server endpoint. */
 export class ManifestBoundHttpTransport implements HushServerTransportPort {
   constructor(private readonly baseUrl: string) {}
+
+  async getBlockchainIndex(): Promise<BlockchainIndexTransportResult> {
+    try {
+      const response = await fetch(`${this.baseUrl}${BLOCKCHAIN_INDEX_PATH}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-hush-protocol': 'identity-v1' },
+        body: '{}',
+        signal: AbortSignal.timeout(RPC_TIMEOUT_MS),
+        cache: 'no-store',
+      });
+      if (!response.ok) return { ok: false, failure: { kind: 'unavailable' } };
+      const body = (await response.json()) as { Index?: unknown; index?: unknown } | null;
+      const raw = body?.Index ?? body?.index;
+      const index = typeof raw === 'string' ? raw : typeof raw === 'number' && Number.isSafeInteger(raw) && raw >= 0 ? String(raw) : null;
+      return index !== null && /^\d+$/.test(index)
+        ? { ok: true, index }
+        : { ok: false, failure: { kind: 'protocol' } };
+    } catch {
+      return { ok: false, failure: { kind: 'unavailable' } };
+    }
+  }
 
   async lookupIdentity(request: { readonly publicSigningAddress: string }): Promise<LookupTransportResult> {
     return this.post<BffIdentityLookupRequest, GetIdentityReply>(LOOKUP_PATH, request, parseBffLookupResponse, (reply) => ({ ok: true, reply }));

@@ -3,8 +3,8 @@
  * secret-boundary, timing, privacy, lifecycle, navigation, and responsive
  * tests for the credential-file UI surfaces.
  *
- * Proves: file input cleared after transfer/cancel, safe selected status
- * (never filename), neutral picker cancel, password never enters React
+ * Proves: file input cleared after transfer/cancel, transient sanitized
+ * basename confirmation, neutral picker cancel, password never enters React
  * state, password components never co-mount with protection, exact copy,
  * empty-password option, countdown accessibility, abbreviated addresses,
  * success truth, stage-specific Back, quarantine gate, and 320px-safe
@@ -17,7 +17,7 @@ import { toRestoreViewState } from '../../../lib/credential-file-restore/present
 import type { RestoreViewState } from '../../../lib/credential-file-restore/presentation/view';
 import { COPY } from './surfaces';
 import { PasswordScreen, errorCopy } from './picker-password';
-import { CredentialFileFlow, OwnerBlockedScreen, QuarantineScreen } from './credential-file-flow';
+import { CredentialFileFlow, OwnerBlockedScreen, QuarantineScreen, selectedFileDisplayName } from './credential-file-flow';
 import { SuccessScreen } from './profile-protection';
 
 function view(overrides: Partial<Parameters<typeof toRestoreViewState>[0]> = {}): RestoreViewState {
@@ -55,11 +55,40 @@ function flowProps(overrides: Partial<Parameters<typeof CredentialFileFlow>[0]> 
 }
 
 describe('FEAT-009 picker/read surfaces (Task 5.1)', () => {
-  it('shows safe selected status and never a filename', () => {
+  it('shows selection guidance and never a filename before selection', () => {
     const props = flowProps({ view: view({ stage: 'picker' }) });
     const { container } = render(<CredentialFileFlow {...props} />);
-    expect(screen.getByText(COPY.picker.selected)).toBeDefined();
-    expect(container.textContent).not.toMatch(/\.dat|backup/i);
+    expect(screen.getByText(COPY.picker.detail)).toBeDefined();
+    expect(container.textContent).not.toMatch(/\.dat/i);
+  });
+
+  it('opens the native browser file chooser and forwards exactly one selected file', async () => {
+    const user = userEvent.setup();
+    const onChooseFile = vi.fn();
+    const props = flowProps({ view: view({ stage: 'picker' }), onChooseFile });
+    const rendered = render(<CredentialFileFlow {...props} />);
+    const input = screen.getByTestId('credential-file-input') as HTMLInputElement;
+    const openSpy = vi.spyOn(input, 'click');
+
+    await user.click(screen.getByTestId('choose-file'));
+    expect(openSpy).toHaveBeenCalledOnce();
+
+    const file = new File([new Uint8Array([0x48, 0x55, 0x53, 0x48])], 'fixture.dat', { type: 'application/octet-stream' });
+    await user.upload(input, file);
+    expect(onChooseFile).toHaveBeenCalledOnce();
+    expect(onChooseFile).toHaveBeenCalledWith(file);
+    expect(input.value).toBe('');
+
+    rendered.rerender(
+      <CredentialFileFlow
+        {...props}
+        view={view({ stage: 'password', passwordField: { visible: false, emptyOptionChecked: false, emptyOptionEnabled: true } })}
+      />,
+    );
+    expect(screen.getByTestId('selected-file-name').textContent).toBe('fixture.dat');
+    await user.click(screen.getByTestId('choose-different-file'));
+    expect(props.onChooseDifferentFile).toHaveBeenCalledOnce();
+    expect(screen.getByTestId('selected-file-name').textContent).toBe(COPY.picker.selectedFallback);
   });
 
   it('picker cancel is neutral — no error announcement, back to entry', () => {
@@ -97,11 +126,34 @@ describe('FEAT-009 password surface (Task 5.3)', () => {
     expect(input.value).toBe(''); // cleared after submission
   });
 
-  it('exact label and purpose-separation explainer are rendered', () => {
+  it('shows the transient selected basename, exact label, and purpose-separation guidance', () => {
     const state = view({ stage: 'password', passwordField: { visible: false, emptyOptionChecked: false, emptyOptionEnabled: true } });
-    render(<PasswordScreen view={state} onSubmit={vi.fn()} onToggleVisibility={vi.fn()} onToggleEmptyOption={vi.fn()} onChooseDifferentFile={vi.fn()} onBack={vi.fn()} />);
+    const { container } = render(<PasswordScreen view={state} selectedFileName="chosen-backup.dat" onSubmit={vi.fn()} onToggleVisibility={vi.fn()} onToggleEmptyOption={vi.fn()} onChooseDifferentFile={vi.fn()} onBack={vi.fn()} />);
+    expect(screen.getByTestId('selected-file-status')).toHaveClass('selection-display');
+    expect(screen.getByTestId('selected-file-status').textContent).toContain(COPY.picker.selectedLabel);
+    expect(screen.getByTestId('selected-file-name').textContent).toBe('chosen-backup.dat');
+    expect(screen.getByTestId('backup-password-input')).toHaveClass('text-input');
+    expect(container.textContent).not.toMatch(/\/home\/|file:\/\/|content:\/\//i);
     expect(screen.getByLabelText(COPY.password.label)).toBeDefined();
     expect(screen.getByTestId('password-explainer').textContent).toBe(COPY.password.explainer);
+  });
+
+  it('removes paths, control characters, and bidi controls from the displayed basename', () => {
+    const file = new File([], 'C:\\private\\safe\u202Ecod.dat');
+    expect(selectedFileDisplayName(file)).toBe('safecod.dat');
+  });
+
+  it('keeps Decrypt backup disabled until a password is entered', async () => {
+    const user = userEvent.setup();
+    const state = view({ stage: 'password', passwordField: { visible: false, emptyOptionChecked: false, emptyOptionEnabled: true } });
+    render(<PasswordScreen view={state} onSubmit={vi.fn()} onToggleVisibility={vi.fn()} onToggleEmptyOption={vi.fn()} onChooseDifferentFile={vi.fn()} onBack={vi.fn()} />);
+    const input = screen.getByTestId('backup-password-input');
+    const submit = screen.getByTestId('submit-password') as HTMLButtonElement;
+    expect(submit.disabled).toBe(true);
+    await user.type(input, 'public-test-password');
+    expect(submit.disabled).toBe(false);
+    await user.clear(input);
+    expect(submit.disabled).toBe(true);
   });
 
   it('show/hide has a stateful accessible name', async () => {
@@ -163,9 +215,29 @@ describe('FEAT-009 profile/protection/success surfaces (Task 5.5)', () => {
     render(<CredentialFileFlow {...props} />);
     const passwordChoice = screen.getByTestId('protection-devicePassword') as HTMLInputElement;
     expect(passwordChoice.checked).toBe(true);
+    expect(screen.getByTestId('restore-device-password')).toBeDefined();
+    expect(screen.getByTestId('restore-device-password-confirmation')).toBeDefined();
+    expect((screen.getByTestId('submit-protection') as HTMLButtonElement).disabled).toBe(true);
     // No Backup-file password field/explainer may be mounted.
     expect(screen.queryByTestId('backup-password-input')).toBeNull();
     expect(screen.queryByTestId('password-explainer')).toBeNull();
+  });
+
+  it('submits a separately entered and confirmed Device password', async () => {
+    const user = userEvent.setup();
+    const onChooseProtection = vi.fn();
+    const props = flowProps({
+      view: view({ stage: 'protection', protectionChoices: ['devicePassword'] }),
+      onChooseProtection,
+    });
+    render(<CredentialFileFlow {...props} />);
+    await user.type(screen.getByTestId('restore-device-password'), 'local-device-password');
+    await user.type(screen.getByTestId('restore-device-password-confirmation'), 'local-device-password');
+    expect((screen.getByTestId('submit-protection') as HTMLButtonElement).disabled).toBe(false);
+    await user.click(screen.getByTestId('submit-protection'));
+    expect(onChooseProtection).toHaveBeenCalledWith('devicePassword', 'local-device-password');
+    expect((screen.getByTestId('restore-device-password') as HTMLInputElement).value).toBe('');
+    expect((screen.getByTestId('restore-device-password-confirmation') as HTMLInputElement).value).toBe('');
   });
 
   it('resume gate shows Finish restoring your identity with unlock and cancel', () => {

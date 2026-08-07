@@ -55,11 +55,12 @@ function main() {
         findings.push(`${file}:${i + 1}: mnemonic-like 24-word sequence`);
       }
       if (LONG_ADDRESS_RE.test(line) && !/testid|testId|baseURL|SIGNING|ENCRYPT|LOCAL_|address\.test/.test(line)) {
-        // Allow public synthetic TEST-ONLY fixture declarations, e.g.
-        // `const SIGNING = 'A11B22...'` or `const address = 'ABCDEFGH...'`.
+        // Allow public synthetic TEST-ONLY fixture declarations and exact
+        // lowercase SHA-256 integrity pins; neither can contain identity data.
         const fixtureDecl = /^\s*(?:const|let)\s+[A-Za-z0-9_]+\s*=\s*'[A-Za-z0-9]{14,}'\s*;?$/.test(line);
         const inlineFixture = /(?:const|let|await|return|expect\()\s*[A-Za-z0-9_]*\s*=\s*'[A-Za-z0-9]{14,}'/.test(line);
-        if (!fixtureDecl && !inlineFixture) {
+        const sha256IntegrityPin = /['"][a-f0-9]{64}['"]/.test(line);
+        if (!fixtureDecl && !inlineFixture && !sha256IntegrityPin) {
           findings.push(`${file}:${i + 1}: long alphanumeric literal (possible full address/transaction)`);
         }
       }

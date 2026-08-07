@@ -178,8 +178,9 @@ describe('OnboardingHost', () => {
 
   it('renders the real Credential File flow for the credentialFile child', () => {
     render(<OnboardingHost child={childFixture('credentialFile')} onBack={onBack} />);
-    // 'picker' screen renders the choose-file action.
-    expect(screen.getByRole('button', { name: /choose/i })).toBeInTheDocument();
+    // 'picker' uses the canonical default action; root owns the one Back link.
+    expect(screen.getByRole('button', { name: /choose/i })).toHaveClass('button-default', 'w-full');
+    expect(screen.queryByTestId('restore-back')).toBeNull();
   });
 
   it('shows a typed fail-closed error instead of placeholder onboarding copy when no child is mounted', () => {

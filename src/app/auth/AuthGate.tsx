@@ -18,7 +18,7 @@ import { AuthShell } from './AuthShell';
 import { FirstRun } from './FirstRun';
 import { LockedUser } from './LockedUser';
 import { RemovalConfirmation } from './RemovalConfirmation';
-import { ErrorSurface, RecoveryNavigation, TemporaryMode } from './ErrorSurfaces';
+import { ErrorSurface, TemporaryMode } from './ErrorSurfaces';
 import { OnboardingHost } from './onboarding/OnboardingHost';
 import { resolveOnboardingChild, subscribeChildViews } from './onboarding/onboarding-registry';
 import { useState, useSyncExternalStore } from 'react';
@@ -61,7 +61,6 @@ function PendingSurface({ label }: { label: string }) {
 
 export function AuthGate({ projection, handlers }: AuthGateProps) {
   const { authState } = projection;
-  const [showRecovery, setShowRecovery] = useState(false);
   const [showTemporary, setShowTemporary] = useState(false);
   // Unconditional hook: child-view subscription for the onboarding surface.
   const activeChildView = useChildView(projection.onboardingKind);
@@ -102,16 +101,9 @@ export function AuthGate({ projection, handlers }: AuthGateProps) {
       );
       break;
     case 'locked':
-      surface = showRecovery ? (
-        <RecoveryNavigation
-          onRestoreCredentialFile={() => handlers.dispatch({ type: 'INTENT.RESTORE_CREDENTIAL_FILE' })}
-          onRestoreRecoveryWords={() => handlers.dispatch({ type: 'INTENT.RESTORE_RECOVERY_WORDS' })}
-          onBackToUnlock={() => setShowRecovery(false)}
-        />
-      ) : (
+      surface = (
         <LockedUser
           onSubmitSecret={handlers.submitSecret}
-          onForgotPassword={() => setShowRecovery(true)}
           onRemoveLocalUser={() => handlers.dispatch({ type: 'INTENT.REMOVE_LOCAL_USER' })}
           outcomeError={lockedOutcomeError(projection.outcomeCode)}
         />
@@ -163,7 +155,18 @@ export function AuthGate({ projection, handlers }: AuthGateProps) {
       surface = <PendingSurface label="Preparing…" />;
   }
 
+  const onboardingBack = authState === 'onboarding'
+    ? () => {
+        if (activeChildView?.kind === 'createUser') {
+          activeChildView.props.c.onBack();
+        } else {
+          activeChildView?.props.onBack();
+        }
+        handlers.dispatch({ type: 'INTENT.BACK_FROM_ONBOARDING' });
+      }
+    : undefined;
+
   return (
-    <AuthShell projection={projection}>{surface}</AuthShell>
+    <AuthShell projection={projection} onBack={onboardingBack}>{surface}</AuthShell>
   );
 }

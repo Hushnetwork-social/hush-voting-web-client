@@ -11,12 +11,19 @@ import type { AuthMachineInput } from '../../lib/auth/state/machine';
 import type { TrustedTargetDescriptor } from '../../lib/runtime/target';
 import type { TargetAwareActorRegistration, TargetClass } from '../../lib/auth/composition-target';
 import { AuthGate } from './AuthGate';
+import { AuthenticatedUserMenu } from './AuthenticatedUserMenu';
+import {
+  BLOCKCHAIN_INDEX_POLL_INTERVAL_MS,
+  BlockchainIndexTracker,
+  fetchBlockchainIndex,
+} from '../../lib/connectivity/blockchain-index';
 
 /** Telemetry preference: only an already-recorded explicit opt-in enables emission. */
 const TELEMETRY_PREFERENCE = { explicitOptIn: false };
 
 /** Module-level secret sink (set by buildMachineInput; read by the adapter). */
 let activeSecretSink: ((operationId: string, secret: string) => void) | null = null;
+let activeLockSink: (() => Promise<boolean>) | null = null;
 
 const FIRST_RUN_INTENTS = new Set<AuthIntent['type']>([
   'INTENT.CREATE_USER',
@@ -71,6 +78,8 @@ function coarseStage(authState: string): AllowlistedTelemetryEvent['coarseStage'
  * explicit diagnostics — never a null-provider actor graph.
  */
 async function buildMachineInput(): Promise<AuthMachineInput> {
+  activeSecretSink = null;
+  activeLockSink = null;
   if (process.env.NODE_ENV !== 'production' && process.env.NEXT_PUBLIC_HUSH_TEST_HARNESS === '1') {
     // Build-isolated synthetic harness (tests only; reached ONLY through the
     // separately named `npm run dev:harness` command; statically pruned from
@@ -120,6 +129,7 @@ async function buildMachineInput(): Promise<AuthMachineInput> {
       const webModule = await import('../../lib/auth/web/web-composition');
       webComposition = webModule.getWebComposition(manifest);
       activeSecretSink = webModule.submitWebSecret;
+      activeLockSink = webModule.lockWebSession;
     } catch {
       webComposition = null;
     }
@@ -197,6 +207,8 @@ export default function AuthRoot({ machineInputProvider }: AuthRootProps = {}) {
 
   const [authorityGeneration, setAuthorityGeneration] = useState(0);
   const entryHistoryTokenRef = useRef<string | null>(null);
+  const authenticatedGuardTokenRef = useRef<string | null>(null);
+  const protectedAccessRef = useRef(false);
   const flowHistoryTokensRef = useRef(new Set<string>());
 
   const rebuildAuthority = useCallback(() => {
@@ -222,12 +234,26 @@ export default function AuthRoot({ machineInputProvider }: AuthRootProps = {}) {
     };
   }, [authorityGeneration, machineInputProvider]);
 
+  const projection = useAuthProjection(adapter);
+  useEffect(() => {
+    protectedAccessRef.current = projection?.protectedAccess === true;
+  }, [projection?.protectedAccess]);
+
   useEffect(() => {
     const entryToken = entryHistoryTokenRef.current ?? createOpaqueHistoryToken(1);
     entryHistoryTokenRef.current = entryToken;
     window.history.replaceState({ hvToken: entryToken }, '', '/');
 
     const handlePopState = (event: PopStateEvent) => {
+      if (protectedAccessRef.current) {
+        // Browser Back is not a security action. While authenticated, restore
+        // an opaque same-URL guard entry without rebuilding or locking the
+        // authority. Only the explicit Lock command destroys the session.
+        const guardToken = authenticatedGuardTokenRef.current ?? createOpaqueHistoryToken(3);
+        authenticatedGuardTokenRef.current = guardToken;
+        window.history.pushState({ hvToken: guardToken }, '', '/');
+        return;
+      }
       if (historyToken(event.state) === entryHistoryTokenRef.current) {
         rebuildAuthority();
       }
@@ -237,7 +263,43 @@ export default function AuthRoot({ machineInputProvider }: AuthRootProps = {}) {
     return () => window.removeEventListener('popstate', handlePopState);
   }, [rebuildAuthority]);
 
-  const projection = useAuthProjection(adapter);
+  useEffect(() => {
+    if (projection?.protectedAccess !== true) {
+      authenticatedGuardTokenRef.current = null;
+      return;
+    }
+    const guardToken = authenticatedGuardTokenRef.current ?? createOpaqueHistoryToken(3);
+    authenticatedGuardTokenRef.current = guardToken;
+    if (historyToken(window.history.state) !== guardToken) {
+      window.history.pushState({ hvToken: guardToken }, '', '/');
+    }
+  }, [projection?.protectedAccess]);
+
+  // Real HushServerNode connectivity: a successful GetBlockchainHeight call
+  // is online; three consecutive observations of the same index are paused.
+  // Failed/malformed probes are offline. Polls are serialized and bounded.
+  useEffect(() => {
+    if (adapter === null) return;
+    const tracker = new BlockchainIndexTracker();
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const poll = async (): Promise<void> => {
+      const index = await fetchBlockchainIndex();
+      if (cancelled) return;
+      adapter.sendEvent({
+        type: 'CONNECTIVITY.CHANGE',
+        state: index === null ? tracker.failure() : tracker.observe(index),
+      });
+      timer = setTimeout(() => void poll(), BLOCKCHAIN_INDEX_POLL_INTERVAL_MS);
+    };
+
+    void poll();
+    return () => {
+      cancelled = true;
+      if (timer !== null) clearTimeout(timer);
+    };
+  }, [adapter]);
 
   // Telemetry gate: no event is emitted without explicit opt-in (currently off).
   // Emitted at most once per instance; never during render.
@@ -259,6 +321,18 @@ export default function AuthRoot({ machineInputProvider }: AuthRootProps = {}) {
   const handlers = useMemo(
     () => ({
       dispatch: (intent: AuthIntent) => {
+        if (intent.type === 'INTENT.LOCK') {
+          const completeLock = async () => {
+            if (activeLockSink === null) {
+              if (machineInputProvider === undefined) return;
+            } else if (!(await activeLockSink())) {
+              return;
+            }
+            adapter?.send(intent);
+          };
+          void completeLock();
+          return;
+        }
         if (FIRST_RUN_INTENTS.has(intent.type)) {
           const flowToken = createOpaqueHistoryToken(2);
           flowHistoryTokensRef.current.add(flowToken);
@@ -274,7 +348,7 @@ export default function AuthRoot({ machineInputProvider }: AuthRootProps = {}) {
       },
       submitSecret: (secret: string) => adapter?.submitSecret(secret),
     }),
-    [adapter],
+    [adapter, machineInputProvider],
   );
 
   // Synchronous protected boundary: no protected content behind the gate.
@@ -297,7 +371,14 @@ export default function AuthRoot({ machineInputProvider }: AuthRootProps = {}) {
             </span>
             <span>HushVoting!</span>
           </span>
-          <span className="foundation-badge">Authenticated</span>
+          {projection?.authenticatedIdentity !== null && projection?.authenticatedIdentity !== undefined ? (
+            <AuthenticatedUserMenu
+              identity={projection.authenticatedIdentity}
+              onLock={() => handlers.dispatch({ type: 'INTENT.LOCK' })}
+            />
+          ) : (
+            <span className="foundation-badge">Authenticated</span>
+          )}
         </header>
         <section className="hero" aria-labelledby="authenticated-title">
           <h1 id="authenticated-title">You are signed in on this device.</h1>

@@ -46,6 +46,7 @@ const allowedContext: AuthMachineContext = {
   registeredCapabilities: new Set<CapabilityId>(),
   safeCoordination: false,
   safeIdentity: null,
+  authenticatedIdentity: null,
   environment: null,
   cooldownDeadlineMs: null,
   navigationToken: null,
@@ -219,6 +220,7 @@ describe('secret-bearing values are rejected at the contract boundary', () => {
     expect(contextKeys).toEqual(
       [
         'activeOperationId',
+        'authenticatedIdentity',
         'coarseStageStartedAtMs',
         'cooldownDeadlineMs',
         'environment',

@@ -39,7 +39,7 @@ export function abbreviateAddress(address: string): string {
  * values: the dedicated DOM-owned input buffers are the only phrase holders.
  */
 export interface WordGridProjection {
-  readonly selectedWordCount: '12' | '24' | null; // no count selected initially
+  readonly selectedWordCount: '12' | '24' | null; // current UI defaults to 24; null remains accepted for older projections
   readonly invalidPositions: readonly number[]; // 1-based numbered positions; no echoed values
   readonly countValid: boolean;
   readonly vocabularyValid: boolean;

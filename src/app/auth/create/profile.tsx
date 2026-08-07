@@ -54,7 +54,7 @@ export function ProfileScreen({ onContinue, onBack }: ProfileProps) {
         autoComplete="off"
         spellCheck={false}
         aria-describedby={error ? 'create-alias-error' : undefined}
-        className="min-h-11 w-full rounded-xl border border-transparent bg-[var(--surface-strong)] px-3 text-sm text-[var(--text)] focus:border-[var(--accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+        className="min-h-11 w-full rounded-[0.85rem] border border-transparent bg-[var(--surface)] px-3 text-sm text-[var(--text)] focus:border-[var(--accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
       />
       {error ? <FieldError id="create-alias-error">{error}</FieldError> : null}
       <fieldset className="mt-4">
@@ -84,7 +84,7 @@ export function ProfileScreen({ onContinue, onBack }: ProfileProps) {
         </label>
       </fieldset>
       {visibility === 'public' ? (
-        <div className="mt-3 rounded-xl bg-[var(--warning-surface)] px-4 py-3" role="region" aria-label={PROFILE.publicWarningTitle}>
+        <div className="mt-3 rounded-[0.85rem] bg-[var(--warning-surface)] px-4 py-3" role="region" aria-label={PROFILE.publicWarningTitle}>
           <p className="text-sm font-semibold text-[var(--warning)]">{PROFILE.publicWarningTitle}</p>
           <p className="mt-1 text-sm text-[var(--text-muted)]">{PROFILE.publicWarningDetail}</p>
           <label className="mt-2 flex items-start gap-2 text-sm text-[var(--text)]">
@@ -100,7 +100,7 @@ export function ProfileScreen({ onContinue, onBack }: ProfileProps) {
       ) : null}
       <div className="mt-4 flex items-center gap-3">
         <BackButton onClick={onBack} />
-        <ActionButton onClick={submit}>{PROFILE.continue}</ActionButton>
+        <ActionButton onClick={submit} fullWidth>{PROFILE.continue}</ActionButton>
       </div>
     </SurfacePanel>
   );

@@ -202,6 +202,7 @@ export class WorkerAuthority {
       return { accepted: false, outcome: 'OPERATION_UNKNOWN_CHANNEL' };
     }
     if (this.activeOperationId !== null) {
+      this.deliverOperationRejection(request, 'AUTHORITY_BUSY');
       return { accepted: false, outcome: 'OPERATION_BUSY' };
     }
     const requiredPurpose = FRESH_CAPABILITY_REQUIRED_BY_OPERATION[request.operation];
@@ -211,6 +212,7 @@ export class WorkerAuthority {
         { purpose: requiredPurpose, clientChannel: request.clientChannel, authorityEpoch: this.epoch, nowMs: this.env.nowMs() },
       );
       if (!consumption.ok) {
+        this.deliverOperationRejection(request, 'AUTHORITY_REJECTED');
         return { accepted: false, outcome: `OPERATION_CAPABILITY_${consumption.reason.toUpperCase()}` };
       }
       this.freshCapabilities.set(consumption.capability.id, consumption.capability);
@@ -218,6 +220,18 @@ export class WorkerAuthority {
     this.activeOperationId = request.operationId;
     void this.runOperation(request);
     return { accepted: true, outcome: 'OPERATION_STARTED' };
+  }
+
+  /** Known current channels always receive a terminal typed rejection. */
+  private deliverOperationRejection(request: OperationRequest, outcome: 'AUTHORITY_BUSY' | 'AUTHORITY_REJECTED'): void {
+    this.env.deliver(request.clientChannel, {
+      kind: 'operation-outcome',
+      operationId: request.operationId,
+      clientChannel: request.clientChannel,
+      outcome,
+      retryable: outcome === 'AUTHORITY_BUSY',
+      allowedActions: outcome === 'AUTHORITY_BUSY' ? ['retry'] : [],
+    });
   }
 
   private async runOperation(request: OperationRequest): Promise<void> {

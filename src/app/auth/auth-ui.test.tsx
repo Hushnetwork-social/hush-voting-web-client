@@ -13,6 +13,7 @@ import userEvent from '@testing-library/user-event';
 import { AuthGate } from './AuthGate';
 import { FirstRun } from './FirstRun';
 import { LockedUser } from './LockedUser';
+import { AuthShell } from './AuthShell';
 import { RemovalConfirmation } from './RemovalConfirmation';
 import { ErrorSurface, RecoveryNavigation, TemporaryMode } from './ErrorSurfaces';
 import { errorCopyForOutcome, documentTitleForState } from '../../lib/auth/ui/copy';
@@ -24,6 +25,7 @@ function projection(overrides: Partial<AuthRenderProjection>): AuthRenderProject
     connectivity: 'online',
     protectedAccess: false,
     safeIdentity: { alias: 'Ada', abbreviatedSigningAddress: 'NVh…1a2b' },
+    authenticatedIdentity: null,
     outcomeCode: null,
     supportCode: null,
     onboardingKind: null,
@@ -68,7 +70,7 @@ describe('locked-user surface and secret transfer', () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
     render(
-      <LockedUser onSubmitSecret={onSubmit} onForgotPassword={() => undefined} onRemoveLocalUser={() => undefined} />,
+      <LockedUser onSubmitSecret={onSubmit} onRemoveLocalUser={() => undefined} />,
     );
     const input = screen.getByLabelText('Device password');
     await user.type(input, 'sup3r-secret');
@@ -81,12 +83,16 @@ describe('locked-user surface and secret transfer', () => {
     expect(document.body.textContent ?? '').not.toContain('sup3r-secret');
   });
 
-  it('shows no authenticated navigation and offers recovery + removal', () => {
+  it('shows no authenticated navigation and requires removal before recovery', () => {
     render(
-      <LockedUser onSubmitSecret={() => undefined} onForgotPassword={() => undefined} onRemoveLocalUser={() => undefined} />,
+      <LockedUser onSubmitSecret={() => undefined} onRemoveLocalUser={() => undefined} />,
     );
-    expect(screen.getByRole('button', { name: /forgot device password/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /forgot device password/i })).toBeNull();
     expect(screen.getByRole('button', { name: /remove local user/i })).toBeInTheDocument();
+    const actions = screen.getAllByRole('button');
+    expect(actions).toHaveLength(2);
+    expect(actions[0]).toHaveAccessibleName(/remove local user/i);
+    expect(actions[1]).toHaveAccessibleName(/unlock hushvoting/i);
     expect(screen.queryByRole('navigation')).toBeNull();
     expect(screen.queryByText(/server login|account password|password reset|remote sign-out/i)).toBeNull();
   });
@@ -210,6 +216,24 @@ describe('document titles never expose secrets or identifiers', () => {
   });
 });
 
+describe('Auth shell onboarding navigation', () => {
+  it('places one text-style Back control before the setup heading', async () => {
+    const onBack = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <AuthShell projection={projection({ authState: 'onboarding' })} onBack={onBack}>
+        <p>Setup content</p>
+      </AuthShell>,
+    );
+    const back = screen.getByRole('button', { name: 'Back' });
+    const heading = screen.getByRole('heading', { name: 'Set up this device' });
+    expect(back).toHaveClass('auth-back-link');
+    expect(back.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    await user.click(back);
+    expect(onBack).toHaveBeenCalledOnce();
+  });
+});
+
 describe('AuthGate composition', () => {
   it('renders official branding and first-run actions without premature password copy', async () => {
     const user = userEvent.setup();
@@ -240,6 +264,8 @@ describe('AuthGate composition', () => {
     );
     expect(screen.getByLabelText('Device password')).toBeInTheDocument();
     expect(screen.getByText(/your device password protects credentials/i)).toBeInTheDocument();
+    expect(screen.getByLabelText('Network online')).toHaveAttribute('data-connectivity', 'online');
+    expect(screen.queryByRole('button', { name: /forgot device password/i })).toBeNull();
   });
 
   it('never mounts protected navigation behind any auth surface', () => {

@@ -18,7 +18,7 @@
 import { useMemo, useSyncExternalStore } from 'react';
 import { createActor, type Actor, type SnapshotFrom } from 'xstate';
 import { authMachine, type AuthMachineEvent, type AuthMachineInput } from '../state/machine';
-import type { AuthIntent, AuthStateCode, ConnectivityStateCode } from '../types';
+import type { AuthenticatedIdentityMetadata, AuthIntent, AuthStateCode, ConnectivityStateCode } from '../types';
 
 /** Render-safe projection of the authority snapshot. */
 export interface AuthRenderProjection {
@@ -27,6 +27,7 @@ export interface AuthRenderProjection {
   /** True only when protected content may mount (authenticated + capability). */
   readonly protectedAccess: boolean;
   readonly safeIdentity: { alias: string; abbreviatedSigningAddress: string } | null;
+  readonly authenticatedIdentity: AuthenticatedIdentityMetadata | null;
   readonly outcomeCode: string | null;
   readonly supportCode: string | null;
   readonly onboardingKind: string | null;
@@ -57,6 +58,7 @@ function projectSnapshot(snapshot: AuthSnapshot): AuthRenderProjection {
   const connectivity = connectivityFromValue(value);
   const context = (snapshot.context ?? {}) as {
     safeIdentity?: { alias: string; abbreviatedSigningAddress: string } | null;
+    authenticatedIdentity?: AuthenticatedIdentityMetadata | null;
     outcomeCode?: string | null;
     supportCode?: string | null;
     onboardingKind?: string | null;
@@ -67,6 +69,7 @@ function projectSnapshot(snapshot: AuthSnapshot): AuthRenderProjection {
     // Synchronous capability boundary: only authenticated grants protected access.
     protectedAccess: authState === 'authenticated',
     safeIdentity: context.safeIdentity ?? null,
+    authenticatedIdentity: context.authenticatedIdentity ?? null,
     outcomeCode: context.outcomeCode ?? null,
     supportCode: context.supportCode ?? null,
     onboardingKind: context.onboardingKind ?? null,
@@ -116,15 +119,6 @@ export class AuthAdapter {
           this.pendingSecret = null;
           this.secretSink(this.activeUnlockOperationId, secret);
         }
-      }
-      // Connectivity signal: typed network outcomes drive the connectivity
-      // region (offline stays retryable; exact success reports online).
-      const outcome = this.cachedProjection.outcomeCode;
-      const connectivity = this.cachedProjection.connectivity;
-      if ((outcome === 'VERIFY_TIMEOUT' || outcome === 'VERIFY_NETWORK_UNAVAILABLE') && connectivity !== 'offline') {
-        this.actor.send({ type: 'CONNECTIVITY.CHANGE', state: 'offline' });
-      } else if (outcome === 'VERIFY_SUCCESS' && connectivity !== 'online') {
-        this.actor.send({ type: 'CONNECTIVITY.CHANGE', state: 'online' });
       }
     });
   }

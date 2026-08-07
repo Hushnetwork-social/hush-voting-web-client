@@ -8,6 +8,7 @@
  * actions the view state allows. Non-owner/quarantine states short-circuit
  * before any sensitive surface mounts. Visible URL stays `/`.
  */
+import { useState } from 'react';
 import type { RestoreViewState } from '../../../lib/credential-file-restore/presentation/view';
 import type { RestoreProtectionChoice } from '../../../lib/credential-file-restore/contracts/projection';
 import { COPY, RestoreBackButton, RestoreErrorRegion, RestorePanel, RestorePrimaryButton, RestoreStatusRegion } from './surfaces';
@@ -17,13 +18,13 @@ import { ProfileReviewScreen, ProtectionScreen, ResumeAndStagingScreen, SuccessS
 export interface CredentialFileFlowProps {
   readonly view: RestoreViewState;
   readonly sessionOnlyOnly: boolean;
-  readonly onChooseFile: () => void;
+  readonly onChooseFile: (file: File) => void;
   readonly onCancelRead: () => void;
   readonly onSubmitPassword: (password: string) => void;
   readonly onToggleVisibility: () => void;
   readonly onToggleEmptyOption: (enabled: boolean) => void;
   readonly onChooseDifferentFile: () => void;
-  readonly onChooseProtection: (mode: RestoreProtectionChoice) => void;
+  readonly onChooseProtection: (mode: RestoreProtectionChoice, devicePassword?: string) => void;
   readonly onCreateIdentity: () => void;
   readonly onReveal: () => void;
   readonly onUnlockResume: () => void;
@@ -33,9 +34,43 @@ export interface CredentialFileFlowProps {
   readonly onRetryCleanup: () => void;
 }
 
+/**
+ * Produces a display-only basename. It cannot carry a path/URI, control or
+ * bidi characters, and is bounded before entering transient React state.
+ */
+export function selectedFileDisplayName(file: File): string {
+  const basename = file.name.split(/[\\/]/).at(-1) ?? '';
+  const sanitized = basename
+    .replace(/[\u0000-\u001f\u007f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/gu, '')
+    .trim();
+  if (sanitized.length === 0) return 'Selected credential file';
+  const characters = Array.from(sanitized);
+  if (characters.length <= 96) return sanitized;
+  return `${characters.slice(0, 47).join('')}…${characters.slice(-48).join('')}`;
+}
+
 /** Thin renderer — screen routing only; policy stays in the authority. */
 export function CredentialFileFlow(props: CredentialFileFlowProps) {
   const { view } = props;
+  const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
+
+  const chooseFile = (file: File) => {
+    setSelectedFileName(selectedFileDisplayName(file));
+    props.onChooseFile(file);
+  };
+  const chooseDifferentFile = () => {
+    setSelectedFileName(null);
+    props.onChooseDifferentFile();
+  };
+  const submitPassword = (password: string) => {
+    // The basename is no longer needed after the user confirms this source.
+    setSelectedFileName(null);
+    props.onSubmitPassword(password);
+  };
+  const goBack = () => {
+    setSelectedFileName(null);
+    props.onBack();
+  };
 
   switch (view.screen) {
     case 'entry':
@@ -46,10 +81,10 @@ export function CredentialFileFlow(props: CredentialFileFlowProps) {
     case 'capabilityPreflight':
     case 'picker':
     case 'reading':
-      return <PickerReadScreen {...props} />;
+      return <PickerReadScreen {...props} onChooseFile={chooseFile} onBack={goBack} />;
     case 'password':
     case 'decrypting':
-      return <PasswordScreen view={view} onSubmit={props.onSubmitPassword} onToggleVisibility={props.onToggleVisibility} onToggleEmptyOption={props.onToggleEmptyOption} onChooseDifferentFile={props.onChooseDifferentFile} onBack={props.onBack} />;
+      return <PasswordScreen view={view} selectedFileName={selectedFileName} onSubmit={submitPassword} onToggleVisibility={props.onToggleVisibility} onToggleEmptyOption={props.onToggleEmptyOption} onChooseDifferentFile={chooseDifferentFile} onBack={goBack} />;
     case 'validating':
     case 'lookup':
       return <ProgressScreen view={view} onBack={props.onBack} />;

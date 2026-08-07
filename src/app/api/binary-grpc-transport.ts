@@ -15,7 +15,7 @@ import { loadSync } from '@grpc/proto-loader';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import type { HushServerTransportPort, LookupTransportResult, SubmitTransportResult } from '../../lib/identity-creation/transport';
+import type { BlockchainIndexTransportResult, HushServerTransportPort, LookupTransportResult, SubmitTransportResult } from '../../lib/identity-creation/transport';
 import { RPC_TIMEOUT_MS } from '../../lib/identity-creation/transport';
 import type { GetIdentityReply, SubmitSignedTransactionReply } from '../../lib/identity-creation/wire';
 
@@ -97,6 +97,18 @@ export class BinaryGrpcTransport implements HushServerTransportPort {
     this.surface = surface ?? loadPinnedGrpcSurface(endpoint);
   }
 
+  async getBlockchainIndex(): Promise<BlockchainIndexTransportResult> {
+    try {
+      const reply = await unaryCall<unknown>(this.surface.HushBlockchain, 'GetBlockchainHeight', {}, RPC_TIMEOUT_MS);
+      const index = normalizeBlockchainIndex(reply);
+      return index === null
+        ? { ok: false, failure: { kind: 'protocol' } }
+        : { ok: true, index };
+    } catch (error) {
+      return { ok: false, failure: grpcErrorToFailure(error) };
+    }
+  }
+
   async lookupIdentity(request: { readonly publicSigningAddress: string }): Promise<LookupTransportResult> {
     try {
       const reply = await unaryCall<unknown>(this.surface.HushIdentity, 'GetIdentity', { PublicSigningAddress: request.publicSigningAddress }, RPC_TIMEOUT_MS);
@@ -117,6 +129,14 @@ export class BinaryGrpcTransport implements HushServerTransportPort {
       return { ok: false, failure: grpcErrorToFailure(error) };
     }
   }
+}
+
+/** Normalize the protobuf int64 without risking JavaScript precision loss. */
+export function normalizeBlockchainIndex(reply: unknown): string | null {
+  const index = (reply as { Index?: unknown } | null)?.Index;
+  if (typeof index === 'string' && /^\d+$/.test(index)) return index;
+  if (typeof index === 'number' && Number.isSafeInteger(index) && index >= 0) return String(index);
+  return null;
 }
 
 /** Parse `host:port`; returns null for anything else (fail closed). */

@@ -9,7 +9,7 @@
  */
 import { describe, expect, it, beforeEach } from 'vitest';
 import { BrowserVaultClient, type MessagePortLike } from '../../browser-vault/production/client';
-import { createWebOnboardingPorts } from './child-bridge';
+import { createWebOnboardingPorts, mapCredentialImportFailure } from './child-bridge';
 import { ISOLATED_DEVNET_MANIFEST } from '../../runtime/manifests';
 import type { DeploymentManifest } from '../../runtime/deployment';
 
@@ -93,6 +93,15 @@ async function primeClient(port: FakePort, client: BrowserVaultClient): Promise<
 
 beforeEach(() => {
   idCounter = 0;
+});
+
+describe('credential import diagnostics', () => {
+  it('maps closed compatibility reasons without parsing free-form messages', () => {
+    expect(mapCredentialImportFailure('INVALID_INPUT', { reason: 'DAT_UNKNOWN_FIELD' })).toBe('PAYLOAD_UNKNOWN_FIELD');
+    expect(mapCredentialImportFailure('INVALID_INPUT', { reason: 'DAT_KEY_MISMATCH' })).toBe('KEY_PROOF_FAILED');
+    expect(mapCredentialImportFailure('WRONG_PASSWORD_OR_DAMAGED', undefined)).toBe('AUTHENTICATION_FAILED');
+    expect(mapCredentialImportFailure('INVALID_INPUT', { reason: 'a filename or secret value' })).toBe('UNKNOWN_OUTCOME');
+  });
 });
 
 describe('FEAT-010 child-bridge confirmMissingProfile', () => {

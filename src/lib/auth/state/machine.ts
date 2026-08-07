@@ -8,7 +8,7 @@
  *                   verifyingIdentityOnline, missingProfileConfirmation,
  *                   authenticated, recoverableError, blockedError,
  *                   removingLocalUser
- *   connectivity  — unknown, online, offline, reconnecting
+ *   connectivity  — unknown, online, paused, offline, reconnecting
  *
  * Design rules enforced here:
  * - `authenticated` requires BOTH a live opaque capability and a current
@@ -260,6 +260,11 @@ export const authMachine = setup({
         (args.event as { result?: { safeIdentity?: AuthMachineContext['safeIdentity'] } }).result?.safeIdentity ?? null,
     }),
     clearSafeIdentity: assign({ safeIdentity: () => null }),
+    assignAuthenticatedIdentity: assign({
+      authenticatedIdentity: (args) =>
+        (args.event as { result?: { identity?: AuthMachineContext['authenticatedIdentity'] } }).result?.identity ?? null,
+    }),
+    clearAuthenticatedIdentity: assign({ authenticatedIdentity: () => null }),
     assignLocalUserRef: assign({
       localUserRef: (args) =>
         (args.event as { result?: { localUserRef?: LocalUserRef } }).result?.localUserRef ?? null,
@@ -291,6 +296,7 @@ export const authMachine = setup({
     registeredCapabilities: input.registeredCapabilities,
     safeCoordination: input.safeCoordination,
     safeIdentity: null,
+    authenticatedIdentity: null,
     environment: null,
     cooldownDeadlineMs: null,
     navigationToken: null,
@@ -510,7 +516,7 @@ export const authMachine = setup({
                 target: 'authenticated',
                 guard: ({ context, event }) =>
                   machineGuards.isCurrentOperation(context, event) && event.result.code === 'VERIFY_SUCCESS',
-                actions: ['clearActiveOperation', 'assignOutcome'],
+                actions: ['clearActiveOperation', 'assignAuthenticatedIdentity', 'assignOutcome'],
               },
               {
                 target: 'missingProfileConfirmation',
@@ -567,7 +573,7 @@ export const authMachine = setup({
                 target: 'authenticated',
                 guard: ({ context, event }) =>
                   machineGuards.isCurrentOperation(context, event) && event.result.code === 'VERIFY_SUCCESS',
-                actions: ['clearActiveOperation', 'assignOutcome', 'assignLocalUserRef'],
+                actions: ['clearActiveOperation', 'assignAuthenticatedIdentity', 'assignOutcome', 'assignLocalUserRef'],
               },
               {
                 target: 'blockedError',
@@ -595,6 +601,7 @@ export const authMachine = setup({
         },
         authenticated: {
           entry: ['clearActiveOperation', 'clearOutcome', 'clearSupportCode'],
+          exit: 'clearAuthenticatedIdentity',
           on: {
             'INTENT.LOCK': { target: 'locked', actions: ['incrementEpoch', 'clearOutcome'] },
             'TIMER.IDLE_TIMEOUT': { target: 'locked', actions: ['incrementEpoch', 'clearOutcome'] },
@@ -681,6 +688,7 @@ export const authMachine = setup({
           on: {
             'CONNECTIVITY.CHANGE': [
               { target: 'online', guard: ({ event }) => event.state === 'online' },
+              { target: 'paused', guard: ({ event }) => event.state === 'paused' },
               { target: 'offline', guard: ({ event }) => event.state === 'offline' },
               { target: 'reconnecting', guard: ({ event }) => event.state === 'reconnecting' },
             ],
@@ -689,6 +697,16 @@ export const authMachine = setup({
         online: {
           on: {
             'CONNECTIVITY.CHANGE': [
+              { target: 'paused', guard: ({ event }) => event.state === 'paused' },
+              { target: 'offline', guard: ({ event }) => event.state === 'offline' },
+              { target: 'reconnecting', guard: ({ event }) => event.state === 'reconnecting' },
+            ],
+          },
+        },
+        paused: {
+          on: {
+            'CONNECTIVITY.CHANGE': [
+              { target: 'online', guard: ({ event }) => event.state === 'online' },
               { target: 'offline', guard: ({ event }) => event.state === 'offline' },
               { target: 'reconnecting', guard: ({ event }) => event.state === 'reconnecting' },
             ],
@@ -698,6 +716,7 @@ export const authMachine = setup({
           on: {
             'CONNECTIVITY.CHANGE': [
               { target: 'online', guard: ({ event }) => event.state === 'online' },
+              { target: 'paused', guard: ({ event }) => event.state === 'paused' },
               { target: 'reconnecting', guard: ({ event }) => event.state === 'reconnecting' },
             ],
           },
@@ -706,6 +725,7 @@ export const authMachine = setup({
           on: {
             'CONNECTIVITY.CHANGE': [
               { target: 'online', guard: ({ event }) => event.state === 'online' },
+              { target: 'paused', guard: ({ event }) => event.state === 'paused' },
               { target: 'offline', guard: ({ event }) => event.state === 'offline' },
             ],
           },

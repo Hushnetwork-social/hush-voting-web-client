@@ -14,7 +14,7 @@
 
 import type { BrowserVaultClient, ClientOperationResult } from '../../browser-vault/production/client';
 import type { LocalUserAuthorityPort, SecretAuthorityPort, IdentityVerificationPort, RemovalPort, BrowserCoordinationPort } from '../ports';
-import type { SessionEpoch, LocalUserRef, OperationId } from '../types';
+import type { AuthenticatedIdentityMetadata, SessionEpoch, LocalUserRef, OperationId } from '../types';
 import type { InitializationResult, UnlockResult, VerificationResult, RemovalResult, CoordinationResult } from '../results';
 import { AUTH_TIMING } from '../types';
 
@@ -23,6 +23,21 @@ export interface WorkerSafeIdentityPayload {
   readonly safeIdentity?: { readonly alias?: unknown; readonly abbreviatedSigningAddress?: unknown };
   readonly surface?: unknown;
   readonly reason?: unknown;
+}
+
+export function authenticatedIdentityFromPayload(payload: unknown): AuthenticatedIdentityMetadata | null {
+  if (typeof payload !== 'object' || payload === null) return null;
+  const value = payload as { profileName?: unknown; signingAddress?: unknown; encryptionAddress?: unknown };
+  if (
+    typeof value.profileName !== 'string' || value.profileName.length < 1 || value.profileName.length > 64 ||
+    typeof value.signingAddress !== 'string' || !/^[A-Za-z0-9]{1,256}$/.test(value.signingAddress) ||
+    typeof value.encryptionAddress !== 'string' || !/^[A-Za-z0-9]{1,256}$/.test(value.encryptionAddress)
+  ) return null;
+  return {
+    alias: value.profileName,
+    publicSigningKey: value.signingAddress,
+    publicEncryptionKey: value.encryptionAddress,
+  };
 }
 
 function safeIdentityFromPayload(payload: unknown): { readonly alias: string; readonly abbreviatedSigningAddress: string } | null {
@@ -42,12 +57,34 @@ function safeIdentityFromPayload(payload: unknown): { readonly alias: string; re
   return { alias, abbreviatedSigningAddress: abbreviated };
 }
 
-/** Cancelable operation wrapper used by every adapter. */
+/**
+ * XState invokes an actor's cleanup callback both for a real interruption and
+ * after its result has completed. Only the former may invalidate the vault
+ * authority. Track settlement on the exact promise returned to XState so its
+ * post-result cleanup cannot race the next operation with a stale epoch.
+ */
+const settledOperations = new WeakMap<BrowserVaultClient, Set<OperationId>>();
+
+function settledFor(client: BrowserVaultClient): Set<OperationId> {
+  const existing = settledOperations.get(client);
+  if (existing) return existing;
+  const created = new Set<OperationId>();
+  settledOperations.set(client, created);
+  return created;
+}
+
 function cancelable<T>(client: BrowserVaultClient, operationId: OperationId, result: Promise<T>): { readonly operationId: OperationId; readonly result: Promise<T> } {
-  return {
-    operationId,
-    result,
-  };
+  const tracked = result.finally(() => {
+    settledFor(client).add(operationId);
+  });
+  return { operationId, result: tracked };
+}
+
+function cancelIfInFlight(client: BrowserVaultClient, operationId: OperationId): void {
+  if (settledFor(client).delete(operationId)) {
+    return;
+  }
+  client.cancel(operationId);
 }
 
 /**
@@ -113,9 +150,21 @@ export function createWebLocalUserAuthority(client: BrowserVaultClient): LocalUs
       return cancelable(client, operationId, result);
     },
     cancel(operationId: OperationId) {
-      client.cancel(operationId);
+      cancelIfInFlight(client, operationId);
     },
   };
+}
+
+/** Closed, secret-safe returning-unlock diagnostics. */
+function reportUnlockFailure(outcome: string): void {
+  const allowed = new Set([
+    'WRONG_PASSWORD_OR_DAMAGED', 'THROTTLED', 'NETWORK_MISMATCH',
+    'UNSUPPORTED_VAULT', 'CORRUPT_VAULT', 'TRANSPORT_UNAVAILABLE',
+    'AUTHORITY_INVALIDATED', 'AUTHORITY_BUSY', 'AUTHORITY_REJECTED',
+    'UNKNOWN_FAILURE',
+  ]);
+  const safeOutcome = allowed.has(outcome) ? outcome : 'UNCLASSIFIED';
+  console.warn(`[HushVoting][returning-unlock] stage=unlock outcome=${safeOutcome} code=${safeOutcome}`);
 }
 
 /**
@@ -135,6 +184,7 @@ export function createWebSecretAuthority(client: BrowserVaultClient): SecretAuth
         // SecretSubmissionSink (keyed by the machine's OPERATION.STARTED id)
         // reaches the exact operation the worker consumes.
         return client.dispatch('unlockPassword', undefined, undefined, operationId).then((outcome) => {
+        if (outcome.outcome !== 'OK') reportUnlockFailure(outcome.outcome);
         switch (outcome.outcome) {
           case 'OK':
             return { code: 'UNLOCK_SUCCESS' } as UnlockResult;
@@ -161,7 +211,7 @@ export function createWebSecretAuthority(client: BrowserVaultClient): SecretAuth
       return cancelable(client, operationId, result);
     },
     cancel(operationId: OperationId) {
-      client.cancel(operationId);
+      cancelIfInFlight(client, operationId);
     },
   };
 }
@@ -177,8 +227,16 @@ export function createWebIdentityVerification(client: BrowserVaultClient): Ident
         }
         return client.dispatch('verifyOnlineIdentity').then((outcome) => {
         switch (outcome.outcome) {
-          case 'OK':
-            return { code: 'VERIFY_SUCCESS' } as VerificationResult;
+          case 'OK': {
+            // The worker's typed OK is the authentication proof. Public menu
+            // metadata is additive presentation data: an older live worker
+            // may omit it during a development hot update and must not turn a
+            // valid unlock into UNKNOWN_FAILURE.
+            const identity = authenticatedIdentityFromPayload(outcome.payload);
+            return identity === null
+              ? { code: 'VERIFY_SUCCESS' } as VerificationResult
+              : { code: 'VERIFY_SUCCESS', identity } as VerificationResult;
+          }
           case 'PROFILE_MISSING': {
             const safe = safeIdentityFromPayload(outcome.payload);
             if (safe) {
@@ -205,7 +263,7 @@ export function createWebIdentityVerification(client: BrowserVaultClient): Ident
       return cancelable(client, operationId, result);
     },
     cancel(operationId: OperationId) {
-      client.cancel(operationId);
+      cancelIfInFlight(client, operationId);
     },
   };
 }
@@ -239,7 +297,7 @@ export function createWebRemoval(client: BrowserVaultClient, issueCapability: ()
       return cancelable(client, operationId, result);
     },
     cancel(operationId: OperationId) {
-      client.cancel(operationId);
+      cancelIfInFlight(client, operationId);
     },
   };
 }
@@ -273,7 +331,7 @@ export function createWebBrowserCoordination(client: BrowserVaultClient): Browse
       // Web Locks release on scope exit; the worker lease is authority-owned.
     },
     cancel(operationId: OperationId) {
-      client.cancel(operationId);
+      cancelIfInFlight(client, operationId);
     },
   };
 }

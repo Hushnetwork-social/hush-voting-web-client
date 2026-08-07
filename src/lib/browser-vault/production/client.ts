@@ -121,13 +121,24 @@ export function emitClientBeacon(status: { readonly ok: boolean; readonly reason
   }
 }
 
+/** Bind the worker instance URL/name to the exact fetched bundle digest. */
+export function versionedWorkerUrl(url: string, buildDigest: string): string {
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}build=${buildDigest}`;
+}
+
+export function workerNameForUrl(url: string): string {
+  const digest = /[?&]build=([0-9a-f]{12})(?:&|$)/i.exec(url)?.[1]?.toLowerCase() ?? 'unversioned';
+  return `hushvoting-vault-authority-${digest}`;
+}
+
 /** Default worker factory (real browser SharedWorker). */
 export function defaultWorkerFactory(url: string): { readonly port: MessagePortLike } | null {
   try {
     if (typeof SharedWorker === 'undefined') {
       return null;
     }
-    const worker = new SharedWorker(url, { type: 'module', name: 'hushvoting-vault-authority' });
+    const worker = new SharedWorker(url, { type: 'module', name: workerNameForUrl(url) });
     worker.port.start();
     return { port: worker.port as unknown as MessagePortLike };
   } catch {
@@ -199,7 +210,8 @@ export class BrowserVaultClient {
       emitClientBeacon({ ok: false, reason: 'digest-unavailable', stage: 'connect' });
       return { ok: false, reason: 'transport' };
     }
-    const created = this.workerFactory(this.workerUrl);
+    const instanceUrl = versionedWorkerUrl(this.workerUrl, buildDigest);
+    const created = this.workerFactory(instanceUrl);
     if (created === null) {
       emitClientBeacon({ ok: false, reason: 'worker-creation-failed', stage: 'connect' });
       return { ok: false, reason: 'transport' };

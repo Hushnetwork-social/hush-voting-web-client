@@ -20,9 +20,10 @@ import type { AuthRenderProjection } from '../../lib/auth/react/adapter';
 interface AuthShellProps {
   readonly projection: AuthRenderProjection;
   readonly children: ReactNode;
+  readonly onBack?: () => void;
 }
 
-export function AuthShell({ projection, children }: AuthShellProps) {
+export function AuthShell({ projection, children, onBack }: AuthShellProps) {
   const { authState, safeIdentity, supportCode } = projection;
 
   // Document title is a non-sensitive accessibility surface; never a secret.
@@ -45,12 +46,17 @@ export function AuthShell({ projection, children }: AuthShellProps) {
             />
           </span>
           <span className="auth-brand-name">HushVoting!</span>
-          <span className="auth-env" aria-hidden="true">
-            {projection.connectivity === 'offline' ? 'offline' : 'online'}
+          <span className="auth-env" data-connectivity={projection.connectivity} aria-label={`Network ${connectivityLabel(projection.connectivity)}`}>
+            {connectivityLabel(projection.connectivity)}
           </span>
         </header>
 
-        <section className="auth-surface" aria-labelledby="auth-shell-heading">
+        <section className={`auth-surface${onBack !== undefined ? ' auth-surface-with-back' : ''}`} aria-labelledby="auth-shell-heading">
+          {onBack !== undefined && (
+            <button type="button" className="auth-back-link" onClick={onBack}>
+              <span aria-hidden="true">←</span> Back
+            </button>
+          )}
           <h1 id="auth-shell-heading" className="auth-heading">
             {projection.authState === 'initializing' ? 'HushVoting!' : headingForProjection(projection)}
           </h1>
@@ -85,6 +91,21 @@ export function AuthShell({ projection, children }: AuthShellProps) {
       </span>
     </main>
   );
+}
+
+function connectivityLabel(connectivity: AuthRenderProjection['connectivity']): string {
+  switch (connectivity) {
+    case 'online':
+      return 'online';
+    case 'paused':
+      return 'paused';
+    case 'offline':
+      return 'offline';
+    case 'reconnecting':
+      return 'reconnecting';
+    case 'unknown':
+      return 'checking';
+  }
 }
 
 function headingForProjection(projection: AuthRenderProjection): string {

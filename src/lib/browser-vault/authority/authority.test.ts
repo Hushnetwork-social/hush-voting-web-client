@@ -117,13 +117,35 @@ describe('worker authority — operations and serialization', () => {
     release();
   });
 
-  it('rejects operations that require an unconsumed fresh capability', () => {
-    const env = makeEnv();
+  it('dispatches profile submission and lifecycle promotion without an unrelated fresh capability', () => {
+    const first = new WorkerAuthority(makeEnv(), 'verificationOnly', 1);
+    first.handle(validHandshake());
+    const submit = first.handle({
+      ...validOperation('chan-1', 1, 'submitIdentityTransaction', 'submit-1'),
+      payload: { alias: 'Public test profile', visibility: 'private' },
+    });
+    expect(submit).toEqual({ accepted: true, outcome: 'OPERATION_STARTED' });
+
+    const second = new WorkerAuthority(makeEnv(), 'verificationOnly', 1);
+    second.handle(validHandshake());
+    const promote = second.handle({
+      ...validOperation('chan-1', 1, 'promoteLifecycle', 'promote-1'),
+      payload: { status: 'Active' },
+    });
+    expect(promote).toEqual({ accepted: true, outcome: 'OPERATION_STARTED' });
+  });
+
+  it('rejects operations that require an unconsumed fresh capability and resolves the caller', () => {
+    const delivered: Array<{ kind?: string; outcome?: string }> = [];
+    const env = makeEnv({
+      deliver: (_channel, event) => delivered.push(event as { kind?: string; outcome?: string }),
+    });
     const authority = new WorkerAuthority(env, 'locked', 1);
     authority.handle(validHandshake());
     const result = authority.handle(validOperation('chan-1', 1, 'removeLocalUser', 'op-1'));
     expect(result.accepted).toBe(false);
     expect(result.outcome).toContain('OPERATION_CAPABILITY_');
+    expect(delivered.some((event) => event.kind === 'operation-outcome' && event.outcome === 'AUTHORITY_REJECTED')).toBe(true);
   });
 });
 

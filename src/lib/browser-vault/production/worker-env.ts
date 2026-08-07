@@ -50,6 +50,13 @@ export type WorkerOperationOutcome =
   | { readonly outcome: 'INVALID_INPUT'; readonly payload?: unknown }
   | { readonly outcome: 'UNKNOWN_FAILURE'; readonly payload?: unknown };
 
+export function classifyWorkerException(error: unknown): string {
+  if (error instanceof ReferenceError) return 'WORKER_REFERENCE_ERROR';
+  if (error instanceof TypeError) return 'WORKER_TYPE_ERROR';
+  if (typeof DOMException !== 'undefined' && error instanceof DOMException && error.name === 'OperationError') return 'WORKER_CRYPTO_OPERATION_ERROR';
+  return 'WORKER_UNEXPECTED_EXCEPTION';
+}
+
 function outcomeFromSealed(result: SealedOutcome): WorkerOperationOutcome {
   switch (result.code) {
     case 'OK':
@@ -154,7 +161,7 @@ export function createWorkerBffIdentityLookup(fetchImpl: typeof fetch = fetch): 
         reply?: { successfull?: unknown; profileName?: unknown; publicSigningAddress?: unknown; publicEncryptAddress?: unknown; isPublic?: unknown } | null;
       };
       const reply = payload.reply;
-      if (reply === null || reply === undefined) {
+      if (reply === null || reply === undefined || reply.successfull === false) {
         return { kind: 'missing' };
       }
       const signing = reply.publicSigningAddress;
@@ -188,6 +195,37 @@ export interface SecretTransfer {
   consumed: boolean;
 }
 
+export interface SecretTransferBook {
+  readonly store: (transfer: SecretTransfer) => void;
+  readonly take: (operationId: string, kind: SecretTransfer['kind']) => string | Uint8Array | null;
+}
+
+/**
+ * One operation may require more than one independently consumed secret
+ * (credential import needs both fileBytes and filePassword). Keying only by
+ * operation id would let the later transfer overwrite the earlier one.
+ */
+export function createSecretTransferBook(): SecretTransferBook {
+  const operations = new Map<string, Map<SecretTransfer['kind'], SecretTransfer>>();
+  const store = (transfer: SecretTransfer): void => {
+    const operation = operations.get(transfer.operationId) ?? new Map<SecretTransfer['kind'], SecretTransfer>();
+    operation.set(transfer.kind, transfer);
+    operations.set(transfer.operationId, operation);
+  };
+  const take = (operationId: string, kind: SecretTransfer['kind']): string | Uint8Array | null => {
+    const operation = operations.get(operationId);
+    const transfer = operation?.get(kind);
+    if (!operation || !transfer || transfer.consumed) {
+      return null;
+    }
+    transfer.consumed = true;
+    operation.delete(kind);
+    if (operation.size === 0) operations.delete(operationId);
+    return transfer.value;
+  };
+  return { store, take };
+}
+
 /** Production authority environment over the sealed engine. */
 export function createProductionWorkerEnvironment(params: {
   readonly storage: VaultStorageSession;
@@ -200,19 +238,8 @@ export function createProductionWorkerEnvironment(params: {
   readonly fetchImpl?: typeof fetch;
 }): { readonly env: AuthorityEnvironment; readonly engine: SealedVaultEngine; readonly secrets: { store: (transfer: SecretTransfer) => void; take: (operationId: string, kind: SecretTransfer['kind']) => string | Uint8Array | null } } {
   const manifestResolution = resolveManifestForRuntimeConfig(params.runtimeConfigId);
-  const secrets = new Map<string, SecretTransfer>();
-  const store = (transfer: SecretTransfer): void => {
-    secrets.set(transfer.operationId, transfer);
-  };
-  const take = (operationId: string, kind: SecretTransfer['kind']): string | Uint8Array | null => {
-    const transfer = secrets.get(operationId);
-    if (!transfer || transfer.kind !== kind || transfer.consumed) {
-      return null;
-    }
-    transfer.consumed = true;
-    secrets.delete(operationId);
-    return transfer.value;
-  };
+  const secretBook = createSecretTransferBook();
+  const { store, take } = secretBook;
   /** Bounded wait for a secret the UI submits after the operation started. */
   const waitForSecret = (operationId: string, kind: SecretTransfer['kind'], timeoutMs = 60_000): Promise<string | Uint8Array | null> =>
     new Promise((resolve) => {
@@ -278,8 +305,9 @@ export function createProductionWorkerEnvironment(params: {
       emitDiagnosticBeacon({ kind: 'operation-done', operation, outcome: result.outcome });
       return result;
     } catch (error) {
-      emitDiagnosticBeacon({ kind: 'operation-error', operation, outcome: `error: ${String(error)}` });
-      return { outcome: 'UNKNOWN_FAILURE', retryable: false, allowedActions: [], supportCode: undefined };
+      const reason = classifyWorkerException(error);
+      emitDiagnosticBeacon({ kind: 'operation-error', operation, outcome: reason });
+      return { outcome: 'UNKNOWN_FAILURE', retryable: false, allowedActions: [], supportCode: undefined, payload: { reason } };
     }
   };
 

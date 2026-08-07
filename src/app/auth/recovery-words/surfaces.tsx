@@ -7,12 +7,13 @@
  * minimum interactive targets, 320 px reflow.
  */
 import { useId } from 'react';
+import { useInlineOnboardingBack } from '../onboarding/back-context';
 
 /** Shared complementary surface panel (never heavy-card-in-card). */
 export function RecoveryPanel({ title, children }: { title: string; children: React.ReactNode }) {
   const titleId = useId();
   return (
-    <section aria-labelledby={titleId} className="rounded-2xl bg-[var(--surface)] px-5 py-4 shadow-sm" data-testid="recovery-surface">
+    <section aria-labelledby={titleId} className="rounded-[0.85rem] bg-[var(--surface-strong)] p-6 shadow-sm" data-testid="recovery-surface">
       <h2 id={titleId} className="mb-2 text-base font-semibold text-[var(--text)]">
         {title}
       </h2>
@@ -28,22 +29,30 @@ export function RecoveryActionButton({
   variant = 'primary',
   disabled = false,
   busy = false,
+  fullWidth = false,
 }: {
   children: React.ReactNode;
   onClick: () => void;
   variant?: 'primary' | 'secondary' | 'danger';
   disabled?: boolean;
   busy?: boolean;
+  fullWidth?: boolean;
 }) {
   const base =
-    'inline-flex min-h-11 items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-50';
+    'inline-flex min-h-11 items-center justify-center px-4 py-2 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-50';
   const styles = {
-    primary: 'bg-[var(--accent)] text-white hover:bg-[var(--accent-strong)]',
-    secondary: 'bg-[var(--surface-strong)] text-[var(--text)] hover:bg-[var(--surface-stronger)]',
-    danger: 'bg-[var(--danger)] text-white hover:bg-[var(--danger-strong)]',
+    primary: 'button-default',
+    secondary: 'rounded-[0.85rem] bg-[var(--surface-stronger)] text-[var(--text)] hover:bg-[var(--surface-highest)]',
+    danger: 'rounded-[0.85rem] bg-[var(--danger)] text-white hover:bg-[var(--danger-strong)]',
   };
   return (
-    <button type="button" onClick={onClick} disabled={disabled || busy} className={`${base} ${styles[variant]}`} data-testid="recovery-action">
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled || busy}
+      className={`${base} ${styles[variant]}${fullWidth ? ' w-full' : ''}`}
+      data-testid="recovery-action"
+    >
       {busy ? '…' : children}
     </button>
   );
@@ -51,6 +60,8 @@ export function RecoveryActionButton({
 
 /** Back/lock control (root-only navigation label per stage). */
 export function RecoveryBackButton({ onClick, label = 'Back' }: { onClick: () => void; label?: string }) {
+  const showInlineBack = useInlineOnboardingBack();
+  if (!showInlineBack) return null;
   return (
     <button
       type="button"
@@ -87,19 +98,24 @@ export function WordInput({
   label,
   concealed,
   invalid,
+  inputRef,
   onValue,
+  onPaste,
 }: {
   id: string;
   label: string;
   concealed: boolean;
   invalid: boolean;
+  inputRef?: (element: HTMLInputElement | null) => void;
   onValue: (value: string) => void;
+  onPaste?: (event: React.ClipboardEvent<HTMLInputElement>) => void;
 }) {
   return (
     <label htmlFor={id} className="flex flex-col gap-1 text-xs font-medium text-[var(--text-muted)]">
       {label}
       <input
         id={id}
+        ref={inputRef}
         type={concealed ? 'password' : 'text'}
         autoComplete="off"
         autoCorrect="off"
@@ -107,7 +123,8 @@ export function WordInput({
         spellCheck={false}
         aria-invalid={invalid || undefined}
         onChange={(event) => onValue(event.target.value)}
-        className={`min-h-11 rounded-xl border bg-[var(--surface-strong)] px-3 py-2 text-sm text-[var(--text)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
+        onPaste={onPaste}
+        className={`min-h-11 rounded-[0.85rem] border bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
           invalid ? 'border-[var(--danger)]' : 'border-transparent'
         }`}
         data-testid={`word-input-${id}`}

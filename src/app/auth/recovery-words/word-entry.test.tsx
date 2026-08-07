@@ -5,7 +5,7 @@
  * positions, concealment, clear-all, error focus, no secret snapshots.
  */
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { WordGridProjection } from '../../../lib/recovery-words/contracts/projection';
 import { WordEntryScreen, decidePaste, normalizePastedPhrase } from './word-entry';
@@ -60,11 +60,12 @@ describe('decidePaste (entry contract)', () => {
 });
 
 describe('WordEntryScreen (Task 5.2)', () => {
-  it('renders exactly 12/24 choices and no initial grid', () => {
+  it('opens with all 24 indexed places visible while retaining the explicit 12-word option', () => {
     render(<WordEntryScreen grid={grid()} onSelectCount={vi.fn()} onPastePhrase={vi.fn()} onConfirmPasteReplacement={vi.fn()} onClearAll={vi.fn()} onVerify={vi.fn()} onBack={vi.fn()} />);
-    expect(screen.getByLabelText('12 words')).toBeDefined();
-    expect(screen.getByLabelText('24 words')).toBeDefined();
-    expect(screen.queryByTestId('word-grid')).toBeNull();
+    expect(screen.getByLabelText('12 words')).not.toBeChecked();
+    expect(screen.getByLabelText('24 words')).toBeChecked();
+    expect(screen.getByTestId('word-grid')).toBeInTheDocument();
+    expect(screen.getAllByTestId(/word-input-rw-/)).toHaveLength(24);
     expect(screen.getByText(/will not save these recovery words/)).toBeDefined();
   });
 
@@ -80,14 +81,23 @@ describe('WordEntryScreen (Task 5.2)', () => {
     expect(screen.getByRole('button', { name: 'Verify' })).toBeDisabled();
   });
 
-  it('enables Verify when valid and not busy, and forwards the phrase on click', async () => {
+  it('distributes a complete pasted phrase across every position and enables Verify', async () => {
     const user = userEvent.setup();
+    const onPastePhrase = vi.fn();
     const onVerify = vi.fn();
-    render(<WordEntryScreen grid={grid({ selectedWordCount: '12', canVerify: true })} onSelectCount={vi.fn()} onPastePhrase={vi.fn()} onConfirmPasteReplacement={vi.fn()} onClearAll={vi.fn()} onVerify={onVerify} onBack={vi.fn()} />);
-    const first = screen.getByLabelText('Recovery word 1 of 12');
-    await user.type(first, 'abandon');
+    render(<WordEntryScreen grid={grid({ selectedWordCount: '24', canVerify: true })} onSelectCount={vi.fn()} onPastePhrase={onPastePhrase} onConfirmPasteReplacement={vi.fn()} onClearAll={vi.fn()} onVerify={onVerify} onBack={vi.fn()} />);
+    const first = screen.getByLabelText('Recovery word 1 of 24');
+    fireEvent.paste(first, { clipboardData: { getData: () => M24 } });
+
+    const fields = screen.getAllByTestId(/word-input-rw-/);
+    expect(fields).toHaveLength(24);
+    M24.split(' ').forEach((word, index) => expect(fields[index]).toHaveValue(word));
+    expect(onPastePhrase).toHaveBeenCalledWith(normalizePastedPhrase(M24));
+    expect(screen.getByRole('button', { name: 'Verify' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Verify' })).toHaveClass('button-default', 'w-full');
+
     await user.click(screen.getByRole('button', { name: 'Verify' }));
-    expect(onVerify).toHaveBeenCalled();
+    expect(onVerify).toHaveBeenCalledWith(normalizePastedPhrase(M24));
   });
 
   it('never renders word values into nonessential accessibility content when concealed', () => {

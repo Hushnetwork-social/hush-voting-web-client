@@ -34,14 +34,20 @@ import {
   createSecretAuthorityTestActor,
 } from '../testing/actors';
 
+const VERIFIED_IDENTITY = {
+  alias: 'Alice',
+  publicSigningKey: '02abcdef',
+  publicEncryptionKey: '03abcdef',
+} as const;
+
 /** Build a full scripted actor set. */
 function makeActors(overrides: Partial<AuthActors> = {}): AuthActors {
   const base: AuthActors = {
     localUserAuthority: createLocalUserAuthorityTestActor([{ code: 'INIT_NO_LOCAL_USER' }]),
     secretAuthority: createSecretAuthorityTestActor([{ code: 'UNLOCK_SUCCESS' }]),
     identityVerification: createIdentityVerificationTestActor([
-      { code: 'VERIFY_SUCCESS' },
-      { code: 'VERIFY_SUCCESS' },
+      { code: 'VERIFY_SUCCESS', identity: VERIFIED_IDENTITY },
+      { code: 'VERIFY_SUCCESS', identity: VERIFIED_IDENTITY },
     ]),
     onboarding: {
       createUser: createOnboardingTestActor([{ code: 'ONBOARDING_COMPLETED', localUserRef: 'test-local-user-1' }]),
@@ -202,11 +208,26 @@ describe('auth machine reachable states and transitions', () => {
     expect(snapshotCodes(machine.getSnapshot()).auth).toBe('locked');
   });
 
+  it('retains verified public identity only while authenticated', async () => {
+    const machine = createDriver(makeActors());
+    completeAllPendingOperations();
+    await settle();
+    await drive(machine, { type: 'INTENT.CREATE_USER' });
+    expect(snapshotCodes(machine.getSnapshot()).auth).toBe('authenticated');
+    expect(machine.getSnapshot().context.authenticatedIdentity).toEqual(VERIFIED_IDENTITY);
+
+    machine.send({ type: 'INTENT.LOCK' });
+    expect(snapshotCodes(machine.getSnapshot()).auth).toBe('locked');
+    expect(machine.getSnapshot().context.authenticatedIdentity).toBeNull();
+  });
+
   it('connectivity transitions never erase authentication context', async () => {
     const machine = createDriver(makeActors());
     completeAllPendingOperations();
     await settle();
     machine.send({ type: 'CONNECTIVITY.CHANGE', state: 'online' });
+    machine.send({ type: 'CONNECTIVITY.CHANGE', state: 'paused' });
+    expect(snapshotCodes(machine.getSnapshot()).connectivity).toBe('paused');
     machine.send({ type: 'CONNECTIVITY.CHANGE', state: 'offline' });
     machine.send({ type: 'CONNECTIVITY.CHANGE', state: 'reconnecting' });
     machine.send({ type: 'CONNECTIVITY.CHANGE', state: 'online' });

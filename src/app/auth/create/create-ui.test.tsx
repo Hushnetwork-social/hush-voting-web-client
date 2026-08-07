@@ -51,6 +51,7 @@ describe('Profile (Task 5.2)', () => {
     render(<ProfileScreen onContinue={onContinue} onBack={vi.fn()} />);
     expect(screen.getByRole('radio', { name: /Private — recommended/ })).toBeChecked();
     expect(screen.queryByLabelText(/password/i)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Continue' })).toHaveClass('button-default', 'w-full');
     await userEvent.click(screen.getByRole('button', { name: 'Continue' }));
     expect(screen.getByRole('alert')).toBeDefined();
     expect(onContinue).not.toHaveBeenCalled();
@@ -92,6 +93,39 @@ describe('Recovery (Task 5.4)', () => {
     const list = screen.getByTestId('recovery-list');
     expect(list.tagName).toBe('OL');
     expect(list.querySelectorAll('li')).toHaveLength(24);
+  });
+
+  it('copies the visible words only after the explicit Copy words action', async () => {
+    const onCopy = vi.fn();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    render(
+      <RecoveryScreen words={words} onCopy={onCopy} onRegenerateRequest={vi.fn()} onContinue={vi.fn()} onBack={vi.fn()} acknowledged={false} onAcknowledge={vi.fn()} timeoutMessage={null} />,
+    );
+
+    const copy = screen.getByRole('button', { name: 'Copy words' });
+    expect(copy).toHaveClass('button-default');
+    expect(copy).toBeEnabled();
+    expect(writeText).not.toHaveBeenCalled();
+    await userEvent.click(copy);
+
+    expect(writeText).toHaveBeenCalledOnce();
+    expect(writeText).toHaveBeenCalledWith(words.join(' '));
+    expect(onCopy).toHaveBeenCalledOnce();
+    expect(screen.getByRole('button', { name: 'Copied' })).toBeEnabled();
+    expect(screen.getByRole('status')).toHaveTextContent('Recovery words copied.');
+  });
+
+  it('keeps the words visible and reports a bounded message when clipboard access fails', async () => {
+    const writeText = vi.fn().mockRejectedValue(new DOMException('Denied', 'NotAllowedError'));
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    render(
+      <RecoveryScreen words={words} onCopy={vi.fn()} onRegenerateRequest={vi.fn()} onContinue={vi.fn()} onBack={vi.fn()} acknowledged={false} onAcknowledge={vi.fn()} timeoutMessage={null} />,
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Copy words' }));
+    expect(screen.getByRole('status')).toHaveTextContent('Clipboard copy is unavailable. Save the visible words manually.');
+    expect(screen.getByTestId('recovery-list')).toBeInTheDocument();
   });
 
   it('conceals visual AND accessibility content when words are not revealed', () => {

@@ -16,6 +16,28 @@ import { createServerTransport } from '../server-transport';
 
 export const runtime = 'nodejs';
 
+const noStoreHeaders = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+  Pragma: 'no-cache',
+  Expires: '0',
+};
+
+/** Real HushServerNode liveness/progress probe through GetBlockchainHeight. */
+export async function GET(): Promise<NextResponse> {
+  const port: HushServerTransportPort | null = createServerTransport(process.env);
+  if (port === null) {
+    return NextResponse.json({ error: { code: 'NOT_CONFIGURED' } }, { status: 503, headers: noStoreHeaders });
+  }
+  const result = await Promise.race([
+    port.getBlockchainIndex(),
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), RPC_TIMEOUT_MS)),
+  ]).catch(() => ({ ok: false as const, failure: { kind: 'timeout' as const } }));
+  if (!result.ok) {
+    return NextResponse.json({ error: { code: 'SERVER_UNAVAILABLE' } }, { status: 502, headers: noStoreHeaders });
+  }
+  return NextResponse.json({ reply: { index: result.index } }, { headers: noStoreHeaders });
+}
+
 export async function POST(request: Request): Promise<NextResponse> {
   const port: HushServerTransportPort | null = createServerTransport(process.env);
   if (port === null) {

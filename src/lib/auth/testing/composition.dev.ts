@@ -63,7 +63,14 @@ export function createDevelopmentComposition(allowDevelopmentActors: boolean): C
     { code: 'UNLOCK_WRONG_PASSWORD_OR_DAMAGED' },
   ]);
   builder.identityVerification = createAutoResolvingIdentityVerification([
-    { code: 'VERIFY_SUCCESS' },
+    {
+      code: 'VERIFY_SUCCESS',
+      identity: {
+        alias: 'Demo User',
+        publicSigningKey: '02abcdef0123456789',
+        publicEncryptionKey: '03abcdef0123456789',
+      },
+    },
     { code: 'VERIFY_NETWORK_UNAVAILABLE' },
   ]);
   builder.onboarding = {

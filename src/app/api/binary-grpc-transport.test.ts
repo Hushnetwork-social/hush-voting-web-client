@@ -30,6 +30,7 @@ const PROTO_FILES = [path.join(PROTO_DIR, 'hushIdentity.proto'), path.join(PROTO
 async function startTestServer(handlers: {
   getIdentity: (call: { request: { PublicSigningAddress: string } }, cb: (err: unknown, reply: object | null) => void) => void;
   submit: (call: { request: { SignedTransaction: string } }, cb: (err: unknown, reply: object | null) => void) => void;
+  getBlockchainHeight?: (call: { request: object }, cb: (err: unknown, reply: object | null) => void) => void;
 }): Promise<TestServer> {
   const definition = loadSync(PROTO_FILES, { keepCase: true, longs: String, enums: String, defaults: true, oneofs: true });
   const pkg = loadPackageDefinition(definition) as unknown as {
@@ -37,7 +38,10 @@ async function startTestServer(handlers: {
   };
   const server = new Server();
   server.addService(pkg.rpcHush.HushIdentity.service as never, { GetIdentity: handlers.getIdentity } as never);
-  server.addService(pkg.rpcHush.HushBlockchain.service as never, { SubmitSignedTransaction: handlers.submit } as never);
+  server.addService(pkg.rpcHush.HushBlockchain.service as never, {
+    SubmitSignedTransaction: handlers.submit,
+    GetBlockchainHeight: handlers.getBlockchainHeight ?? ((_call: unknown, cb: (err: unknown, reply: object) => void) => cb(null, { Index: '0' })),
+  } as never);
   const port = await new Promise<number>((resolve, reject) =>
     server.bindAsync('127.0.0.1:0', ServerCredentials.createInsecure(), (error, boundPort) => (error ? reject(error) : resolve(boundPort))),
   );
@@ -70,6 +74,17 @@ describe('binary gRPC transport (Task 6.2)', () => {
     cleanup.push(() => harness!.close());
     return new BinaryGrpcTransport(`127.0.0.1:${harness.port}`);
   }
+
+  it('retrieves the blockchain index as an exact int64 string', async () => {
+    const transport = await withServer({
+      getIdentity: (_call, cb) => cb(null, { Successfull: false }),
+      submit: (_call, cb) => cb(null, { Successfull: true, status: 'TRANSACTION_STATUS_ACCEPTED' }),
+      getBlockchainHeight: (_call, cb) => cb(null, { Index: '9223372036854775807' }),
+    });
+
+    const result = await transport.getBlockchainIndex();
+    expect(result).toEqual({ ok: true, index: '9223372036854775807' });
+  });
 
   it('returns the exact identity fields over binary gRPC', async () => {
     const transport = await withServer({

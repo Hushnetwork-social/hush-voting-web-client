@@ -32,9 +32,11 @@ export type TransportFailure =
 
 export type LookupTransportResult = { readonly ok: true; readonly reply: GetIdentityReply } | { readonly ok: false; readonly failure: TransportFailure };
 export type SubmitTransportResult = { readonly ok: true; readonly reply: SubmitSignedTransactionReply } | { readonly ok: false; readonly failure: TransportFailure };
+export type BlockchainIndexTransportResult = { readonly ok: true; readonly index: string } | { readonly ok: false; readonly failure: TransportFailure };
 
 /** Server-side transport port — implemented by the BFF gRPC binding or native Rust. */
 export interface HushServerTransportPort {
+  getBlockchainIndex(): Promise<BlockchainIndexTransportResult>;
   lookupIdentity(request: { readonly publicSigningAddress: string }): Promise<LookupTransportResult>;
   submitTransaction(request: { readonly signedTransaction: string }): Promise<SubmitTransportResult>;
 }
@@ -102,6 +104,24 @@ function isBffErrorCode(value: unknown): value is BffErrorReply['error']['code']
 /** Browser same-origin transport adapter (used by the page/worker). */
 export class BffTransport implements HushServerTransportPort {
   constructor(private readonly basePath: string) {}
+
+  async getBlockchainIndex(): Promise<BlockchainIndexTransportResult> {
+    try {
+      const response = await fetch(`${this.basePath}/api/blockchain`, {
+        method: 'GET',
+        cache: 'no-store',
+        signal: AbortSignal.timeout(RPC_TIMEOUT_MS),
+      });
+      if (!response.ok) return { ok: false, failure: { kind: 'unavailable' } };
+      const body = (await response.json()) as { reply?: { index?: unknown } } | null;
+      const index = body?.reply?.index;
+      return typeof index === 'string' && /^\d+$/.test(index)
+        ? { ok: true, index }
+        : { ok: false, failure: { kind: 'protocol' } };
+    } catch {
+      return { ok: false, failure: { kind: 'unavailable' } };
+    }
+  }
 
   async lookupIdentity(request: { readonly publicSigningAddress: string }): Promise<LookupTransportResult> {
     const response = await fetch(`${this.basePath}/api/identity`, {

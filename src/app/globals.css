@@ -17,6 +17,21 @@
   --text: #d9e3f7;
   --muted: #cac4d4;
   --focus: #cebdff;
+
+  /* Shared semantic aliases used by the onboarding feature surfaces. */
+  --surface-strong: var(--surface-elevated);
+  --surface-stronger: var(--surface-highest);
+  --text-muted: var(--muted);
+  --accent: var(--primary-container);
+  --accent-strong: #b49cff;
+  --accent-contrast: var(--on-primary);
+  --success: #86efac;
+  --warning: #fcd34d;
+  --warning-surface: rgba(161, 98, 7, 0.22);
+  --danger: #fca5a5;
+  --danger-strong: #b91c1c;
+  --surface-error: rgba(185, 28, 28, 0.22);
+  --text-error: #fecaca;
 }
 
 * {
@@ -74,10 +89,11 @@ a:focus-visible {
   display: inline-flex;
   align-items: center;
   gap: 0.75rem;
-  font-size: 1.05rem;
+  font-size: 1.25rem;
   font-weight: 750;
+  line-height: 1;
   text-decoration: none;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.015em;
 }
 
 .brand-mark {
@@ -108,6 +124,167 @@ a:focus-visible {
 .foundation-badge {
   padding: 0.55rem 0.8rem;
   text-transform: uppercase;
+}
+
+.authenticated-user-menu {
+  position: relative;
+  margin-left: auto;
+}
+
+.authenticated-user-trigger {
+  display: inline-flex;
+  min-height: 2.85rem;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.65rem 0.9rem;
+  color: var(--text);
+  background: rgba(167, 139, 250, 0.14);
+  border: 1px solid transparent;
+  border-radius: 0.85rem;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.authenticated-user-trigger:hover,
+.authenticated-user-trigger[aria-expanded='true'] {
+  background: var(--surface-elevated);
+}
+
+.authenticated-user-trigger:focus-visible,
+.authenticated-user-close:focus-visible,
+.authenticated-lock-button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.authenticated-user-popup {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 0.75rem);
+  right: 0;
+  display: grid;
+  width: min(26rem, calc(100vw - 2.5rem));
+  gap: 1.15rem;
+  padding: 1.25rem;
+  background: var(--surface);
+  border-radius: 0.85rem;
+  box-shadow: 0 1.25rem 3.5rem rgba(0, 0, 0, 0.38);
+}
+
+.authenticated-user-popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.authenticated-user-popup-header h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.authenticated-user-close {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  padding: 0;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-radius: 0.5rem;
+  font: inherit;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+
+.authenticated-user-details {
+  display: grid;
+  gap: 1rem;
+  margin: 0;
+}
+
+.authenticated-user-details > div {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.authenticated-user-details dt {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.authenticated-user-details dd {
+  margin: 0;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.authenticated-user-details > div:not(:first-child) dd {
+  color: var(--primary);
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.authenticated-key-row {
+  display: flex;
+  min-height: 2rem;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.authenticated-copy-key {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 2rem;
+  place-items: center;
+  padding: 0;
+  color: var(--primary);
+  background: var(--surface-elevated);
+  border: 1px solid transparent;
+  border-radius: 0.55rem;
+  cursor: pointer;
+}
+
+.authenticated-copy-key:hover {
+  background: var(--surface-highest);
+}
+
+.authenticated-copy-key:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.authenticated-copy-feedback {
+  min-width: 3.25rem;
+  margin-left: auto;
+  color: var(--success);
+  font-family: var(--font-hanken-grotesk), ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.authenticated-lock-button {
+  display: inline-flex;
+  width: 100%;
+  min-height: 2.85rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  padding: 0.7rem 1rem;
+  color: var(--on-primary);
+  background: var(--primary);
+  border: 0;
+  border-radius: 0.85rem;
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
 }
 
 .hero {
@@ -345,8 +522,10 @@ h1 {
 }
 
 .auth-brand-name {
+  font-size: 1.25rem;
   font-weight: 750;
-  letter-spacing: -0.01em;
+  line-height: 1;
+  letter-spacing: -0.015em;
 }
 
 .auth-env {
@@ -354,16 +533,62 @@ h1 {
   color: var(--muted);
   font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
   font-size: 0.72rem;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
 
+.auth-env[data-connectivity='online'] {
+  color: var(--success);
+}
+
+.auth-env[data-connectivity='offline'] {
+  color: var(--danger);
+}
+
+.auth-env[data-connectivity='paused'],
+.auth-env[data-connectivity='reconnecting'],
+.auth-env[data-connectivity='unknown'] {
+  color: var(--warning);
+}
+
 .auth-surface {
   background: var(--surface);
-  border-radius: 1.5rem;
+  border-radius: 0.85rem;
   padding: clamp(1.5rem, 4vw, 2.25rem);
   display: grid;
   gap: 1.25rem;
+}
+
+.auth-surface-with-back {
+  padding-top: 1.25rem;
+}
+
+.auth-back-link {
+  display: inline-flex;
+  min-height: 1.5rem;
+  margin-bottom: -0.75rem;
+  width: fit-content;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0;
+  color: var(--primary);
+  background: transparent;
+  border: 0;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.auth-back-link:hover {
+  color: var(--text);
+}
+
+.auth-back-link:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+  border-radius: 0.35rem;
 }
 
 .auth-heading {
@@ -420,7 +645,7 @@ h1 {
   text-align: left;
   padding: 1rem 1.1rem;
   background: var(--surface-elevated);
-  border-radius: 1rem;
+  border-radius: 0.85rem;
   border: 1px solid transparent;
   color: var(--text);
   cursor: pointer;
@@ -444,6 +669,40 @@ h1 {
   color: var(--muted);
   font-size: 0.88rem;
   line-height: 1.45;
+}
+
+.text-input {
+  box-sizing: border-box;
+  width: 100%;
+  height: 3rem;
+  border: 1px solid var(--surface-highest);
+  border-radius: 0.85rem;
+  padding: 0.75rem 1rem;
+  background: var(--surface-lowest);
+  color: var(--text);
+  font: inherit;
+}
+
+.text-input::placeholder {
+  color: var(--muted);
+}
+
+.text-input:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+  border-color: transparent;
+}
+
+.text-input:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.selection-display {
+  min-height: 3rem;
+  border: 1px solid var(--surface-highest);
+  border-radius: 0.85rem;
+  background: var(--surface);
 }
 
 .field {
@@ -487,29 +746,60 @@ h1 {
   color: #fca5a5;
 }
 
+.locked-user {
+  display: grid;
+  gap: 1.25rem;
+}
+
 .locked-actions {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  justify-content: space-between;
+  gap: 0.85rem;
   flex-wrap: wrap;
 }
 
+.locked-actions .button-primary,
+.locked-actions .button-danger-ghost {
+  min-height: 2.85rem;
+  border-radius: 0.85rem;
+}
+
+.restore-surface {
+  border-radius: 0.85rem;
+}
+
+.button-default,
 .button-primary,
 .button-danger,
 .button-danger-ghost {
-  border-radius: 999px;
+  border-radius: 0.85rem;
   padding: 0.7rem 1.4rem;
   font: inherit;
   font-weight: 700;
   cursor: pointer;
 }
 
+.button-default,
 .button-primary {
+  min-height: 2.75rem;
   background: var(--primary);
   color: var(--on-primary);
   border: none;
 }
 
+.button-default:hover:not(:disabled),
+.button-primary:hover:not(:disabled) {
+  background: var(--accent-strong);
+}
+
+.button-default:focus-visible,
+.button-primary:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.button-default:disabled,
 .button-primary:disabled,
 .button-danger:disabled {
   opacity: 0.5;

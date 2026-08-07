@@ -19,6 +19,7 @@ import type { RecoveryFlowProps } from '../recovery-words/recovery-flow';
 import { RecoveryFlow } from '../recovery-words/recovery-flow';
 import type { CredentialFileFlowProps } from '../credential-file/credential-file-flow';
 import { CredentialFileFlow } from '../credential-file/credential-file-flow';
+import { OnboardingBackProvider } from './back-context';
 
 /** Closed discriminated child slot (one real completed flow per kind). */
 export type OnboardingChild =
@@ -53,11 +54,11 @@ export function OnboardingHost({ child, onBack }: OnboardingHostProps) {
   }
   switch (child.kind) {
     case 'createUser':
-      return <CreateUserFlow {...child.props} />;
+      return <OnboardingBackProvider><CreateUserFlow {...child.props} /></OnboardingBackProvider>;
     case 'recoveryWords':
-      return <RecoveryFlow {...child.props} />;
+      return <OnboardingBackProvider><RecoveryFlow {...child.props} /></OnboardingBackProvider>;
     case 'credentialFile':
-      return <CredentialFileFlow {...child.props} />;
+      return <OnboardingBackProvider><CredentialFileFlow {...child.props} /></OnboardingBackProvider>;
     default: {
       const never: never = child;
       return never;

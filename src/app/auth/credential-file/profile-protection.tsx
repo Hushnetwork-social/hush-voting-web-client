@@ -9,13 +9,14 @@
  * the mnemonic-source notice. No Backup-file password or source state is
  * mounted here.
  */
+import { useRef, useState } from 'react';
 import type { RestoreViewState } from '../../../lib/credential-file-restore/presentation/view';
 import type { RestoreProtectionChoice } from '../../../lib/credential-file-restore/contracts/projection';
 import { COPY, RestoreBackButton, RestoreErrorRegion, RestorePanel, RestorePrimaryButton, RestoreStatusRegion } from './surfaces';
 
 export interface ProfileProtectionProps {
   readonly view: RestoreViewState;
-  readonly onChooseProtection: (mode: RestoreProtectionChoice) => void;
+  readonly onChooseProtection: (mode: RestoreProtectionChoice, devicePassword?: string) => void;
   readonly onCreateIdentity: () => void;
   readonly onReveal: () => void;
   readonly onUnlockResume: () => void;
@@ -61,17 +62,48 @@ export function ProfileReviewScreen({ view, onCreateIdentity, onReveal, onBack }
 /** Separate protection choice — Device password default; no co-mounted backup state. */
 export function ProtectionScreen({ view, onChooseProtection, onBack }: ProfileProtectionProps) {
   const choices = view.protectionChoices ?? [];
+  const [selectedMode, setSelectedMode] = useState<RestoreProtectionChoice>(choices[0] ?? 'devicePassword');
+  const [confirmationError, setConfirmationError] = useState<string | null>(null);
+  const [canSubmitPassword, setCanSubmitPassword] = useState(false);
+  const passwordRef = useRef<HTMLInputElement>(null);
+  const confirmationRef = useRef<HTMLInputElement>(null);
+
+  const updatePasswordReadiness = () => {
+    const password = passwordRef.current?.value ?? '';
+    const confirmation = confirmationRef.current?.value ?? '';
+    setCanSubmitPassword(password.length >= 8 && password === confirmation);
+    setConfirmationError(null);
+  };
+
+  const submitProtection = () => {
+    if (selectedMode !== 'devicePassword') {
+      onChooseProtection(selectedMode);
+      return;
+    }
+    const password = passwordRef.current?.value ?? '';
+    const confirmation = confirmationRef.current?.value ?? '';
+    if (password.length < 8 || password !== confirmation) {
+      setConfirmationError(password.length < 8 ? 'Use at least 8 characters.' : 'Device passwords do not match.');
+      (password.length < 8 ? passwordRef.current : confirmationRef.current)?.focus();
+      return;
+    }
+    onChooseProtection(selectedMode, password);
+    if (passwordRef.current) passwordRef.current.value = '';
+    if (confirmationRef.current) confirmationRef.current.value = '';
+    setConfirmationError(null);
+  };
+
   return (
     <RestorePanel title={COPY.protection.title}>
       <fieldset className="flex flex-col gap-3">
         <legend className="mb-1 text-sm font-medium text-[var(--text)]">{COPY.protection.createVaultPassword}</legend>
         {choices.map((mode) => (
-          <label key={mode} className="flex min-h-11 items-center gap-3 rounded-xl bg-[var(--surface-strong)] p-3 text-sm text-[var(--text)]">
+          <label key={mode} className="flex min-h-11 items-center gap-3 rounded-[0.85rem] bg-[var(--surface)] p-3 text-sm text-[var(--text)]">
             <input
               type="radio"
               name="restore-protection"
-              defaultChecked={mode === 'devicePassword'}
-              onChange={() => onChooseProtection(mode)}
+              checked={selectedMode === mode}
+              onChange={() => setSelectedMode(mode)}
               data-testid={`protection-${mode}`}
             />
             <span>{protectionLabel(mode)}</span>
@@ -79,7 +111,45 @@ export function ProtectionScreen({ view, onChooseProtection, onBack }: ProfilePr
           </label>
         ))}
       </fieldset>
-      <div className="mt-4">
+      <form onSubmit={(event) => { event.preventDefault(); submitProtection(); }}>
+        {selectedMode === 'devicePassword' && (
+          <div className="mt-4 space-y-3">
+            <label className="block text-sm font-medium text-[var(--text)]" htmlFor="restore-device-password">
+              Device password
+            </label>
+            <input
+              ref={passwordRef}
+              id="restore-device-password"
+              type="password"
+              autoComplete="new-password"
+              onInput={updatePasswordReadiness}
+              className="text-input text-sm"
+              data-testid="restore-device-password"
+            />
+            <label className="block text-sm font-medium text-[var(--text)]" htmlFor="restore-device-password-confirmation">
+              Confirm device password
+            </label>
+            <input
+              ref={confirmationRef}
+              id="restore-device-password-confirmation"
+              type="password"
+              autoComplete="new-password"
+              onInput={updatePasswordReadiness}
+              aria-invalid={confirmationError !== null}
+              aria-describedby={confirmationError !== null ? 'restore-device-password-error' : undefined}
+              className="text-input text-sm"
+              data-testid="restore-device-password-confirmation"
+            />
+            {confirmationError !== null && <div id="restore-device-password-error"><RestoreErrorRegion>{confirmationError}</RestoreErrorRegion></div>}
+          </div>
+        )}
+        <div className="mt-5">
+          <RestorePrimaryButton testId="submit-protection" type="submit" disabled={selectedMode === 'devicePassword' && !canSubmitPassword} fullWidth>
+            Protect this device and continue
+          </RestorePrimaryButton>
+        </div>
+      </form>
+      <div className="mt-3 flex justify-center">
         <RestoreBackButton onBack={onBack} />
       </div>
     </RestorePanel>

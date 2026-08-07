@@ -10,7 +10,7 @@
  * "Core transitions", "Errors", and "Test Requirements" sections.
  */
 
-import type { AuthOutcomeCode, AuthStateCode, ConnectivityStateCode } from './types';
+import type { AuthenticatedIdentityMetadata, AuthOutcomeCode, AuthStateCode, ConnectivityStateCode } from './types';
 
 /** Every documented typed state (including recoverable/blocked categories). */
 export type ErrorCategory = 'recoverable' | 'blocked';
@@ -176,7 +176,7 @@ export type UnlockResult =
 
 /** Online identity verification actor result (exact profile + both-key binding). */
 export type VerificationResult =
-  | { readonly code: 'VERIFY_SUCCESS' }
+  | { readonly code: 'VERIFY_SUCCESS'; readonly identity?: AuthenticatedIdentityMetadata }
   | { readonly code: 'VERIFY_PROFILE_MISSING'; readonly safeCandidate: { readonly alias: string; readonly abbreviatedSigningAddress: string } }
   | { readonly code: 'VERIFY_SIGNING_KEY_MISMATCH' }
   | { readonly code: 'VERIFY_ENCRYPTION_KEY_MISMATCH' }
