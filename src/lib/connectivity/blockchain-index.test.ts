@@ -33,6 +33,7 @@ describe('blockchain index connectivity', () => {
   it('accepts only a successful bounded decimal index reply', async () => {
     const okFetch = vi.fn(async () => new Response(JSON.stringify({ reply: { index: '123' } }), { status: 200 }));
     expect(await fetchBlockchainIndex(okFetch as typeof fetch)).toBe('123');
+    expect(okFetch).toHaveBeenCalledWith('/api/blockchain/index', expect.objectContaining({ method: 'POST', cache: 'no-store' }));
 
     const malformedFetch = vi.fn(async () => new Response(JSON.stringify({ reply: { index: 'not-an-index' } }), { status: 200 }));
     expect(await fetchBlockchainIndex(malformedFetch as typeof fetch)).toBeNull();

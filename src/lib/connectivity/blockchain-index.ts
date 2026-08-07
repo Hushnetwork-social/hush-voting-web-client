@@ -38,8 +38,8 @@ export class BlockchainIndexTracker {
 /** Same-origin, no-store index probe. The index is control data, not logged. */
 export async function fetchBlockchainIndex(fetchImpl: typeof fetch = fetch): Promise<string | null> {
   try {
-    const response = await fetchImpl('/api/blockchain', {
-      method: 'GET',
+    const response = await fetchImpl('/api/blockchain/index', {
+      method: 'POST',
       cache: 'no-store',
       signal: AbortSignal.timeout(BLOCKCHAIN_INDEX_PROBE_TIMEOUT_MS),
     });
