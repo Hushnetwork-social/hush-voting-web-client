@@ -10,11 +10,6 @@ on:
         description: "Version to deploy, for example v1.0.1 or 1.0.1. Leave empty to use a timestamp."
         required: false
         type: string
-      grpc_url:
-        description: "HushServerNode gRPC URL."
-        required: false
-        type: string
-        default: "https://api.hushnetwork.social"
       debug_logging:
         description: "Enable debug logging."
         required: false
@@ -27,7 +22,7 @@ env:
   NODE_VERSION: "22"
   APP_SITE_URL: https://app.hushvoting.com
   MARKETING_SITE_URL: https://www.hushvoting.com
-  DEFAULT_HUSHSERVERNODE_GRPC_URL: https://api.hushnetwork.social
+  HUSHSERVER_NODE_ENDPOINT: host.docker.internal:4665
 
 jobs:
   ci:
@@ -108,17 +103,6 @@ jobs:
           echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
           echo "Deploying HushVoting Web Client ${VERSION}"
 
-      - name: Resolve HushServerNode URL
-        id: backend
-        shell: bash
-        run: |
-          set -euo pipefail
-          GRPC_URL="${{ inputs.grpc_url || env.DEFAULT_HUSHSERVERNODE_GRPC_URL }}"
-          if [[ "${GRPC_URL}" != "https://api.hushnetwork.social" ]]; then
-            echo "::warning::Deploying with non-default HushServerNode URL: ${GRPC_URL}"
-          fi
-          echo "grpc_url=${GRPC_URL}" >> "${GITHUB_OUTPUT}"
-
       - name: Validate deployable scaffold
         shell: bash
         run: |
@@ -151,7 +135,6 @@ jobs:
             NEXT_PUBLIC_API_URL=${{ env.APP_SITE_URL }}
             NEXT_PUBLIC_APP_BASE_URL=${{ env.APP_SITE_URL }}
             NEXT_PUBLIC_MARKETING_BASE_URL=${{ env.MARKETING_SITE_URL }}
-            NEXT_PUBLIC_GRPC_URL=${{ steps.backend.outputs.grpc_url }}
             NEXT_PUBLIC_DEBUG_LOGGING=${{ inputs.debug_logging || 'false' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -170,21 +153,27 @@ jobs:
           SSH_HOST: ${{ secrets.AWS_HOST }}
           SSH_USER: ${{ secrets.AWS_SSH_USER }}
           IMAGE_TAG: ${{ steps.version.outputs.version }}
-          GRPC_SERVER_URL: ${{ steps.backend.outputs.grpc_url }}
+          HUSHSERVER_NODE_ENDPOINT: ${{ env.HUSHSERVER_NODE_ENDPOINT }}
           GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
           GHCR_USERNAME: ${{ secrets.GHCR_USERNAME || vars.GHCR_USERNAME || github.actor }}
           GHCR_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           APP_SITE_URL: ${{ env.APP_SITE_URL }}
           MARKETING_SITE_URL: ${{ env.MARKETING_SITE_URL }}
         run: |
-          ssh -i ~/.ssh/lightsail.pem -o ServerAliveInterval=30 -o ServerAliveCountMax=10 "${SSH_USER}@${SSH_HOST}" "IMAGE_TAG=${IMAGE_TAG}" "GRPC_SERVER_URL=${GRPC_SERVER_URL}" "GHCR_TOKEN=${GHCR_TOKEN}" "GHCR_USERNAME=${GHCR_USERNAME}" "GHCR_IMAGE=${GHCR_IMAGE}" "APP_SITE_URL=${APP_SITE_URL}" "MARKETING_SITE_URL=${MARKETING_SITE_URL}" 'bash -s' << 'DEPLOY_SCRIPT'
+          ssh -i ~/.ssh/lightsail.pem -o ServerAliveInterval=30 -o ServerAliveCountMax=10 "${SSH_USER}@${SSH_HOST}" "IMAGE_TAG=${IMAGE_TAG}" "HUSHSERVER_NODE_ENDPOINT=${HUSHSERVER_NODE_ENDPOINT}" "GHCR_TOKEN=${GHCR_TOKEN}" "GHCR_USERNAME=${GHCR_USERNAME}" "GHCR_IMAGE=${GHCR_IMAGE}" "APP_SITE_URL=${APP_SITE_URL}" "MARKETING_SITE_URL=${MARKETING_SITE_URL}" 'bash -s' << 'DEPLOY_SCRIPT'
             set -euo pipefail
 
             CONTAINER_NAME="HushVotingWebClient"
+            DOCKER_NETWORK="HushNetwork"
 
             echo "Starting HushVoting Web Client deployment of version ${IMAGE_TAG}..."
-            echo "Using HushServerNode backend: ${GRPC_SERVER_URL}"
+            echo "Using HushServerNode binary gRPC endpoint: ${HUSHSERVER_NODE_ENDPOINT}"
             echo "${GHCR_TOKEN}" | sudo docker login ghcr.io -u "${GHCR_USERNAME}" --password-stdin
+
+            if ! sudo docker network inspect "${DOCKER_NETWORK}" >/dev/null 2>&1; then
+              echo "Required Docker network ${DOCKER_NETWORK} does not exist."
+              exit 1
+            fi
 
             echo "Pulling ${GHCR_IMAGE}:${IMAGE_TAG}..."
             sudo docker pull "${GHCR_IMAGE}:${IMAGE_TAG}"
@@ -197,8 +186,9 @@ jobs:
             sudo docker run -d \
               --name "${CONTAINER_NAME}" \
               --restart always \
-              -e GRPC_SERVER_URL="${GRPC_SERVER_URL}" \
-              -e NEXT_PUBLIC_GRPC_URL="${GRPC_SERVER_URL}" \
+              --network "${DOCKER_NETWORK}" \
+              --add-host host.docker.internal:host-gateway \
+              -e HUSHSERVER_NODE_ENDPOINT="${HUSHSERVER_NODE_ENDPOINT}" \
               -e NEXT_PUBLIC_API_URL="${APP_SITE_URL}" \
               -e NEXT_PUBLIC_APP_BASE_URL="${APP_SITE_URL}" \
               -e NEXT_PUBLIC_MARKETING_BASE_URL="${MARKETING_SITE_URL}" \
@@ -215,6 +205,8 @@ jobs:
             fi
 
             curl -fsS -I http://127.0.0.1:3006 >/dev/null
+            BLOCKCHAIN_PROBE="$(curl -fsS -X POST http://127.0.0.1:3006/api/blockchain/index)"
+            echo "HushServerNode connectivity verified: ${BLOCKCHAIN_PROBE}"
             echo "HushVoting Web Client deployment complete."
           DEPLOY_SCRIPT
 
@@ -233,4 +225,4 @@ jobs:
           echo "**Container:** \`HushVotingWebClient\`" >> "${GITHUB_STEP_SUMMARY}"
           echo "**Target:** AWS Lightsail" >> "${GITHUB_STEP_SUMMARY}"
           echo "**URL:** \`${{ env.APP_SITE_URL }}\`" >> "${GITHUB_STEP_SUMMARY}"
-          echo "**Backend:** \`${{ steps.backend.outputs.grpc_url }}\`" >> "${GITHUB_STEP_SUMMARY}"
+          echo "**Backend:** existing HushServerNode via server-only binary gRPC (host port 4665)" >> "${GITHUB_STEP_SUMMARY}"
