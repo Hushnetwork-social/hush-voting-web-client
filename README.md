@@ -229,7 +229,7 @@ ghcr.io/hushnetwork-social/hush-voting-web-client:<version>
 AWS runtime:
 
 - Container name: `HushVotingWebClient`
-- Local port: `127.0.0.1:3006`
+- Local port: `127.0.0.1:3009`
 - Public domain: `https://app.hushvoting.com`
 - Backend: existing HushServerNode via server-only binary gRPC on host port `4665`
 

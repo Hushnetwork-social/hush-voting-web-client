@@ -22,6 +22,7 @@ env:
   NODE_VERSION: "22"
   APP_SITE_URL: https://app.hushvoting.com
   MARKETING_SITE_URL: https://www.hushvoting.com
+  APP_HOST_PORT: "3009"
   HUSHSERVER_NODE_ENDPOINT: host.docker.internal:4665
 
 jobs:
@@ -153,6 +154,7 @@ jobs:
           SSH_HOST: ${{ secrets.AWS_HOST }}
           SSH_USER: ${{ secrets.AWS_SSH_USER }}
           IMAGE_TAG: ${{ steps.version.outputs.version }}
+          APP_HOST_PORT: ${{ env.APP_HOST_PORT }}
           HUSHSERVER_NODE_ENDPOINT: ${{ env.HUSHSERVER_NODE_ENDPOINT }}
           GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
           GHCR_USERNAME: ${{ secrets.GHCR_USERNAME || vars.GHCR_USERNAME || github.actor }}
@@ -160,7 +162,7 @@ jobs:
           APP_SITE_URL: ${{ env.APP_SITE_URL }}
           MARKETING_SITE_URL: ${{ env.MARKETING_SITE_URL }}
         run: |
-          ssh -i ~/.ssh/lightsail.pem -o ServerAliveInterval=30 -o ServerAliveCountMax=10 "${SSH_USER}@${SSH_HOST}" "IMAGE_TAG=${IMAGE_TAG}" "HUSHSERVER_NODE_ENDPOINT=${HUSHSERVER_NODE_ENDPOINT}" "GHCR_TOKEN=${GHCR_TOKEN}" "GHCR_USERNAME=${GHCR_USERNAME}" "GHCR_IMAGE=${GHCR_IMAGE}" "APP_SITE_URL=${APP_SITE_URL}" "MARKETING_SITE_URL=${MARKETING_SITE_URL}" 'bash -s' << 'DEPLOY_SCRIPT'
+          ssh -i ~/.ssh/lightsail.pem -o ServerAliveInterval=30 -o ServerAliveCountMax=10 "${SSH_USER}@${SSH_HOST}" "IMAGE_TAG=${IMAGE_TAG}" "APP_HOST_PORT=${APP_HOST_PORT}" "HUSHSERVER_NODE_ENDPOINT=${HUSHSERVER_NODE_ENDPOINT}" "GHCR_TOKEN=${GHCR_TOKEN}" "GHCR_USERNAME=${GHCR_USERNAME}" "GHCR_IMAGE=${GHCR_IMAGE}" "APP_SITE_URL=${APP_SITE_URL}" "MARKETING_SITE_URL=${MARKETING_SITE_URL}" 'bash -s' << 'DEPLOY_SCRIPT'
             set -euo pipefail
 
             CONTAINER_NAME="HushVotingWebClient"
@@ -192,7 +194,7 @@ jobs:
               -e NEXT_PUBLIC_API_URL="${APP_SITE_URL}" \
               -e NEXT_PUBLIC_APP_BASE_URL="${APP_SITE_URL}" \
               -e NEXT_PUBLIC_MARKETING_BASE_URL="${MARKETING_SITE_URL}" \
-              -p 127.0.0.1:3006:3000 \
+              -p "127.0.0.1:${APP_HOST_PORT}:3000" \
               "${GHCR_IMAGE}:${IMAGE_TAG}"
 
             echo "Verifying deployment..."
@@ -204,8 +206,8 @@ jobs:
               exit 1
             fi
 
-            curl -fsS -I http://127.0.0.1:3006 >/dev/null
-            BLOCKCHAIN_PROBE="$(curl -fsS -X POST http://127.0.0.1:3006/api/blockchain/index)"
+            curl -fsS -I "http://127.0.0.1:${APP_HOST_PORT}" >/dev/null
+            BLOCKCHAIN_PROBE="$(curl -fsS -X POST "http://127.0.0.1:${APP_HOST_PORT}/api/blockchain/index")"
             echo "HushServerNode connectivity verified: ${BLOCKCHAIN_PROBE}"
             echo "HushVoting Web Client deployment complete."
           DEPLOY_SCRIPT
@@ -223,6 +225,7 @@ jobs:
           echo "**Version:** \`${{ steps.version.outputs.version }}\`" >> "${GITHUB_STEP_SUMMARY}"
           echo "**Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}\`" >> "${GITHUB_STEP_SUMMARY}"
           echo "**Container:** \`HushVotingWebClient\`" >> "${GITHUB_STEP_SUMMARY}"
+          echo "**Host port:** \`127.0.0.1:${{ env.APP_HOST_PORT }}\`" >> "${GITHUB_STEP_SUMMARY}"
           echo "**Target:** AWS Lightsail" >> "${GITHUB_STEP_SUMMARY}"
           echo "**URL:** \`${{ env.APP_SITE_URL }}\`" >> "${GITHUB_STEP_SUMMARY}"
           echo "**Backend:** existing HushServerNode via server-only binary gRPC (host port 4665)" >> "${GITHUB_STEP_SUMMARY}"
