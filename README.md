@@ -231,9 +231,28 @@ AWS runtime:
 - Container name: `HushVotingWebClient`
 - Local port: `127.0.0.1:3009`
 - Public domain: `https://app.hushvoting.com`
+- Nginx route: `app.hushvoting.com` proxies to `http://127.0.0.1:3009`
 - Backend: existing HushServerNode via server-only binary gRPC on host port `4665`
 
-The web client container is expected to expose HTTP on container port `3000`.
+Port `3006` belongs to the independently deployed Z3C Results application and
+must not be reused or stopped by HushVoting deployment automation. The web
+client container exposes HTTP on container port `3000`.
+
+Every deployment verifies both the container root and
+`POST /api/blockchain/index` before succeeding. The latter proves the web
+client's same-origin BFF can reach the existing HushServerNode over binary
+gRPC; a rendering-only deployment is not considered healthy.
+
+Create and push an annotated release tag from an approved `main` commit:
+
+```bash
+git tag -a HushVotingWebClient-v1.2.3 -m "Release HushVoting Web Client v1.2.3"
+git push origin HushVotingWebClient-v1.2.3
+```
+
+For rollback, manually dispatch the CD workflow with a previously approved
+semantic version. The workflow republishes that commit's image only when run
+from the matching source ref; never move or overwrite an existing release tag.
 
 ## Native releases
 

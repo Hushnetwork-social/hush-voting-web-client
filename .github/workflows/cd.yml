@@ -43,7 +43,7 @@ jobs:
           cache-dependency-path: package-lock.json
 
       - name: Cache Next.js compilation
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .next-web/cache
           key: next-v1-${{ runner.os }}-node${{ env.NODE_VERSION }}-${{ hashFiles('package-lock.json') }}-${{ hashFiles('src/**', 'next.config.ts', 'tailwind.config.ts') }}
@@ -118,8 +118,8 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ secrets.GHCR_USERNAME || vars.GHCR_USERNAME || github.actor }}
-          password: ${{ secrets.GHCR_TOKEN }}
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
