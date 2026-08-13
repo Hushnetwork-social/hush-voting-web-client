@@ -3,7 +3,7 @@
  * FEAT-004 deployment-policy verification (Task 6.4).
  * ====================================================
  * Serves the PRODUCTION web build with a bounded foreground `next start` and
- * asserts the restrictive security headers (CSP, frame denial, nosniff,
+ * asserts the restrictive security headers (nonce CSP, frame denial, nosniff,
  * referrer, HSTS), then terminates the server and all children. Also asserts
  * the built application registers NO service worker on the authenticated
  * origin (checked in a real browser context via Playwright in Phase 7; here
@@ -23,7 +23,8 @@ const BASE = `http://localhost:${PORT}`;
 
 const REQUIRED_HEADERS = [
   ['Content-Security-Policy', "default-src 'self'"],
-  ['Content-Security-Policy', "script-src 'self'"],
+  ['Content-Security-Policy', "script-src 'self' 'nonce-"],
+  ['Content-Security-Policy', "'strict-dynamic'"],
   ['Content-Security-Policy', "object-src 'none'"],
   ['Content-Security-Policy', "frame-ancestors 'none'"],
   ['Content-Security-Policy', "worker-src 'self'"],
@@ -112,8 +113,39 @@ if (response === null) {
       verified = false;
     }
   }
+  const csp = headers['content-security-policy'] ?? '';
+  if (csp.includes("'unsafe-inline'") || csp.includes("'unsafe-eval'")) {
+    fail('CSP contains an unsafe script execution fallback');
+    verified = false;
+  }
+  const nonce = /'nonce-([^']+)'/.exec(csp)?.[1];
+  if (nonce === undefined) {
+    fail('CSP request nonce is missing');
+    verified = false;
+  } else {
+    const html = await response.text();
+    const scriptTags = [...html.matchAll(/<script\b[^>]*>/gi)].map((match) => match[0]);
+    if (scriptTags.length === 0) {
+      fail('rendered page contains no Next.js scripts to qualify');
+      verified = false;
+    }
+    for (const tag of scriptTags) {
+      if (!tag.includes(`nonce="${nonce}"`)) {
+        fail(`rendered script missing the response nonce: ${tag.slice(0, 160)}`);
+        verified = false;
+      }
+    }
+
+    const secondResponse = await fetch(BASE);
+    const secondCsp = secondResponse.headers.get('content-security-policy') ?? '';
+    const secondNonce = /'nonce-([^']+)'/.exec(secondCsp)?.[1];
+    if (secondNonce === undefined || secondNonce === nonce) {
+      fail('CSP nonce was not fresh across two requests');
+      verified = false;
+    }
+  }
   if (verified) {
-    process.stdout.write('DEPLOYMENT POLICY OK (CSP/frame/nosniff/referrer/HSTS verified; no service worker artifact)\n');
+    process.stdout.write('DEPLOYMENT POLICY OK (fresh nonce applied to every Next.js script; strict CSP/frame/nosniff/referrer/HSTS verified; no service worker artifact)\n');
   }
 }
 

@@ -5,6 +5,8 @@
  *
  * - `default-src 'self'`;
  * - `script-src 'self'` without `unsafe-eval` or unapproved inline execution;
+ * - the standalone web runtime adds one unpredictable request nonce plus
+ *   `strict-dynamic` so Next.js can authorize only its own bootstrap scripts;
  * - `worker-src 'self'`;
  * - `object-src 'none'`, `base-uri 'none'`, `frame-ancestors 'none'`;
  * - `connect-src` limited to approved application and HushServerNode/proxy
@@ -55,6 +57,19 @@ export const PRODUCTION_CSP: CspDirectives = {
   'upgrade-insecure-requests': true,
 };
 
+/** Build the request-bound CSP used by the dynamically rendered web app. */
+export function productionNonceCsp(nonce: string): CspDirectives {
+  if (!/^[A-Za-z0-9+/_=-]{16,128}$/.test(nonce)) {
+    throw new Error('CSP nonce must be a bounded base64 value');
+  }
+  const nonceSource = `'nonce-${nonce}'`;
+  return {
+    ...PRODUCTION_CSP,
+    'script-src': ["'self'", nonceSource, "'strict-dynamic'"],
+    'style-src': ["'self'", nonceSource],
+  };
+}
+
 /** Serialize CSP directives to a header value. */
 export function serializeCsp(directives: CspDirectives): string {
   const parts: string[] = [];
@@ -80,6 +95,12 @@ export function productionSecurityHeaders(): Record<string, string> {
     'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=()',
     'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
   };
+}
+
+/** Headers that remain static; CSP is added per request by `src/proxy.ts`. */
+export function productionNonCspSecurityHeaders(): Record<string, string> {
+  const { ['Content-Security-Policy']: _csp, ...headers } = productionSecurityHeaders();
+  return headers;
 }
 
 /** Assert the policy invariants (tested contract; fails on unsafe drift). */
