@@ -94,9 +94,13 @@ Example production configuration:
 ```env
 NEXT_PUBLIC_APP_BASE_URL=https://app.hushvoting.com
 NEXT_PUBLIC_MARKETING_BASE_URL=https://www.hushvoting.com
-NEXT_PUBLIC_GRPC_URL=https://api.hushnetwork.social
-GRPC_SERVER_URL=https://api.hushnetwork.social
+HUSHSERVER_NODE_ENDPOINT=host.docker.internal:4665
 ```
+
+The web build uses a same-origin BFF and keeps the binary gRPC endpoint
+server-side. The production container joins the existing `HushNetwork` Docker
+network and maps `host.docker.internal` to the Lightsail host gateway, where
+HushServerNode already publishes native gRPC on port `4665`.
 
 Example local configuration:
 
@@ -104,7 +108,7 @@ Example local configuration:
 NEXT_PUBLIC_APP_BASE_URL=http://localhost:3201
 NEXT_PUBLIC_MARKETING_BASE_URL=http://localhost:3200
 NEXT_PUBLIC_GRPC_URL=http://localhost:4666
-GRPC_SERVER_URL=http://localhost:4666
+HUSHSERVER_NODE_ENDPOINT=localhost:4665
 ```
 
 ## Development status
@@ -225,9 +229,9 @@ ghcr.io/hushnetwork-social/hush-voting-web-client:<version>
 AWS runtime:
 
 - Container name: `HushVotingWebClient`
-- Local port: `127.0.0.1:3006`
+- Local port: `127.0.0.1:3009`
 - Public domain: `https://app.hushvoting.com`
-- Backend: existing HushServerNode at `https://api.hushnetwork.social`
+- Backend: existing HushServerNode via server-only binary gRPC on host port `4665`
 
 The web client container is expected to expose HTTP on container port `3000`.
 
