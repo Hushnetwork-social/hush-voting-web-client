@@ -8,7 +8,7 @@
  * hardening"; Task 6.4 behavior spec.
  */
 import { describe, expect, it } from 'vitest';
-import { PRODUCTION_CSP, assertPolicySafe, productionSecurityHeaders, serializeCsp } from './policy';
+import { PRODUCTION_CSP, assertPolicySafe, productionNonceCsp, productionSecurityHeaders, serializeCsp } from './policy';
 
 describe('CSP serialization', () => {
   it('serializes the production directive set', () => {
@@ -20,6 +20,20 @@ describe('CSP serialization', () => {
     expect(value).toContain('upgrade-insecure-requests');
     expect(value).not.toContain("'unsafe-inline'");
     expect(value).not.toContain("'unsafe-eval'");
+  });
+
+  it('authorizes framework bootstrap code with one bounded nonce, never unsafe-inline', () => {
+    const nonce = 'MDEyMzQ1Njc4OWFiY2RlZg==';
+    const value = serializeCsp(productionNonceCsp(nonce));
+    expect(value).toContain(`script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`);
+    expect(value).toContain(`style-src 'self' 'nonce-${nonce}'`);
+    expect(value).not.toContain("'unsafe-inline'");
+    expect(value).not.toContain("'unsafe-eval'");
+  });
+
+  it('rejects malformed or unbounded nonce input', () => {
+    expect(() => productionNonceCsp('short')).toThrow();
+    expect(() => productionNonceCsp("validvaluebut'unsafe-inline")).toThrow();
   });
 });
 

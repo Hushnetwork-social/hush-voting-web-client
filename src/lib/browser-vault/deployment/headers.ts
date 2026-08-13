@@ -9,20 +9,26 @@
  * hardening", "Supported Browser and Deployment Baseline".
  */
 import type { NextConfig } from 'next';
-import { productionSecurityHeaders } from './policy';
+import { productionNonCspSecurityHeaders } from './policy';
 
 /** True only for the production web build (never dev/HMR/static export). */
 export function isProductionWebBuild(env: NodeJS.ProcessEnv = process.env): boolean {
   return env.NODE_ENV === 'production' && env.STANDALONE_BUILD === 'true';
 }
 
-/** Next.js headers() configuration for authenticated production pages. */
+/**
+ * Next.js headers() configuration for authenticated production pages.
+ *
+ * CSP is intentionally excluded here: the standalone runtime creates a fresh
+ * nonce in `src/proxy.ts`. A second static CSP header would be intersected by
+ * browsers and would block the nonce-authorized Next.js bootstrap scripts.
+ */
 export function productionSecurityHeaderConfig(env: NodeJS.ProcessEnv = process.env): NonNullable<NextConfig['headers']> {
   return async () => {
     if (!isProductionWebBuild(env)) {
       return [];
     }
-    const headers = Object.entries(productionSecurityHeaders()).map(([key, value]) => ({ key, value }));
+    const headers = Object.entries(productionNonCspSecurityHeaders()).map(([key, value]) => ({ key, value }));
     return [{ source: '/:path*', headers }];
   };
 }

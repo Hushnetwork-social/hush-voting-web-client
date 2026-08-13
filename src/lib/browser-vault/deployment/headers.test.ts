@@ -24,7 +24,8 @@ describe('production header wiring', () => {
     const prodHeaders = await productionSecurityHeaderConfig(prodEnv)();
     expect(prodHeaders.length).toBe(1);
     expect(prodHeaders[0].source).toBe('/:path*');
-    expect(prodHeaders[0].headers.some((h) => h.key === 'Content-Security-Policy')).toBe(true);
+    expect(prodHeaders[0].headers.some((h) => h.key === 'Content-Security-Policy')).toBe(false);
+    expect(prodHeaders[0].headers.some((h) => h.key === 'Strict-Transport-Security')).toBe(true);
 
     expect(await productionSecurityHeaderConfig(devEnv)()).toEqual([]);
     expect(await productionSecurityHeaderConfig(staticEnv)()).toEqual([]);
