@@ -23,6 +23,10 @@ import type { GetIdentityReply, SubmitSignedTransactionReply } from '../../lib/i
 export const PINNED_PROTO_DIGESTS = {
   'hushIdentity.proto': 'df3a2d9b128335dc3c92f0ef2b246655ed4c95f53f7ce058d438d945724f8ffa',
   'hushBlockchain.proto': 'e0625d52e4227ed77b6eb0e7d74b2990b7a8d3e8ecd77bd308371797275dc04b',
+  // FEAT-016 Task 6.1 — pinned FEAT-015 additive licence query service.
+  // The FEAT-015 server never changes its wire contract; this copy is the
+  // sole client-side authority and is digest-verified at load.
+  'hushVotingLicence.proto': 'ee004152c5dd24f15e9ebf88db577e3c854f93712d9499ded95dafa8f762eca8',
 } as const;
 
 export const PROTO_DIR = path.join(process.cwd(), 'src', 'app', 'api', 'protos');

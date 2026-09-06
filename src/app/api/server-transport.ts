@@ -28,6 +28,7 @@ import {
 } from '../../lib/identity-creation/transport';
 import type { GetIdentityReply, SubmitSignedTransactionReply } from '../../lib/identity-creation/wire';
 import { BinaryGrpcTransport, parseGrpcEndpoint } from './binary-grpc-transport';
+import { LicenceQueryGrpcTransport } from './licence-transport';
 
 /** Endpoint configuration source (server-side only, never NEXT_PUBLIC). */
 export const HUSHSERVER_ENDPOINT_ENV = 'HUSHSERVER_NODE_ENDPOINT' as const;
@@ -57,6 +58,30 @@ export function createServerTransport(env: NodeJS.ProcessEnv): HushServerTranspo
     return new ManifestBoundHttpTransport(raw.replace(/\/+$/, '')); // legacy test/fixture path
   }
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// FEAT-016 Task 6.1 — licence-query server transport (binary gRPC only).
+// ---------------------------------------------------------------------------
+
+/**
+ * Create the server-only licence-query transport from the closed endpoint
+ * environment. The FEAT-015 licence service is binary gRPC only — there is no
+ * JSON/legacy mapping — so an `http(s)://` value or an unparseable endpoint
+ * fails closed (never an unconditional-unavailable stub, never a weaker
+ * JSON approximation). Returns null when not configured or unusable.
+ */
+export function createLicenceServerTransport(env: NodeJS.ProcessEnv): LicenceQueryGrpcTransport | null {
+  const raw = env[HUSHSERVER_ENDPOINT_ENV];
+  const grpcEndpoint = parseGrpcEndpoint(raw);
+  if (grpcEndpoint === null) {
+    return null;
+  }
+  try {
+    return new LicenceQueryGrpcTransport(grpcEndpoint);
+  } catch {
+    return null; // pinned proto verification/load failure -> fail closed
+  }
 }
 
 /** Real bounded HTTP transport bound to the configured server endpoint. */

@@ -1,0 +1,75 @@
+syntax = "proto3";
+
+option csharp_namespace = "HushNetwork.proto";
+
+package rpcHush;
+
+// FEAT-015 additive licence query service. Field numbers are immutable once released;
+// removed numbers are reserved. No licence mutation RPC exists — licence assignment and
+// upgrade always travel through the existing HushBlockchain.SubmitSignedTransaction
+// ingress with the HushVotingLicenceAssignmentPayload kind.
+service HushVotingLicence {
+  // Strictly read-only signed query. Never provisions, activates, expires, or writes.
+  rpc GetMyEntitlement(GetMyEntitlementRequest) returns (GetMyEntitlementResponse);
+}
+
+message GetMyEntitlementRequest {
+  // Reserved for future additive fields; never used to select another identity.
+  reserved 1 to 32;
+}
+
+// One safe higher-plan option (strictly higher, currently available Veritas only).
+message LicenceHigherOptionView {
+  string plan_id = 1;
+  string display_name = 2;
+  string safe_description = 3;
+  int64 eligible_voter_cap = 4;       // 0 when unlimited/bounded display uses the boolean
+  bool unlimited_elections = 5;
+  string term_kind = 6;
+  int64 term_years = 7;
+}
+
+// Informational Enterprise entry — never actionable.
+message LicenceEnterpriseView {
+  string plan_id = 1;
+  string display_name = 2;
+  string safe_description = 3;
+}
+
+// Direct Free baseline template (no-active response only).
+message LicenceDirectFreeTemplate {
+  string transition_intent = 1;      // "baseline_free"
+  string requested_plan_id = 2;      // "hushvoting.direct.free"
+  string observed_catalogue_version = 3;
+}
+
+message LicenceActiveEntitlementView {
+  string licence_reference = 1;      // public originating transaction UUID
+  string plan_id = 2;
+  string plan_family = 3;
+  string display_name = 4;
+  string safe_description = 5;
+  int64 eligible_voter_cap = 6;      // 0 when the plan is unlimited/bounded
+  bool unlimited_elections = 7;
+  string term_kind = 8;
+  int64 term_years = 9;
+  repeated string allowed_governance_option_ids = 10;
+  string effective_from_utc = 11;
+  string expires_at_utc = 12;        // empty for perpetual Direct Free
+  string assigned_catalogue_version = 13;
+  repeated LicenceHigherOptionView higher_options = 14;
+  LicenceEnterpriseView enterprise = 15;
+}
+
+enum LicenceEntitlementState {
+  LICENCE_ENTITLEMENT_STATE_UNSPECIFIED = 0;
+  LICENCE_ENTITLEMENT_STATE_ACTIVE = 1;
+  LICENCE_ENTITLEMENT_STATE_NO_ACTIVE = 2;
+}
+
+message GetMyEntitlementResponse {
+  LicenceEntitlementState state = 1;
+  LicenceActiveEntitlementView active = 2;
+  LicenceDirectFreeTemplate direct_free_template = 3;
+  string unavailable_code = 4;       // stable safe code; empty on active/no-active
+}
