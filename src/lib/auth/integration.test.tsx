@@ -68,6 +68,7 @@ describe('single authority per instance', () => {
       actors: makeDemoActors(),
       registeredCapabilities: new Set(),
       safeCoordination: true,
+      entitlementRequired: false,
     });
     const listener = vi.fn();
     const unsubscribe = adapter.subscribe(listener);
@@ -101,6 +102,7 @@ describe('root rendering privacy', () => {
         actors: composition.actors,
         registeredCapabilities: new Set(['localUserAuthority', 'secretAuthority', 'identityVerification', 'browserCoordination']),
         safeCoordination: true,
+      entitlementRequired: false,
       };
     };
     render(<AuthRoot machineInputProvider={harness} />);
@@ -160,7 +162,7 @@ describe('machine input integration', () => {
   it('authMachine accepts a composition-built actor set', () => {
     const dev = createDevelopmentComposition(true);
     const actor = createActor(authMachine, {
-      input: { actors: dev.actors, registeredCapabilities: new Set<CapabilityId>(), safeCoordination: true },
+      input: { actors: dev.actors, registeredCapabilities: new Set<CapabilityId>(), safeCoordination: true, entitlementRequired: false },
     });
     actor.start();
     expect(actor.getSnapshot().value).toBeDefined();

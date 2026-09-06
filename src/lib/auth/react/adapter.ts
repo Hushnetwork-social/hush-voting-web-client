@@ -18,7 +18,26 @@
 import { useMemo, useSyncExternalStore } from 'react';
 import { createActor, type Actor, type SnapshotFrom } from 'xstate';
 import { authMachine, type AuthMachineEvent, type AuthMachineInput } from '../state/machine';
-import type { AuthenticatedIdentityMetadata, AuthIntent, AuthStateCode, ConnectivityStateCode } from '../types';
+import type {
+  AuthenticatedIdentityMetadata,
+  AuthIntent,
+  AuthStateCode,
+  ConnectivityStateCode,
+  EntitlementStageCode,
+} from '../types';
+
+/** All FEAT-016 entitlement substage codes (closed set for value mapping). */
+const ENTITLEMENT_STAGES: ReadonlyArray<string> = [
+  'entitlementResolving',
+  'baselineSigning',
+  'baselineSubmitting',
+  'awaitingIndex',
+  'confirmationDelayed',
+  'entitlementUnavailable',
+  'entitlementUnsupported',
+  'entitlementRepair',
+  'entitlementReady',
+];
 
 /** Render-safe projection of the authority snapshot. */
 export interface AuthRenderProjection {
@@ -26,6 +45,10 @@ export interface AuthRenderProjection {
   readonly connectivity: ConnectivityStateCode;
   /** True only when protected content may mount (authenticated + capability). */
   readonly protectedAccess: boolean;
+  /** FEAT-016 entitlement substage when inside compound `authenticated`. */
+  readonly entitlementStage: EntitlementStageCode | null;
+  /** True only in `entitlementReady` with a live authenticated identity. */
+  readonly entitlementReady: boolean;
   readonly safeIdentity: { alias: string; abbreviatedSigningAddress: string } | null;
   readonly authenticatedIdentity: AuthenticatedIdentityMetadata | null;
   readonly outcomeCode: string | null;
@@ -50,24 +73,55 @@ function connectivityFromValue(value: unknown): ConnectivityStateCode {
   return (typeof connectivity === 'string' ? connectivity : 'unknown') as ConnectivityStateCode;
 }
 
+function entitlementStageFromValue(value: unknown): EntitlementStageCode | null {
+  const auth = (value as { auth?: unknown }).auth;
+  if (auth === null || typeof auth !== 'object') {
+    return null;
+  }
+  const authenticated = (auth as Record<string, unknown>)['authenticated'];
+  if (typeof authenticated === 'string') {
+    return ENTITLEMENT_STAGES.includes(authenticated)
+      ? (authenticated as EntitlementStageCode)
+      : null;
+  }
+  if (authenticated !== null && typeof authenticated === 'object') {
+    const key = Object.keys(authenticated as object)[0];
+    return key !== undefined && ENTITLEMENT_STAGES.includes(key) ? (key as EntitlementStageCode) : null;
+  }
+  return null;
+}
+
 type AuthSnapshot = SnapshotFrom<typeof authMachine>;
 
 function projectSnapshot(snapshot: AuthSnapshot): AuthRenderProjection {
   const value = snapshot.value;
   const authState = authStateFromValue(value);
   const connectivity = connectivityFromValue(value);
+  const entitlementStage = authState === 'authenticated' ? entitlementStageFromValue(value) : null;
   const context = (snapshot.context ?? {}) as {
     safeIdentity?: { alias: string; abbreviatedSigningAddress: string } | null;
     authenticatedIdentity?: AuthenticatedIdentityMetadata | null;
     outcomeCode?: string | null;
     supportCode?: string | null;
     onboardingKind?: string | null;
+    entitlementRequired?: boolean;
   };
+  const entitlementReady =
+    entitlementStage === 'entitlementReady' && context.authenticatedIdentity !== null;
+  // Auth-only harness mode (build-isolated dev/test, no entitlement authority)
+  // keeps identity semantics as the boundary. Every real composition requires
+  // the entitlement-ready stage before protected rendering.
+  const boundaryReady =
+    context.entitlementRequired === false ? context.authenticatedIdentity !== null : entitlementReady;
   return {
     authState,
     connectivity,
-    // Synchronous capability boundary: only authenticated grants protected access.
-    protectedAccess: authState === 'authenticated',
+    // Synchronous FEAT-016 boundary: protected rendering requires the nested
+    // entitlement-ready stage with a live authenticated identity (or the
+    // explicitly auth-only harness). React effects alone never decide it.
+    protectedAccess: authState === 'authenticated' && boundaryReady,
+    entitlementStage,
+    entitlementReady,
     safeIdentity: context.safeIdentity ?? null,
     authenticatedIdentity: context.authenticatedIdentity ?? null,
     outcomeCode: context.outcomeCode ?? null,

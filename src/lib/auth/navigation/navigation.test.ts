@@ -144,29 +144,56 @@ describe('lifecycle shielding', () => {
 });
 
 describe('thin adapter protected projection', () => {
-  it('permits protected content only from an authenticated projection, synchronously', () => {
+  it('permits protected content only from an entitlement-ready projection, synchronously', () => {
     const locked: AuthRenderProjection = {
       authState: 'locked',
       connectivity: 'online',
       protectedAccess: false,
+      entitlementStage: null,
+      entitlementReady: false,
       safeIdentity: null,
       authenticatedIdentity: null,
       outcomeCode: null,
       supportCode: null,
       onboardingKind: null,
     };
-    const authenticated: AuthRenderProjection = {
+    // FEAT-016: identity is authenticated but entitlement is still resolving —
+    // protected rendering stays false until a fresh query returns ready truth.
+    const authenticatedResolving: AuthRenderProjection = {
+      authState: 'authenticated',
+      connectivity: 'online',
+      protectedAccess: false,
+      entitlementStage: 'entitlementResolving',
+      entitlementReady: false,
+      safeIdentity: { alias: 'Ada', abbreviatedSigningAddress: 'NVh…1a2b' },
+      authenticatedIdentity: {
+        alias: 'Ada',
+        publicSigningKey: '0237fdd4364c0b898908be2f1a98a6b4a7890c623ae92a283640e44d87e048daa5',
+        publicEncryptionKey: '02b1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2',
+      },
+      outcomeCode: null,
+      supportCode: null,
+      onboardingKind: null,
+    };
+    const authenticatedReady: AuthRenderProjection = {
       authState: 'authenticated',
       connectivity: 'online',
       protectedAccess: true,
-      safeIdentity: null,
-      authenticatedIdentity: null,
+      entitlementStage: 'entitlementReady',
+      entitlementReady: true,
+      safeIdentity: { alias: 'Ada', abbreviatedSigningAddress: 'NVh…1a2b' },
+      authenticatedIdentity: {
+        alias: 'Ada',
+        publicSigningKey: '0237fdd4364c0b898908be2f1a98a6b4a7890c623ae92a283640e44d87e048daa5',
+        publicEncryptionKey: '02b1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2',
+      },
       outcomeCode: null,
       supportCode: null,
       onboardingKind: null,
     };
     expect(synchronouslyPermitsProtectedContent(locked)).toBe(false);
-    expect(synchronouslyPermitsProtectedContent(authenticated)).toBe(true);
+    expect(synchronouslyPermitsProtectedContent(authenticatedResolving)).toBe(false);
+    expect(synchronouslyPermitsProtectedContent(authenticatedReady)).toBe(true);
     expect(synchronouslyPermitsProtectedContent(null)).toBe(false);
   });
 });

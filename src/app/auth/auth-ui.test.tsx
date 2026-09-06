@@ -24,6 +24,8 @@ function projection(overrides: Partial<AuthRenderProjection>): AuthRenderProject
     authState: 'locked',
     connectivity: 'online',
     protectedAccess: false,
+    entitlementStage: null,
+    entitlementReady: false,
     safeIdentity: { alias: 'Ada', abbreviatedSigningAddress: 'NVh…1a2b' },
     authenticatedIdentity: null,
     outcomeCode: null,

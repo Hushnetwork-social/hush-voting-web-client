@@ -36,6 +36,7 @@ import type {
   AuthMachineContext,
   CapabilityId,
   ConnectivityStateCode,
+  EntitlementStageCode,
   InvalidationReason,
   LocalUserRef,
   OperationId,
@@ -74,7 +75,13 @@ export type AuthMachineEvent =
   | { readonly type: 'SESSION.AUTHORITY_LOST' }
   | { readonly type: 'SESSION.INVALIDATED'; readonly reason: InvalidationReason }
   | { readonly type: 'TIMER.IDLE_TIMEOUT' }
-  | { readonly type: 'TIMER.BACKGROUND_TIMEOUT' };
+  | { readonly type: 'TIMER.BACKGROUND_TIMEOUT' }
+  | {
+      readonly type: 'ENTITLEMENT.STAGE';
+      readonly stage: EntitlementStageCode;
+      readonly epoch: SessionEpoch;
+    }
+  | { readonly type: 'ENTITLEMENT.RESET' };
 
 /** Machine context = allowlisted auth context + injected actor ports. */
 export type AuthMachineContextWithActors = AuthMachineContext & {
@@ -92,6 +99,12 @@ export interface AuthMachineInput {
   readonly actors: AuthActors;
   readonly registeredCapabilities: ReadonlySet<CapabilityId>;
   readonly safeCoordination: boolean;
+  /**
+   * FEAT-016 entitlement strictness (default TRUE). False is permitted ONLY
+   * in the build-isolated auth-only test/dev harness (no entitlement
+   * authority); every real composition keeps the strict gate.
+   */
+  readonly entitlementRequired?: boolean;
 }
 
 /** Map an onboarding intent to its child-flow kind (or null). */
@@ -270,6 +283,11 @@ export const authMachine = setup({
         (args.event as { result?: { localUserRef?: LocalUserRef } }).result?.localUserRef ?? null,
     }),
     clearLocalUserRef: assign({ localUserRef: () => null as LocalUserRef | null }),
+    assignEntitlementStage: assign({
+      entitlementStage: (args) =>
+        (args.event as { stage?: EntitlementStageCode }).stage ?? null,
+    }),
+    clearEntitlementStage: assign({ entitlementStage: () => null as EntitlementStageCode | null }),
     assignOutcome: assign({
       outcomeCode: (args) =>
         (args.event as { result?: { code: AuthMachineContext['outcomeCode'] } }).result?.code ?? null,
@@ -303,6 +321,8 @@ export const authMachine = setup({
     supportCode: null,
     outcomeCode: null,
     coarseStageStartedAtMs: null,
+    entitlementStage: null as EntitlementStageCode | null,
+    entitlementRequired: input.entitlementRequired ?? true,
     actors: input.actors,
     onboardingKind: null as OnboardingKind | null,
     localUserRef: null as LocalUserRef | null,
@@ -600,8 +620,9 @@ export const authMachine = setup({
           },
         },
         authenticated: {
-          entry: ['clearActiveOperation', 'clearOutcome', 'clearSupportCode'],
-          exit: 'clearAuthenticatedIdentity',
+          entry: ['clearActiveOperation', 'clearOutcome', 'clearSupportCode', 'clearEntitlementStage'],
+          exit: ['clearAuthenticatedIdentity', 'clearEntitlementStage'],
+          initial: 'entitlementResolving',
           on: {
             'INTENT.LOCK': { target: 'locked', actions: ['incrementEpoch', 'clearOutcome'] },
             'TIMER.IDLE_TIMEOUT': { target: 'locked', actions: ['incrementEpoch', 'clearOutcome'] },
@@ -610,6 +631,82 @@ export const authMachine = setup({
             'SESSION.AUTHORITY_LOST': { target: 'locked', actions: ['incrementEpoch', 'clearOutcome'] },
             'INTENT.REMOVE_LOCAL_USER': { target: 'removingLocalUser', actions: 'incrementEpoch' },
             'INTENT.REAUTHENTICATION_REQUIRED': { target: 'locked', actions: ['incrementEpoch', 'clearOutcome'] },
+            // FEAT-016: one closed coordinator drives the entitlement stage via
+            // epoch-scoped events. A stale epoch (old session/identity/network)
+            // completion is ignored and can never restore protected access.
+            'ENTITLEMENT.STAGE': [
+              {
+                target: '.entitlementResolving',
+                guard: ({ context, event }) =>
+                  event.stage === 'entitlementResolving' && !isStaleEpoch(event.epoch, context.sessionEpoch),
+                actions: 'assignEntitlementStage',
+              },
+              {
+                target: '.baselineSigning',
+                guard: ({ context, event }) =>
+                  event.stage === 'baselineSigning' && !isStaleEpoch(event.epoch, context.sessionEpoch),
+                actions: 'assignEntitlementStage',
+              },
+              {
+                target: '.baselineSubmitting',
+                guard: ({ context, event }) =>
+                  event.stage === 'baselineSubmitting' && !isStaleEpoch(event.epoch, context.sessionEpoch),
+                actions: 'assignEntitlementStage',
+              },
+              {
+                target: '.awaitingIndex',
+                guard: ({ context, event }) =>
+                  event.stage === 'awaitingIndex' && !isStaleEpoch(event.epoch, context.sessionEpoch),
+                actions: 'assignEntitlementStage',
+              },
+              {
+                target: '.confirmationDelayed',
+                guard: ({ context, event }) =>
+                  event.stage === 'confirmationDelayed' && !isStaleEpoch(event.epoch, context.sessionEpoch),
+                actions: 'assignEntitlementStage',
+              },
+              {
+                target: '.entitlementUnavailable',
+                guard: ({ context, event }) =>
+                  event.stage === 'entitlementUnavailable' && !isStaleEpoch(event.epoch, context.sessionEpoch),
+                actions: 'assignEntitlementStage',
+              },
+              {
+                target: '.entitlementUnsupported',
+                guard: ({ context, event }) =>
+                  event.stage === 'entitlementUnsupported' && !isStaleEpoch(event.epoch, context.sessionEpoch),
+                actions: 'assignEntitlementStage',
+              },
+              {
+                target: '.entitlementRepair',
+                guard: ({ context, event }) =>
+                  event.stage === 'entitlementRepair' && !isStaleEpoch(event.epoch, context.sessionEpoch),
+                actions: 'assignEntitlementStage',
+              },
+              {
+                target: '.entitlementReady',
+                guard: ({ context, event }) =>
+                  event.stage === 'entitlementReady' && !isStaleEpoch(event.epoch, context.sessionEpoch),
+                actions: 'assignEntitlementStage',
+              },
+            ],
+            // Host-driven invalidation (offline/network change/process end):
+            // re-enter the blocking resolution gate; projection cleared by exit.
+            'ENTITLEMENT.RESET': {
+              target: '.entitlementResolving',
+              actions: ['clearOutcome', 'clearEntitlementStage'],
+            },
+          },
+          states: {
+            entitlementResolving: {},
+            baselineSigning: {},
+            baselineSubmitting: {},
+            awaitingIndex: {},
+            confirmationDelayed: {},
+            entitlementUnavailable: {},
+            entitlementUnsupported: {},
+            entitlementRepair: {},
+            entitlementReady: {},
           },
         },
         recoverableError: {

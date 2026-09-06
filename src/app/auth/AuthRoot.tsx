@@ -91,6 +91,10 @@ async function buildMachineInput(): Promise<AuthMachineInput> {
       actors: composition.actors,
       registeredCapabilities: new Set<CapabilityId>(['localUserAuthority', 'secretAuthority', 'identityVerification', 'browserCoordination']),
       safeCoordination: true,
+      // Build-isolated auth-only harness: no entitlement authority exists, so
+      // the entitlement gate is not required here (statically pruned from
+      // product bundles; real compositions keep the strict gate).
+      entitlementRequired: false,
     };
   }
 

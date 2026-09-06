@@ -15,6 +15,9 @@ async function harnessMachineInput(): Promise<AuthMachineInput> {
     actors: composition.actors,
     registeredCapabilities: new Set(['localUserAuthority', 'secretAuthority', 'identityVerification', 'browserCoordination']),
     safeCoordination: true,
+    // Build-isolated auth-only harness (FEAT-016): no entitlement authority in
+    // the dev composition; real compositions require the strict gate.
+    entitlementRequired: false,
   };
 }
 
