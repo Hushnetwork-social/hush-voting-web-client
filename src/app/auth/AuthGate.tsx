@@ -15,6 +15,7 @@
 import type { AuthRenderProjection } from '../../lib/auth/react/adapter';
 import type { AuthIntent } from '../../lib/auth/types';
 import { AuthShell } from './AuthShell';
+import { EntitlementGate } from './EntitlementGate';
 import { FirstRun } from './FirstRun';
 import { LockedUser } from './LockedUser';
 import { RemovalConfirmation } from './RemovalConfirmation';
@@ -68,6 +69,11 @@ export function AuthGate({ projection, handlers }: AuthGateProps) {
   // Surface selection is purely a projection of machine state.
   let surface: React.ReactNode;
   switch (authState) {
+    case 'authenticated':
+      // FEAT-016: identity is authenticated but entitlement is not ready —
+      // the blocking gate renders; protected workspace never mounts here.
+      surface = <EntitlementGate projection={projection} handlers={handlers} />;
+      break;
     case 'initializing':
       surface = <PendingSurface label="Preparing…" />;
       break;

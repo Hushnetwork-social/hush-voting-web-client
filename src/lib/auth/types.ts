@@ -166,6 +166,7 @@ export type AuthIntent =
   | { readonly type: 'INTENT.CONFIRM_MISSING_PROFILE' }
   | { readonly type: 'INTENT.ENTER_TEMPORARY_MODE' }
   | { readonly type: 'INTENT.RETRY' }
+  | { readonly type: 'INTENT.ENTITLEMENT_RETRY' }
   | { readonly type: 'INTENT.TAKE_OVER_SESSION' }
   | { readonly type: 'INTENT.NAVIGATE'; readonly destination: TypedDestinationKind }
   | { readonly type: 'INTENT.GO_BACK' }

@@ -21,6 +21,17 @@ async function harnessMachineInput(): Promise<AuthMachineInput> {
   };
 }
 
+/** FEAT-016 strict composition: entitlement gate required (no auth-only mode). */
+async function strictHarnessMachineInput(): Promise<AuthMachineInput> {
+  const composition = createDevelopmentComposition(true);
+  return {
+    actors: composition.actors,
+    registeredCapabilities: new Set(['localUserAuthority', 'secretAuthority', 'identityVerification', 'browserCoordination']),
+    safeCoordination: true,
+    entitlementRequired: true,
+  };
+}
+
 describe('HomePage (auth-gated root)', () => {
   it('never mounts protected/authenticated content before authentication', async () => {
     render(<AuthRoot machineInputProvider={harnessMachineInput} />);
@@ -32,6 +43,17 @@ describe('HomePage (auth-gated root)', () => {
     // Wait for the harness composition and initialization
     // to settle before Vitest tears down the module environment.
     expect(await screen.findByRole('button', { name: /create user/i })).toBeVisible();
+    expect(screen.queryByTestId('authenticated-shell')).toBeNull();
+  });
+
+  it('FEAT-016 strict composition keeps the entitlement gate mounted after login (no protected shell)', async () => {
+    const user = userEvent.setup();
+    render(<AuthRoot machineInputProvider={strictHarnessMachineInput} />);
+    await user.click(await screen.findByRole('button', { name: /create user/i }));
+    // Identity authenticates, but no entitlement coordinator produced ready
+    // truth in this harness, so the blocking gate stays and nothing protected
+    // mounts (AC-016-001 at the root seam; real ready flows are Phase 7 BDD).
+    expect(await screen.findByTestId('entitlement-gate')).toBeVisible();
     expect(screen.queryByTestId('authenticated-shell')).toBeNull();
   });
 
