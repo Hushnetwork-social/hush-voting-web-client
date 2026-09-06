@@ -90,14 +90,15 @@ export type LicenceNetworkBinding = string & { readonly __licenceNetworkBinding:
 /**
  * One fresh query envelope for the signed metadata. Produced anew for every
  * `GetMyEntitlement` attempt inside the credential authority with a new UTC
- * `signedAt` and signature; the business request is always empty.
+ * `signedAt`; the authority signs the canonical JSON bytes and carries the
+ * signature only in the metadata header — never inside the canonical JSON and
+ * never as a persisted pending record.
  */
 export interface LicenceFreshQueryEnvelope {
   readonly actorAddress: LicenceActorBinding;
   readonly method: typeof LICENCE_QUERY_METHOD;
   readonly request: Record<string, never>;
-  readonly signedAt: string; // ISO-8601 UTC
-  readonly signature: string; // compact base64 signature (authority-owned)
+  readonly signedAt: string; // ISO-8601 UTC, fresh per attempt
 }
 
 /** Canonical compact JSON of the fresh query envelope (ordinal deep sort). */

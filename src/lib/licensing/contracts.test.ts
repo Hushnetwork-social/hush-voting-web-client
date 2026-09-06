@@ -49,7 +49,6 @@ describe('frozen query metadata (FEAT-015 v1)', () => {
       method: LICENCE_QUERY_METHOD,
       request: {},
       signedAt: QUERY_FIXTURE_SIGNED_AT,
-      signature: 'fixture-signature-placeholder',
     };
     expect(licenceQuerySignedJson(envelope)).toBe(QUERY_FIXTURE_EXPECTED_CANONICAL_JSON);
   });
