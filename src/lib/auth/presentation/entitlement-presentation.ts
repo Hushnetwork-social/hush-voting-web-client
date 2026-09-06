@@ -168,7 +168,7 @@ export function entitlementGatePresentation(
   }
   switch (stage) {
     case 'entitlementResolving':
-      return connectivity === 'unknown' ? RESOLVING : RESOLVING;
+      return RESOLVING;
     case 'baselineSigning':
     case 'baselineSubmitting':
       return BASELINE_SETUP;
