@@ -105,7 +105,15 @@
     "entitlement-bootstrap:artifact-scan": "node scripts/entitlement-bootstrap/artifact-scan.mjs",
     "entitlement-bootstrap:quality": "node scripts/entitlement-bootstrap/quality.mjs",
     "entitlement-bootstrap:selftest": "node scripts/entitlement-bootstrap/selftest.mjs",
-    "entitlement-bootstrap:gates": "npm run entitlement-bootstrap:selftest && npm run entitlement-bootstrap:wiring && npm run entitlement-bootstrap:coverage && npm run entitlement-bootstrap:secret-scan && npm run entitlement-bootstrap:property-scan && npm run entitlement-bootstrap:artifact-scan && npm run entitlement-bootstrap:quality"
+    "entitlement-bootstrap:gates": "npm run entitlement-bootstrap:selftest && npm run entitlement-bootstrap:wiring && npm run entitlement-bootstrap:coverage && npm run entitlement-bootstrap:secret-scan && npm run entitlement-bootstrap:property-scan && npm run entitlement-bootstrap:artifact-scan && npm run entitlement-bootstrap:quality",
+    "licence-upgrade:wiring": "node scripts/licence-upgrade/wiring.mjs",
+    "licence-upgrade:coverage": "node scripts/licence-upgrade/coverage.mjs",
+    "licence-upgrade:secret-scan": "node scripts/licence-upgrade/secret-scan.mjs",
+    "licence-upgrade:property-scan": "node scripts/licence-upgrade/property-scan.mjs",
+    "licence-upgrade:artifact-scan": "node scripts/licence-upgrade/artifact-scan.mjs",
+    "licence-upgrade:quality": "node scripts/licence-upgrade/quality.mjs",
+    "licence-upgrade:selftest": "node scripts/licence-upgrade/selftest.mjs",
+    "licence-upgrade:gates": "npm run licence-upgrade:selftest && npm run licence-upgrade:wiring && npm run licence-upgrade:coverage && npm run licence-upgrade:secret-scan && npm run licence-upgrade:property-scan && npm run licence-upgrade:artifact-scan && npm run licence-upgrade:quality"
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.14.4",

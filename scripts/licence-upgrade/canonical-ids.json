@@ -1,0 +1,25 @@
+{
+  "schema": "feat017-canonical-ids-v1",
+  "feature": "FEAT-017",
+  "ownedScenarioIds": [
+    { "id": "AT-LIC-001", "kind": "twintest-paired", "twinServer": true },
+    { "id": "AT-LIC-004", "kind": "twintest-paired", "twinServer": true },
+    { "id": "AT-LIC-005", "kind": "twintest-paired", "twinServer": true },
+    { "id": "AT-LIC-006", "kind": "twintest-paired", "twinServer": true },
+    { "id": "AT-LIC-008", "kind": "twintest-paired", "twinServer": true },
+    { "id": "AT-LIC-009", "kind": "twintest-paired", "twinServer": true },
+    { "id": "AT-LIC-015", "kind": "client-only", "twinServer": false },
+    { "id": "AT-LIC-016", "kind": "client-only", "twinServer": false }
+  ],
+  "regressionScenarioIds": [
+    { "id": "AT-LIC-003", "kind": "regression-twintest", "twinServer": true },
+    { "id": "AT-LIC-007", "kind": "regression-twintest", "twinServer": true },
+    { "id": "AT-LIC-010", "kind": "regression-twintest", "twinServer": true },
+    { "id": "AT-LIC-011", "kind": "regression-twintest", "twinServer": true },
+    { "id": "AT-LIC-012", "kind": "regression-twintest", "twinServer": true }
+  ],
+  "manualObligations": [
+    { "id": "MT-QUAL-ANDROID-017-001", "taskId": "phase-7-task-7-7" },
+    { "id": "MT-QUAL-UBUNTU-017-001", "taskId": "phase-7-task-7-8" }
+  ]
+}
