@@ -739,6 +739,42 @@ mod tests {
     }
 
     #[test]
+    fn confirmed_upgrade_envelope_seals_deterministically_like_baseline() {
+        let secret = test_secret();
+        let address = compressed_signing_address(&secret).expect("address");
+        let upgrade_json = canonical_unsigned_upgrade_transaction_json(
+            "8c6a1b77-4d2e-4f91-a4c0-9e7b2d8f1a55",
+            "2026-09-06T00:00:00.000Z",
+            "5f2d9e11-3c44-4a80-b8e7-6b2f1a0c9d3e",
+            LICENCE_PLAN_DIRECT_FREE,
+            "hushvoting.veritas.2000",
+            LICENCE_CATALOGUE_VERSION_V1,
+        );
+        let sealed = seal_baseline_licence(&secret, &address, &upgrade_json).expect("seal upgrade");
+        assert!(is_signed_licence_json(&sealed.signed_json));
+        assert_eq!(
+            sha256_hex_lower(sealed.signed_json.as_bytes()),
+            sealed.signed_digest
+        );
+        // The same sealed bytes reuse the exact envelope (query-first restart +
+        // exact retry reuse the sealed record, never a replacement envelope).
+        let again = seal_baseline_licence(&secret, &address, &upgrade_json).expect("seal again");
+        assert_eq!(again.signed_json, sealed.signed_json);
+        // The signature verifies over the canonical unsigned envelope bytes.
+        let parsed: serde_json::Value = serde_json::from_str(&sealed.signed_json).expect("json");
+        let signature_base64 = parsed["UserSignature"]["Signature"]
+            .as_str()
+            .expect("sig")
+            .to_string();
+        let compact = base64_decode_to_64(&signature_base64).expect("base64");
+        assert!(verify_compact_signature(
+            upgrade_json.as_bytes(),
+            &compact,
+            &address
+        ));
+    }
+
+    #[test]
     fn no_browser_bff_or_generic_signing_surface_is_imported() {
         // Source-property guard: this crate's licence module must not import
         // browser/worker/IndexedDB/BFF or page code paths. The build itself
