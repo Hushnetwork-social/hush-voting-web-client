@@ -192,6 +192,16 @@ export function projectSafeHigherOptions(
       continue; // structural failure is handled before this projection runs
     }
     const option = raw as unknown as LicenceHigherOptionView;
+    // Standalone-call defense in depth: never project an entry whose required
+    // safe text members are missing/unbounded (the builder already rejects the
+    // whole view for such entries before calling this helper).
+    if (
+      !isBoundedText(option.PlanId, MAX_OPTION_TEXT_LENGTH) ||
+      !isBoundedText(option.DisplayName, MAX_OPTION_TEXT_LENGTH) ||
+      !isBoundedText(option.SafeDescription, MAX_SAFE_TEXT_LENGTH)
+    ) {
+      continue;
+    }
     if (option.PlanId === active.PlanId) {
       continue; // current plan must never appear as a higher self-service option
     }
@@ -220,7 +230,13 @@ export function projectSafeHigherOptions(
 export function projectSafeEnterprise(
   active: LicenceActiveEntitlementTransportView,
 ): LicenceSafeEnterprise | null {
-  if (active.Enterprise === undefined || !isRecordValue(active.Enterprise)) {
+  if (
+    active.Enterprise === undefined ||
+    !isRecordValue(active.Enterprise) ||
+    !isBoundedText(active.Enterprise.PlanId) ||
+    !isBoundedText(active.Enterprise.DisplayName) ||
+    !isBoundedText(active.Enterprise.SafeDescription)
+  ) {
     return null;
   }
   const enterprise = active.Enterprise as unknown as {
