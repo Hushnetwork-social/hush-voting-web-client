@@ -26259,6 +26259,7 @@ var LICENCE_QUERY_SIGNATORY_HEADER = "x-hush-licence-query-signatory";
 var LICENCE_QUERY_SIGNED_AT_HEADER = "x-hush-licence-query-signed-at";
 var LICENCE_QUERY_SIGNATURE_HEADER = "x-hush-licence-query-signature";
 var LICENCE_QUERY_METHOD = "GetMyEntitlement";
+var LICENCE_ASSIGNMENT_PAYLOAD_KIND = "71370664-5eb4-4ce9-b96a-d7e7ffe53db5";
 var LICENCE_PLAN_DIRECT_FREE = "hushvoting.direct.free";
 var LICENCE_CATALOGUE_VERSION_V1 = "hushvoting-licence-catalogue/v1.0.0";
 var LICENCE_TRANSITION_INTENT_BASELINE_FREE = "baseline_free";
@@ -26388,6 +26389,9 @@ var LICENCE_PENDING_SCHEMA_VERSION = 1;
 var LICENCE_PENDING_MAX_JSON_BYTES = 65536;
 var LICENCE_PENDING_MAX_ATTEMPT_EVIDENCE = 64;
 var LICENCE_PENDING_ID_MAX_LENGTH = 128;
+function isConfirmedUpgradePendingRecord(record) {
+  return record.upgradeBinding !== void 0;
+}
 function parseUpgradeBinding(value) {
   if (!isRecordValue(value)) {
     return null;
@@ -27905,6 +27909,9 @@ function projectSafeHigherOptions(active) {
       continue;
     }
     const option = raw;
+    if (!isBoundedText(option.PlanId, MAX_OPTION_TEXT_LENGTH) || !isBoundedText(option.DisplayName, MAX_OPTION_TEXT_LENGTH) || !isBoundedText(option.SafeDescription, MAX_SAFE_TEXT_LENGTH)) {
+      continue;
+    }
     if (option.PlanId === active.PlanId) {
       continue;
     }
@@ -27929,7 +27936,7 @@ function projectSafeHigherOptions(active) {
   return options;
 }
 function projectSafeEnterprise(active) {
-  if (active.Enterprise === void 0 || !isRecordValue2(active.Enterprise)) {
+  if (active.Enterprise === void 0 || !isRecordValue2(active.Enterprise) || !isBoundedText(active.Enterprise.PlanId) || !isBoundedText(active.Enterprise.DisplayName) || !isBoundedText(active.Enterprise.SafeDescription)) {
     return null;
   }
   const enterprise = active.Enterprise;
@@ -28174,7 +28181,129 @@ function decideSubmissionOutcome(outcome) {
   }
 }
 
+// src/lib/licensing/upgrade.ts
+var MAX_PLAN_ID_LENGTH = 128;
+var MAX_CATALOGUE_LENGTH = 256;
+var UUID_RE2 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+var ISO_UTC_RE2 = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/;
+function isBoundedText2(value, max) {
+  return typeof value === "string" && value.length > 0 && value.length <= max;
+}
+function buildConfirmedUpgradeUnsignedTransaction(input) {
+  if (!isBoundedText2(input.expectedCurrentLicenceTransactionId, MAX_PLAN_ID_LENGTH) || !UUID_RE2.test(input.expectedCurrentLicenceTransactionId)) {
+    return { ok: false, reason: "malformed-current-reference" };
+  }
+  if (!isBoundedText2(input.expectedCurrentPlanId, MAX_PLAN_ID_LENGTH) || !isBoundedText2(input.requestedPlanId, MAX_PLAN_ID_LENGTH)) {
+    return { ok: false, reason: "malformed-plan-id" };
+  }
+  if (input.requestedPlanId === input.expectedCurrentPlanId || input.requestedPlanId === LICENCE_PLAN_DIRECT_FREE) {
+    return { ok: false, reason: "self-target-or-direct-free" };
+  }
+  if (input.observedCatalogueVersion !== LICENCE_CATALOGUE_VERSION_V1 || input.observedCatalogueVersion.length > MAX_CATALOGUE_LENGTH) {
+    return { ok: false, reason: "stale-or-unbounded-catalogue" };
+  }
+  if (!isBoundedText2(input.transactionId, MAX_PLAN_ID_LENGTH) || !UUID_RE2.test(input.transactionId)) {
+    return { ok: false, reason: "malformed-transaction-id" };
+  }
+  if (input.transactionId === input.expectedCurrentLicenceTransactionId) {
+    return { ok: false, reason: "alias-new-transaction" };
+  }
+  if (!isBoundedText2(input.transactionTimestampUtc, 64) || !ISO_UTC_RE2.test(input.transactionTimestampUtc)) {
+    return { ok: false, reason: "malformed-timestamp" };
+  }
+  const payload = {
+    TransitionIntent: LICENCE_TRANSITION_INTENT_CONFIRMED_UPGRADE,
+    RequestedPlanId: input.requestedPlanId,
+    ObservedCatalogueVersion: input.observedCatalogueVersion,
+    ExpectedCurrentLicenceTransactionId: input.expectedCurrentLicenceTransactionId,
+    ExpectedCurrentPlanId: input.expectedCurrentPlanId
+  };
+  const payloadSize = licencePayloadSizeBytes(payload);
+  const canonicalUnsignedJson = serializeLicenceUnsignedTransaction({
+    TransactionId: input.transactionId,
+    PayloadKind: LICENCE_ASSIGNMENT_PAYLOAD_KIND,
+    TransactionTimeStamp: input.transactionTimestampUtc,
+    Payload: payload,
+    PayloadSize: payloadSize
+  });
+  return {
+    ok: true,
+    payload,
+    payloadSize,
+    canonicalUnsignedJson,
+    digest: licenceTransactionDigest(canonicalUnsignedJson)
+  };
+}
+function isBoundedPlanId(value) {
+  return isBoundedText2(value, MAX_PLAN_ID_LENGTH);
+}
+function resolveUpgradeTargetDisplayName(projection, targetPlanId) {
+  if (projection === null) {
+    return null;
+  }
+  if (projection.planId === targetPlanId) {
+    return projection.displayName;
+  }
+  const offered = projection.higherOptions.find((option) => option.planId === targetPlanId);
+  return offered === void 0 ? null : offered.displayName;
+}
+
+// src/lib/licensing/session-contract.ts
+var LICENCE_UPGRADE_OPERATION_STATUSES = [
+  "pending",
+  "delayed",
+  "stale",
+  "local-success",
+  "competing-activation"
+];
+function isLicenceUpgradeOperationStatus(value) {
+  return typeof value === "string" && LICENCE_UPGRADE_OPERATION_STATUSES.includes(value);
+}
+function isLicenceUpgradeStaleReason(value) {
+  return value === "current-changed" || value === "catalogue-changed" || value === "stale-rejection";
+}
+function buildLicenceUpgradeSafeOperation(input) {
+  if (!isLicenceUpgradeOperationStatus(input.status)) {
+    return { ok: false, reason: "invalid-input" };
+  }
+  if (input.status !== "stale" && input.reason !== void 0) {
+    return { ok: false, reason: "invalid-input" };
+  }
+  if ((input.status === "pending" || input.status === "delayed") && (input.operation === void 0 || input.operation === null)) {
+    return { ok: false, reason: "invalid-input" };
+  }
+  const base = {
+    kind: "licence-upgrade-safe-operation",
+    operation: input.operation ?? null,
+    currentPlanId: input.currentPlanId ?? null,
+    currentPlanDisplayName: input.currentPlanDisplayName ?? null,
+    targetPlanDisplayName: input.targetPlanDisplayName ?? null
+  };
+  if (input.status === "stale") {
+    if (!isLicenceUpgradeStaleReason(input.reason)) {
+      return { ok: false, reason: "invalid-input" };
+    }
+    return { ok: true, snapshot: { ...base, status: "stale", reason: input.reason } };
+  }
+  return { ok: true, snapshot: { ...base, status: input.status } };
+}
+var LICENCE_REVALIDATION_TRIGGERS = [
+  "foreground",
+  "reconnect",
+  "expiry",
+  "account-entry",
+  "authoritative-rejection",
+  "explicit-recovery"
+];
+function isLicenceRevalidationTrigger(value) {
+  return typeof value === "string" && LICENCE_REVALIDATION_TRIGGERS.includes(value);
+}
+function isLicenceConnectivityInput(value) {
+  return value === "online" || value === "offline" || value === "paused" || value === "reconnecting";
+}
+
 // src/lib/licensing/coordinator.ts
+var WEB_TARGET_BINDING = "web-sharedworker";
 var LicenceEntitlementCoordinator = class {
   constructor(actorBinding, networkBinding, ports) {
     this.actorBinding = actorBinding;
@@ -28194,6 +28323,8 @@ var LicenceEntitlementCoordinator = class {
     this.lastReachableAtMs = null;
     this.confirmationStartedReachableMs = null;
     this.lastOutcomeCode = null;
+    /** FEAT-017: one-shot local-success notification eligibility (Task 3.3). */
+    this.upgradeNotificationEligible = false;
   }
   snapshot() {
     return {
@@ -28202,7 +28333,9 @@ var LicenceEntitlementCoordinator = class {
       pendingTransactionId: this.pendingTransactionId,
       consecutiveUnauthenticated: this.consecutiveUnauthenticated,
       reachableElapsedMs: this.reachableElapsedMs,
-      lastOutcomeCode: this.lastOutcomeCode
+      lastOutcomeCode: this.lastOutcomeCode,
+      upgradeOperation: this.buildUpgradeOperationSnapshot(),
+      upgradeNotificationEligible: this.upgradeNotificationEligible
     };
   }
   /** Query-first start: restart, after-auth, and explicit bootstrap recovery. */
@@ -28226,7 +28359,10 @@ var LicenceEntitlementCoordinator = class {
     if (!eligibility.authenticated || !eligibility.foregrounded || !eligibility.reachable || this.inFlight) {
       return this.snapshot();
     }
-    if (this.phase !== "awaitingIndex" && this.phase !== "confirmationDelayed" && this.phase !== "entitlementUnavailable") {
+    if (this.phase !== "awaitingIndex" && this.phase !== "confirmationDelayed" && this.phase !== "entitlementUnavailable" && // FEAT-017 D017-01: while a confirmed-upgrade operation is unresolved
+    // the old indexed licence remains current; the authority must keep its
+    // query-only loop running even though the machine phase is ready.
+    !(this.phase === "entitlementReady" && this.hasLiveUpgradeOperation())) {
       return this.snapshot();
     }
     if (this.lastQueryAtMs !== null && this.ports.nowMs() - this.lastQueryAtMs < ENTITLEMENT_QUERY_POLL_INTERVAL_MS) {
@@ -28289,6 +28425,71 @@ var LicenceEntitlementCoordinator = class {
     this.projection = null;
     this.lastOutcomeCode = `revalidate:${trigger}`;
     await this.runFreshQuery(trigger);
+    return this.snapshot();
+  }
+  /**
+   * FEAT-017 Task 3.1 — one explicit confirmed-upgrade activation request.
+   *
+   * Consumes the closed higher-option handle the page selected and seals one
+   * exact confirmed-upgrade operation inside the existing credential
+   * authority. Deterministic rules (locked by Task 3.2 tests):
+   *  - opening/selection/confirmation never create a transaction — only this
+   *    explicit Activate request does;
+   *  - one authority operation owns construction, journaling, submission,
+   *    polling, and retry — duplicate confirmation (double click, tab race,
+   *    remount) coalesces or routes to the existing operation (D017-03);
+   *  - truth is re-queried fresh before sealing and the selected target must
+   *    still be a server-offered higher option of the SAME current licence the
+   *    page displayed (D017-06 stale detection; no seal on changed truth);
+   *  - the exact server-bound binding (expected current reference/plan, target,
+   *    catalogue) comes from the authority's own validated fresh projection —
+   *    never from client-authored policy;
+   *  - admission is never presented as activation; ordinary three-second
+   *    waiting only requeries, and Retry reuses the exact sealed transaction.
+   */
+  async confirmUpgrade(targetPlanId) {
+    this.clearUpgradePresentationArtifacts();
+    if (!isBoundedPlanId(targetPlanId)) {
+      this.lastOutcomeCode = "upgrade-invalid-input";
+      return this.snapshot();
+    }
+    const requestedPlanId = targetPlanId;
+    if (this.hasLiveUpgradeOperation()) {
+      this.lastOutcomeCode = "upgrade-already-pending";
+      return this.snapshot();
+    }
+    if (this.pendingRecord !== null || this.pendingTransactionId !== null) {
+      this.lastOutcomeCode = "upgrade-not-ready";
+      return this.snapshot();
+    }
+    if (this.phase !== "entitlementReady" || this.projection === null) {
+      this.lastOutcomeCode = "upgrade-not-ready";
+      return this.snapshot();
+    }
+    const displayed = this.projection;
+    await this.runFreshQuery("confirm-upgrade");
+    if (this.cancelled) {
+      return this.snapshot();
+    }
+    if (this.hasLiveUpgradeOperation()) {
+      this.lastOutcomeCode = "upgrade-already-pending";
+      return this.snapshot();
+    }
+    if (this.phase !== "entitlementReady" || this.projection === null) {
+      this.lastOutcomeCode = "upgrade-not-ready";
+      return this.snapshot();
+    }
+    const fresh = this.projection;
+    if (fresh.licenceReference !== displayed.licenceReference || fresh.planId !== displayed.planId || fresh.planId === requestedPlanId) {
+      this.lastOutcomeCode = "upgrade-stale-current-changed";
+      return this.snapshot();
+    }
+    const offered = fresh.higherOptions.some((option) => option.planId === requestedPlanId);
+    if (!offered) {
+      this.lastOutcomeCode = "upgrade-stale-catalogue-changed";
+      return this.snapshot();
+    }
+    await this.sealAndSubmitConfirmedUpgrade(requestedPlanId, fresh);
     return this.snapshot();
   }
   /** Lock/invalidation: stop work, clear ephemeral projection, ignore late results. */
@@ -28368,10 +28569,14 @@ var LicenceEntitlementCoordinator = class {
     switch (cls) {
       case "ready": {
         if (outcome.outcome !== "ready") return;
+        const outcomeCodeBeforeReconcile = this.lastOutcomeCode;
+        await this.attachBoundPendingRecordForReconciliation();
         this.reconcilePendingAgainstActive(outcome.projection.licenceReference);
         this.projection = outcome.projection;
         this.phase = "entitlementReady";
-        this.lastOutcomeCode = "ready";
+        if (this.lastOutcomeCode === outcomeCodeBeforeReconcile) {
+          this.lastOutcomeCode = "ready";
+        }
         return;
       }
       case "noActive": {
@@ -28415,17 +28620,20 @@ var LicenceEntitlementCoordinator = class {
   async handleNoActive(template, reason) {
     const bound = await this.findBoundPending();
     if (bound !== null) {
+      this.pendingRecord = bound;
+      this.pendingTransactionId = bound.transactionId;
+      if (isConfirmedUpgradePendingRecord(bound)) {
+        this.phase = "awaitingIndex";
+        this.lastOutcomeCode = "upgrade-no-active-query-only";
+        return;
+      }
       if (reason === "poll") {
-        this.pendingRecord = bound;
-        this.pendingTransactionId = bound.transactionId;
         if (this.phase !== "confirmationDelayed") {
           this.phase = "awaitingIndex";
           this.lastOutcomeCode = "still-waiting-no-auto-resubmit";
         }
         return;
       }
-      this.pendingRecord = bound;
-      this.pendingTransactionId = bound.transactionId;
       this.lastOutcomeCode = "no-active-resubmit-exact";
       await this.submitPending(bound);
       return;
@@ -28446,7 +28654,7 @@ var LicenceEntitlementCoordinator = class {
       transactionId: identity.transactionId,
       identityBinding: this.actorBinding,
       networkBinding: this.networkBinding,
-      targetBinding: "web-sharedworker",
+      targetBinding: WEB_TARGET_BINDING,
       createdUtc: identity.timestampUtc,
       attemptEvidence: [],
       recoveryState: "sealed"
@@ -28478,10 +28686,36 @@ var LicenceEntitlementCoordinator = class {
     if (this.pendingTransactionId === null) {
       return;
     }
+    if (this.pendingRecord !== null && isConfirmedUpgradePendingRecord(this.pendingRecord)) {
+      this.reconcilePendingUpgrade(activeLicenceReference);
+      return;
+    }
     const pendingIsActive = activeLicenceReference === this.pendingTransactionId;
     this.retirePending(pendingIsActive ? "confirmed-indexed" : "superseded");
     this.pendingRecord = null;
     this.pendingTransactionId = null;
+  }
+  /**
+   * FEAT-017 reconciliation of one confirmed-upgrade operation against fresh
+   * indexed truth. Returning the expected OLD licence reference is neither
+   * success nor supersession: the operation stays pending under the old
+   * limits. Exact-match / competing truth resolution completes in Task 3.3;
+   * until then a changed reference conservatively preserves the sealed
+   * operation (never retired, never claimed successful).
+   */
+  reconcilePendingUpgrade(activeLicenceReference) {
+    if (this.pendingRecord === null) {
+      return;
+    }
+    const binding = this.pendingRecord.upgradeBinding;
+    if (binding === void 0) {
+      return;
+    }
+    if (activeLicenceReference === binding.expectedCurrentLicenceTransactionId) {
+      this.lastOutcomeCode = "upgrade-pending-old-current";
+      return;
+    }
+    this.lastOutcomeCode = "upgrade-awaiting-changed-truth";
   }
   async submitPending(record) {
     if (this.cancelled) {
@@ -28497,9 +28731,14 @@ var LicenceEntitlementCoordinator = class {
       }
       this.recordAttempt(record, admission);
       const decision = decideSubmissionOutcome(admission);
+      const upgrade = isConfirmedUpgradePendingRecord(record);
       switch (decision.kind) {
         case "reconcileByQuery":
-          this.phase = "awaitingIndex";
+          if (upgrade && this.projection !== null) {
+            this.phase = "entitlementReady";
+          } else {
+            this.phase = "awaitingIndex";
+          }
           this.lastOutcomeCode = admission === "accepted" ? "accepted" : "pending";
           break;
         case "queryImmediately":
@@ -28512,7 +28751,11 @@ var LicenceEntitlementCoordinator = class {
           this.lastOutcomeCode = "terminal-rejected";
           break;
         case "preserveAndReconcile":
-          this.phase = "awaitingIndex";
+          if (upgrade && this.projection !== null) {
+            this.phase = "entitlementReady";
+          } else {
+            this.phase = "awaitingIndex";
+          }
           this.lastOutcomeCode = "submit-uncertain";
           break;
       }
@@ -28550,23 +28793,125 @@ var LicenceEntitlementCoordinator = class {
       this.ports.deletePending(this.pendingTransactionId);
     }
   }
+  /** True while one confirmed-upgrade operation is sealed and unresolved. */
+  hasLiveUpgradeOperation() {
+    return this.pendingRecord !== null && this.pendingTransactionId !== null && isConfirmedUpgradePendingRecord(this.pendingRecord);
+  }
+  /**
+   * FEAT-017: page-safe snapshot of the live confirmed-upgrade operation
+   * (pending/delayed). Terminal outcomes (Task 3.3) replace the live view once
+   * the operation resolves. Built through the closed session-contract builder,
+   * so exact bytes, signatures, bindings, and journal state are structurally
+   * absent; display names come only from validated fresh projection data at
+   * snapshot time (Phase 2 review recommendation #4).
+   */
+  buildUpgradeOperationSnapshot() {
+    if (!this.hasLiveUpgradeOperation() || this.pendingRecord === null) {
+      return null;
+    }
+    const binding = this.pendingRecord.upgradeBinding;
+    if (binding === void 0) {
+      return null;
+    }
+    const identity = {
+      pendingTransactionId: this.pendingRecord.transactionId,
+      expectedCurrentPlanId: binding.expectedCurrentPlanId,
+      targetPlanId: binding.requestedPlanId,
+      observedCatalogueVersion: binding.observedCatalogueVersion,
+      sealedAtUtc: this.pendingRecord.createdUtc
+    };
+    const delayed = this.phase === "confirmationDelayed";
+    const built = buildLicenceUpgradeSafeOperation({
+      status: delayed ? "delayed" : "pending",
+      operation: identity,
+      currentPlanId: this.projection === null ? null : this.projection.planId,
+      currentPlanDisplayName: this.projection === null ? null : this.projection.displayName,
+      targetPlanDisplayName: resolveUpgradeTargetDisplayName(
+        this.projection,
+        binding.requestedPlanId
+      )
+    });
+    return built.ok ? built.snapshot : null;
+  }
+  /**
+   * Restart/reconnect recovery on READY truth: when no operation is loaded in
+   * memory but the durable journal still holds a bound pending record for this
+   * identity/network, attach it so reconciliation can preserve/retire it
+   * against the fresh active reference. FEAT-016 only recovered bound records
+   * under no-active truth; a confirmed-upgrade operation must ALSO survive a
+   * query-first restart while the old licence is still current.
+   */
+  async attachBoundPendingRecordForReconciliation() {
+    if (this.pendingRecord !== null || this.pendingTransactionId !== null) {
+      return;
+    }
+    const bound = await this.findBoundPending();
+    if (bound !== null) {
+      this.pendingRecord = bound;
+      this.pendingTransactionId = bound.transactionId;
+    }
+  }
+  /**
+   * FEAT-017: one new activation intent supersedes previously surfaced
+   * presentation artifacts (one-shot notification eligibility; Task 3.3 also
+   * clears retained terminal result/stale/competing notices here).
+   */
+  clearUpgradePresentationArtifacts() {
+    this.upgradeNotificationEligible = false;
+  }
+  /**
+   * FEAT-017: seal and submit ONE exact confirmed-upgrade operation from the
+   * authority's own validated fresh projection. The purpose-bound record is
+   * journaled BEFORE submission (seal-before-submit), binding the expected old
+   * current reference/plan, the requested target, and the observed catalogue
+   * release so a later query-first restart can recover and reconcile it.
+   */
+  async sealAndSubmitConfirmedUpgrade(requestedPlanId, truth) {
+    const identity = this.ports.nextBaselineIdentity();
+    const binding = {
+      kind: "confirmed_upgrade",
+      expectedCurrentLicenceTransactionId: truth.licenceReference,
+      expectedCurrentPlanId: truth.planId,
+      requestedPlanId,
+      observedCatalogueVersion: truth.catalogueVersion
+    };
+    const built = buildConfirmedUpgradeUnsignedTransaction({
+      expectedCurrentLicenceTransactionId: truth.licenceReference,
+      expectedCurrentPlanId: truth.planId,
+      requestedPlanId,
+      observedCatalogueVersion: truth.catalogueVersion,
+      transactionId: identity.transactionId,
+      transactionTimestampUtc: identity.timestampUtc
+    });
+    if (!built.ok) {
+      this.phase = "entitlementRepair";
+      this.lastOutcomeCode = `upgrade-template-rejected:${built.reason}`;
+      return;
+    }
+    const record = {
+      schemaVersion: 1,
+      purpose: LICENCE_PENDING_PURPOSE,
+      transaction: { exactJson: built.canonicalUnsignedJson, digest: built.digest },
+      transactionId: identity.transactionId,
+      identityBinding: this.actorBinding,
+      networkBinding: this.networkBinding,
+      targetBinding: WEB_TARGET_BINDING,
+      createdUtc: identity.timestampUtc,
+      attemptEvidence: [],
+      recoveryState: "sealed",
+      upgradeBinding: binding
+    };
+    const saved = this.ports.savePending(record);
+    if (!saved.ok) {
+      this.phase = "entitlementRepair";
+      this.lastOutcomeCode = "journal-unavailable";
+      return;
+    }
+    this.pendingRecord = record;
+    this.pendingTransactionId = record.transactionId;
+    await this.submitPending(record);
+  }
 };
-
-// src/lib/licensing/session-contract.ts
-var LICENCE_REVALIDATION_TRIGGERS = [
-  "foreground",
-  "reconnect",
-  "expiry",
-  "account-entry",
-  "authoritative-rejection",
-  "explicit-recovery"
-];
-function isLicenceRevalidationTrigger(value) {
-  return typeof value === "string" && LICENCE_REVALIDATION_TRIGGERS.includes(value);
-}
-function isLicenceConnectivityInput(value) {
-  return value === "online" || value === "offline" || value === "paused" || value === "reconnecting";
-}
 
 // src/lib/browser-vault/production/licence-session.ts
 function snapshotFromCoordinator(snapshot) {
