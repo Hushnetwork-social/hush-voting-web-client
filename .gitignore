@@ -58,3 +58,4 @@ conformance/archive/
 .features-gen/
 .features-gen-auth-lifecycle/
 .features-gen-entitlement-bootstrap/
+.features-gen-licence-upgrade/

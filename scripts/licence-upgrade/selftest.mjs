@@ -99,6 +99,27 @@ try {
       ]),
     }),
   );
+
+  // 6. journey-wiring red-effectiveness: an owned canonical id missing from a
+  // seeded FEAT-017 features dir must fail the BDD journey wiring validator.
+  const journeyFeaturesSeed = join(root, 'journey-features-seed');
+  mkdirSync(journeyFeaturesSeed, { recursive: true });
+  writeFileSync(
+    join(journeyFeaturesSeed, 'incomplete.feature'),
+    [
+      '@FEAT-017',
+      'Feature: incomplete journey seed',
+      '  @AT-LIC-004',
+      '  Scenario: The full-width licence page reflects the exact server catalogue in server order',
+      '    Given Alice has completed exact EPIC-001 identity authentication',
+    ].join('\n'),
+  );
+  results.push(
+    expectRed('journey-wiring', process.execPath, [join(SCRIPT_DIR, 'journey-wiring.mjs')], {
+      FEAT017_WIRING_FEATURES: journeyFeaturesSeed,
+      FEAT017_WIRING_SKIP_LIST: '1',
+    }),
+  );
 } finally {
   rmSync(root, { recursive: true, force: true });
 }

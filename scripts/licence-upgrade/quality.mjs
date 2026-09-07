@@ -37,6 +37,7 @@ function run(label, command, args) {
 }
 
 console.log('FEAT-017 focused quality aggregate');
+run('journey-wiring-discovery', 'node', [join(SCRIPT_DIR, 'journey-wiring.mjs')]);
 run('wiring', 'node', [join(SCRIPT_DIR, 'wiring.mjs')]);
 run('coverage', 'node', [join(SCRIPT_DIR, 'coverage.mjs')]);
 run('secret-scan', 'node', [join(SCRIPT_DIR, 'secret-scan.mjs')]);

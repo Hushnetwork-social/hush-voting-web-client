@@ -13,6 +13,7 @@ import userEvent from '@testing-library/user-event';
 import {
   confirmationFacts,
   directFreeNoHigherProjection,
+  draftFor,
   gateFacts,
   optionsFacts,
   pendingIndicatorFacts,
@@ -20,10 +21,14 @@ import {
   upgradeOperationOf,
   veritas2000ActiveProjection,
   workspaceFacts,
+  FIXTURE_TIME_ZONE,
   VERITAS_2000_PLAN,
 } from './fixtures';
 import type { LicenceWorkspaceViewFacts } from '../../../lib/licensing/upgrade-presentation';
-import { projectActivationNotification } from '../../../lib/licensing/upgrade-presentation';
+import {
+  projectActivationNotification,
+  projectConfirmationViewFacts,
+} from '../../../lib/licensing/upgrade-presentation';
 import type { LicenceCurrentSurface } from '../../../lib/licensing/upgrade-presentation';
 import { licenceUpgradeCopy } from '../../../lib/licensing/upgrade-copy';
 import { LicenceWorkspace } from './licence-workspace';
@@ -337,8 +342,15 @@ describe('view facts are validated against authority state', () => {
     void view;
   });
 
-  it('confirmation is null without a matching fresh draft', () => {
-    const facts = confirmationFacts(directFreeInput(), 'hushvoting.veritas.2000');
-    expect(facts).not.toBeNull();
+  it('confirmation is only produced for a draft matching the FRESH options', () => {
+    // Valid fresh draft → confirmation exists.
+    expect(confirmationFacts(directFreeInput(), 'hushvoting.veritas.2000')).not.toBeNull();
+    // A draft whose plan is no longer a fresh higher option can never reach C0:
+    // after the current licence changes to a no-higher projection, the earlier
+    // 2k draft must be stale and the confirmation projection must be null.
+    const freshInput = directFreeInput();
+    const draft = draftFor(freshInput, 'hushvoting.veritas.2000');
+    const changedInput = presentationInput({ projection: directFreeNoHigherProjection() });
+    expect(projectConfirmationViewFacts(changedInput, draft, FIXTURE_TIME_ZONE)).toBeNull();
   });
 });
