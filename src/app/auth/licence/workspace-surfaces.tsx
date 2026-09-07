@@ -132,7 +132,10 @@ export function LicenceProgressSurface({
   return (
     <div className="licence-progress" aria-busy={facts.ariaBusy ? 'true' : 'false'} data-testid="licence-progress">
       <p className="licence-progress-waiting">{facts.waitingMessage ?? facts.statusText}</p>
-      <p className="licence-progress-status" role="status" aria-live="polite" data-testid="licence-progress-status">
+      {/* Visible status line (announcement itself is emitted once by the
+          workspace shell live region; this text is not a second live region so
+          polls never double-announce). */}
+      <p className="licence-progress-status" data-testid="licence-progress-status">
         {facts.statusText}
       </p>
 

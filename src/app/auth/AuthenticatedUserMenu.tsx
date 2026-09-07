@@ -130,7 +130,15 @@ export function AuthenticatedUserMenu({ identity, onLock, licence }: Authenticat
           </dl>
 
           {licence !== undefined && licence !== null ? (
-            <AccountLicenceSummary facts={licence.facts} onAction={licence.onLicenceAction} />
+            <AccountLicenceSummary
+              facts={licence.facts}
+              onAction={(action) => {
+                // A0/A0P action closes the flyout (the licence flow opens in
+                // the workspace via the Phase 6 root destination).
+                setOpen(false);
+                licence.onLicenceAction(action);
+              }}
+            />
           ) : null}
 
           <button

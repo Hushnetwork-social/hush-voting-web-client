@@ -77,10 +77,10 @@ describe('Account licence summary (A0/A0P)', () => {
     const action = within(block).getByRole('button', { name: 'Upgrade' });
     await userEvent.setup().click(action);
     expect(onLicenceAction).toHaveBeenCalledWith('upgrade');
+    // A0 action closes the flyout (licence flow opens in the workspace).
+    expect(screen.queryByRole('dialog', { name: 'User information' })).toBeNull();
 
-    // Existing identity copy and Lock remain intact.
-    expect(within(dialog).getByText('Public signing key')).toBeInTheDocument();
-    expect(within(dialog).getByRole('button', { name: 'Lock' })).toBeInTheDocument();
+    // Lock is part of the flyout while open.
     void view;
   });
 
