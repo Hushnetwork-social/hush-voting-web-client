@@ -20,6 +20,7 @@ import {
   BROWSER_PROTOCOL_VERSION,
   type BrowserWorkerEvent,
   type CapabilityIssued,
+  type LicenceProgressEvent,
   type OperationOutcome,
   type RuntimeConfigId,
 } from '../contracts/protocol';
@@ -45,7 +46,7 @@ export interface ClientOperationResult {
   readonly payload?: unknown;
 }
 
-/** Closed operation kinds the page may dispatch (v2 vocabulary). */
+/** Closed operation kinds the page may dispatch (v2 vocabulary + FEAT-016). */
 export type ClientOperationKind =
   | 'provisionFromValidatedBundle'
   | 'unlockPassword'
@@ -62,7 +63,11 @@ export type ClientOperationKind =
   | 'retainTransactionDigest'
   | 'submitIdentityTransaction'
   | 'promoteLifecycle'
-  | 'inspectStartup';
+  | 'inspectStartup'
+  // FEAT-016 additive: closed entitlement-bootstrap steps.
+  | 'licenceBootstrapStart'
+  | 'licenceBootstrapControl'
+  | 'licenceBootstrapEligibility';
 
 /** Secret purposes accepted by the sink. */
 export type SecretPurpose = 'devicePassword' | 'mnemonic' | 'filePassword' | 'fileBytes';
@@ -146,6 +151,15 @@ export function defaultWorkerFactory(url: string): { readonly port: MessagePortL
   }
 }
 
+/** Safe entitlement progress received from the authority (page-visible). */
+export interface LicenceProgress {
+  readonly phase: string;
+  readonly projection: unknown | null;
+  readonly lastOutcomeCode: string | null;
+  readonly pendingTransactionId: string | null;
+  readonly emittedAtMs: number;
+}
+
 /**
  * The page-side vault client. One instance per tab; the SharedWorker
  * authority is shared across tabs by construction.
@@ -165,6 +179,7 @@ export class BrowserVaultClient {
   private readonly pending = new Map<string, (result: ClientOperationResult) => void>();
   private pendingCapabilityResolvers: Array<(issued: CapabilityIssued) => void> = [];
   private invalidationHandler: ((reason: string) => void) | null = null;
+  private licenceProgressHandler: ((progress: LicenceProgress) => void) | null = null;
   private inFlightConnect: Promise<HandshakeResult> | null = null;
   /** Secret transfers queued per operation id (posted BEFORE the operation). */
   private readonly pendingSecretPosts = new Map<string, Promise<void>>();
@@ -258,6 +273,11 @@ export class BrowserVaultClient {
   /** Register the global-invalidation handler (Lock/removal/takeover). */
   onInvalidation(handler: (reason: string) => void): void {
     this.invalidationHandler = handler;
+  }
+
+  /** Register the safe entitlement-progress handler (FEAT-016). */
+  onLicenceProgress(handler: (progress: LicenceProgress) => void): void {
+    this.licenceProgressHandler = handler;
   }
 
   /** Dispatch one operation; resolves on the matching typed outcome.
@@ -424,6 +444,17 @@ export class BrowserVaultClient {
         }
         this.pending.clear();
         this.invalidationHandler?.(message.reason);
+        break;
+      }
+      case 'licence-progress': {
+        const progress = message as LicenceProgressEvent;
+        this.licenceProgressHandler?.({
+          phase: progress.phase,
+          projection: progress.projection ?? null,
+          lastOutcomeCode: progress.lastOutcomeCode,
+          pendingTransactionId: progress.pendingTransactionId,
+          emittedAtMs: progress.emittedAtMs,
+        });
         break;
       }
       case 'handshake-rejected':

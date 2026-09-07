@@ -22061,7 +22061,11 @@ var OPERATION_PAYLOAD_SCHEMAS = {
   retainTransactionDigest: ["digest"],
   submitIdentityTransaction: ["alias", "visibility"],
   promoteLifecycle: ["status"],
-  inspectStartup: []
+  inspectStartup: [],
+  // FEAT-016 additive: closed entitlement-bootstrap control payloads.
+  licenceBootstrapStart: ["networkBinding"],
+  licenceBootstrapControl: ["control", "trigger"],
+  licenceBootstrapEligibility: ["foreground", "connectivity"]
 };
 var FORBIDDEN_PAYLOAD_MARKERS = ["password", "mnemonic", "secret", "key", "salt", "nonce", "decrypted", "bundle", "private", "fileBytes", "bytes"];
 function hasSecretShapedField(value) {
@@ -22199,7 +22203,11 @@ var OPERATION_KINDS = /* @__PURE__ */ new Set([
   "retainTransactionDigest",
   "submitIdentityTransaction",
   "promoteLifecycle",
-  "inspectStartup"
+  "inspectStartup",
+  // FEAT-016 additive.
+  "licenceBootstrapStart",
+  "licenceBootstrapControl",
+  "licenceBootstrapEligibility"
 ]);
 function validateSecretTransfer(record) {
   if (!hasNoUnknownFields(record, ["kind", "operationId", "clientChannel", "authorityEpoch", "purpose", "value"])) {
@@ -22329,7 +22337,12 @@ var FRESH_CAPABILITY_REQUIRED_BY_OPERATION = {
   retainTransactionDigest: null,
   submitIdentityTransaction: null,
   promoteLifecycle: null,
-  inspectStartup: null
+  inspectStartup: null,
+  // FEAT-016 additive: entitlement bootstrap steps require no fresh
+  // password capability (authenticated session only).
+  licenceBootstrapStart: null,
+  licenceBootstrapControl: null,
+  licenceBootstrapEligibility: null
 };
 
 // src/lib/browser-vault/authority/authority.ts
@@ -22587,8 +22600,8 @@ function success(value) {
 
 // src/lib/browser-vault/contracts/storage.ts
 var VAULT_DATABASE_NAME = "hushvoting-vault";
-var VAULT_SCHEMA_VERSION = 1;
-var VAULT_STORES = ["vaultSlots", "vaultJournal", "operationalSidecars"];
+var VAULT_SCHEMA_VERSION = 2;
+var VAULT_STORES = ["vaultSlots", "vaultJournal", "operationalSidecars", "licenceJournal"];
 var VAULT_SLOT_KEYS = ["slot-a", "slot-b"];
 var VAULT_JOURNAL_KEY = "current";
 var ALLOWED_SIDECAR_KEYS = [
@@ -22598,6 +22611,7 @@ var ALLOWED_SIDECAR_KEYS = [
   "persistenceAck",
   "epoch"
 ];
+var LICENCE_JOURNAL_KEYS = ["slot-a", "slot-b", "pointer"];
 function classifyStorageError(error) {
   if (error instanceof DOMException) {
     switch (error.name) {
@@ -22649,6 +22663,9 @@ function assertAllowedStorageKey(store, key) {
   }
   if (store === "operationalSidecars" && !ALLOWED_SIDECAR_KEYS.includes(key)) {
     throw new Error(`disallowed key for operationalSidecars: ${key}`);
+  }
+  if (store === "licenceJournal" && !LICENCE_JOURNAL_KEYS.includes(key)) {
+    throw new Error(`disallowed key for licenceJournal: ${key}`);
   }
 }
 function verifyDatabaseLayout(stores) {
@@ -26237,6 +26254,267 @@ function corpusTimestamp(date = /* @__PURE__ */ new Date()) {
   return date.toISOString();
 }
 
+// src/lib/licensing/contracts.ts
+var LICENCE_QUERY_SIGNATORY_HEADER = "x-hush-licence-query-signatory";
+var LICENCE_QUERY_SIGNED_AT_HEADER = "x-hush-licence-query-signed-at";
+var LICENCE_QUERY_SIGNATURE_HEADER = "x-hush-licence-query-signature";
+var LICENCE_QUERY_METHOD = "GetMyEntitlement";
+var LICENCE_PLAN_DIRECT_FREE = "hushvoting.direct.free";
+var LICENCE_TRANSITION_INTENT_BASELINE_FREE = "baseline_free";
+function licenceQuerySignedJson(envelope) {
+  return `{"actorAddress":"${envelope.actorAddress}","method":"${envelope.method}","request":{},"signedAt":"${envelope.signedAt}"}`;
+}
+
+// src/lib/licensing/canonical.ts
+function licencePayloadSizeBytes(payload) {
+  return new TextEncoder().encode(JSON.stringify(payload)).length;
+}
+function serializeLicenceUnsignedTransaction(tx) {
+  return JSON.stringify({
+    TransactionId: tx.TransactionId,
+    PayloadKind: tx.PayloadKind,
+    TransactionTimeStamp: tx.TransactionTimeStamp,
+    Payload: tx.Payload,
+    PayloadSize: tx.PayloadSize
+  });
+}
+function licenceTransactionDigest(canonicalJson) {
+  return sha256Hex(new TextEncoder().encode(canonicalJson));
+}
+
+// src/lib/licensing/sealing.ts
+var LICENCE_USER_SIGNATURE_MEMBER = "UserSignature";
+function isLicenceOuterEnvelopeJson(value) {
+  if (typeof value !== "string" || value.length === 0 || value.length > 65536) {
+    return false;
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return false;
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    return false;
+  }
+  const record = parsed;
+  if (typeof record.TransactionId !== "string" || typeof record.PayloadKind !== "string") {
+    return false;
+  }
+  if (typeof record.TransactionTimeStamp !== "string" || typeof record.Payload !== "object" || record.Payload === null) {
+    return false;
+  }
+  if (typeof record.PayloadSize !== "number" || !Number.isInteger(record.PayloadSize)) {
+    return false;
+  }
+  return true;
+}
+function isLicenceCanonicalUnsignedJson(value) {
+  if (!isLicenceOuterEnvelopeJson(value)) {
+    return false;
+  }
+  return JSON.parse(value).UserSignature === void 0;
+}
+function isLicenceSignedTransactionJson(value) {
+  if (!isLicenceOuterEnvelopeJson(value)) {
+    return false;
+  }
+  const signature = JSON.parse(value)[LICENCE_USER_SIGNATURE_MEMBER];
+  if (typeof signature !== "object" || signature === null) {
+    return false;
+  }
+  const member = signature;
+  return typeof member.Signatory === "string" && member.Signatory.length > 0 && typeof member.Signature === "string" && member.Signature.length > 0;
+}
+function sealLicenceTransaction(input) {
+  if (!isLicenceCanonicalUnsignedJson(input.unsignedJson)) {
+    return { ok: false, code: "malformed-unsigned" };
+  }
+  if (!/^[0-9a-fA-F]{64}$/.test(input.signingPrivateKeyHex)) {
+    return { ok: false, code: "missing-signer" };
+  }
+  if (typeof input.signingAddress !== "string" || input.signingAddress.length === 0) {
+    return { ok: false, code: "missing-signer" };
+  }
+  const signed = signMessage(input.unsignedJson, input.signingPrivateKeyHex);
+  if (!signed.ok) {
+    return { ok: false, code: "signature-failed" };
+  }
+  const parsed = JSON.parse(input.unsignedJson);
+  const signedJson = JSON.stringify({
+    ...parsed,
+    [LICENCE_USER_SIGNATURE_MEMBER]: {
+      Signatory: input.signingAddress,
+      Signature: signed.value.compactBase64
+    }
+  });
+  return { ok: true, signedJson, signedDigest: sha256Hex(utf8Bytes(signedJson)) };
+}
+function signLicenceQueryEnvelope(input) {
+  if (!/^[0-9a-fA-F]{64}$/.test(input.signingPrivateKeyHex)) {
+    return { ok: false, code: "missing-signer" };
+  }
+  const envelope = {
+    actorAddress: input.actorAddress,
+    method: LICENCE_QUERY_METHOD,
+    request: {},
+    signedAt: input.signedAt
+  };
+  const canonicalJson = licenceQuerySignedJson(envelope);
+  const signed = signMessage(canonicalJson, input.signingPrivateKeyHex);
+  if (!signed.ok) {
+    return { ok: false, code: "signature-failed" };
+  }
+  return {
+    ok: true,
+    headers: {
+      signatory: input.actorAddress.toLowerCase(),
+      signedAt: input.signedAt,
+      signature: signed.value.compactBase64
+    }
+  };
+}
+function licenceFreshTimestampUtc(nowMs) {
+  return new Date(nowMs).toISOString();
+}
+
+// src/lib/licensing/pending-transaction.ts
+var LICENCE_PENDING_PURPOSE = "pending_licence_transaction";
+var LICENCE_PENDING_AAD_LABEL = "hushvoting-licence-pending-v1";
+var LICENCE_PENDING_STORE_NAMESPACE = "hushvoting-licence-journal";
+var LICENCE_PENDING_SCHEMA_VERSION = 1;
+var LICENCE_PENDING_MAX_JSON_BYTES = 65536;
+var LICENCE_PENDING_MAX_ATTEMPT_EVIDENCE = 64;
+var LICENCE_PENDING_ID_MAX_LENGTH = 128;
+var SHA256_HEX_RE = /^[0-9a-f]{64}$/;
+var ISO_UTC_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/;
+var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+var TARGET_BINDINGS = ["web-sharedworker", "ubuntu-native", "android-native"];
+var RECOVERY_STATES = [
+  "sealed",
+  "waitingAccepted",
+  "waitingPending",
+  "confirmedIndexed",
+  "superseded",
+  "retired",
+  "unrecoverable"
+];
+var ATTEMPT_OUTCOMES = [
+  "accepted",
+  "pending",
+  "alreadyExists",
+  "uncertain",
+  "terminalRejected",
+  "superseded"
+];
+function digestOfPendingLicence(exactJson) {
+  return sha256Hex(new TextEncoder().encode(exactJson));
+}
+function isRecordValue(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function isBoundedString2(value, max = LICENCE_PENDING_MAX_JSON_BYTES) {
+  return typeof value === "string" && value.length > 0 && value.length <= max;
+}
+function isIsoUtc(value) {
+  return typeof value === "string" && ISO_UTC_RE.test(value);
+}
+function parsePendingLicenceRecord(value) {
+  if (!isRecordValue(value)) {
+    return null;
+  }
+  if (value.schemaVersion !== LICENCE_PENDING_SCHEMA_VERSION || value.purpose !== LICENCE_PENDING_PURPOSE) {
+    return null;
+  }
+  const tx = value.transaction;
+  if (!isRecordValue(tx) || !isBoundedString2(tx.exactJson) || !isBoundedString2(tx.digest, 64) || !SHA256_HEX_RE.test(tx.digest)) {
+    return null;
+  }
+  if (digestOfPendingLicence(tx.exactJson) !== tx.digest) {
+    return null;
+  }
+  if (!isBoundedString2(value.transactionId, LICENCE_PENDING_ID_MAX_LENGTH) || !UUID_RE.test(value.transactionId)) {
+    return null;
+  }
+  if (!isBoundedString2(value.identityBinding, LICENCE_PENDING_ID_MAX_LENGTH) || !isBoundedString2(value.networkBinding, LICENCE_PENDING_ID_MAX_LENGTH)) {
+    return null;
+  }
+  const target = value.targetBinding;
+  if (typeof target !== "string" || !TARGET_BINDINGS.includes(target)) {
+    return null;
+  }
+  if (!isIsoUtc(value.createdUtc)) {
+    return null;
+  }
+  if (value.submittedUtc !== void 0 && value.submittedUtc !== null && !isIsoUtc(value.submittedUtc)) {
+    return null;
+  }
+  if (value.indexObservedUtc !== void 0 && value.indexObservedUtc !== null && !isIsoUtc(value.indexObservedUtc)) {
+    return null;
+  }
+  const recoveryState = value.recoveryState;
+  if (typeof recoveryState !== "string" || !RECOVERY_STATES.includes(recoveryState)) {
+    return null;
+  }
+  const attempts = value.attemptEvidence;
+  if (!Array.isArray(attempts) || attempts.length > LICENCE_PENDING_MAX_ATTEMPT_EVIDENCE) {
+    return null;
+  }
+  for (const attempt of attempts) {
+    if (!isRecordValue(attempt) || !isIsoUtc(attempt.at) || typeof attempt.outcome !== "string" || !ATTEMPT_OUTCOMES.includes(attempt.outcome)) {
+      return null;
+    }
+  }
+  return {
+    schemaVersion: LICENCE_PENDING_SCHEMA_VERSION,
+    purpose: LICENCE_PENDING_PURPOSE,
+    transaction: { exactJson: tx.exactJson, digest: tx.digest },
+    transactionId: value.transactionId,
+    identityBinding: value.identityBinding,
+    networkBinding: value.networkBinding,
+    targetBinding: target,
+    createdUtc: value.createdUtc,
+    submittedUtc: value.submittedUtc === void 0 || value.submittedUtc === null ? void 0 : value.submittedUtc,
+    indexObservedUtc: value.indexObservedUtc === void 0 || value.indexObservedUtc === null ? void 0 : value.indexObservedUtc,
+    attemptEvidence: attempts.map((attempt) => ({
+      at: attempt.at,
+      outcome: attempt.outcome
+    })),
+    recoveryState
+  };
+}
+function parsePendingLicenceRecordJson(json) {
+  try {
+    return parsePendingLicenceRecord(JSON.parse(json));
+  } catch {
+    return null;
+  }
+}
+function serializePendingLicenceRecord(record) {
+  const json = {
+    schemaVersion: record.schemaVersion,
+    purpose: record.purpose,
+    transaction: { exactJson: record.transaction.exactJson, digest: record.transaction.digest },
+    transactionId: record.transactionId,
+    identityBinding: record.identityBinding,
+    networkBinding: record.networkBinding,
+    targetBinding: record.targetBinding,
+    createdUtc: record.createdUtc,
+    attemptEvidence: record.attemptEvidence.map((attempt) => ({
+      at: attempt.at,
+      outcome: attempt.outcome
+    })),
+    recoveryState: record.recoveryState
+  };
+  if (record.submittedUtc !== void 0) {
+    json.submittedUtc = record.submittedUtc;
+  }
+  if (record.indexObservedUtc !== void 0) {
+    json.indexObservedUtc = record.indexObservedUtc;
+  }
+  return JSON.stringify(json);
+}
+
 // src/lib/vault-core/contracts/sidecar.ts
 var THROTTLE_SCHEDULE = [
   null,
@@ -26284,6 +26562,9 @@ var RECORD_BOUNDS = {
 
 // src/lib/browser-vault/production/sealed-vault.ts
 var CREDENTIAL_KEK_LABEL = "hush/vault/v1/credential-kek";
+var LICENCE_JOURNAL_STORE = "licenceJournal";
+var LICENCE_JOURNAL_POINTER_KEY = "pointer";
+var LICENCE_JOURNAL_SLOT_KEYS = ["slot-a", "slot-b"];
 var KDF_SALT_EXTENSION = "hush.vault.kdf-salt";
 function b64url(bytes) {
   let binary = "";
@@ -27190,6 +27471,9 @@ var SealedVaultEngine = class {
       await this.storage.deleteRecord("vaultSlots", slotKey);
     }
     await this.storage.deleteRecord("vaultJournal", "current");
+    for (const key of [...LICENCE_JOURNAL_SLOT_KEYS, LICENCE_JOURNAL_POINTER_KEY]) {
+      await this.storage.deleteRecord(LICENCE_JOURNAL_STORE, key);
+    }
     await persist("clearing-caches");
     for (const key of ["throttle", "removalTombstone", "lease", "persistenceAck", "epoch"]) {
       await this.storage.deleteRecord("operationalSidecars", key);
@@ -27234,6 +27518,199 @@ var SealedVaultEngine = class {
       abbreviatedSigningAddress: `${envelope.preview.signingAddressPrefix}\u2026${envelope.preview.signingAddressSuffix}`
     };
     return { code: "OK", detail: { surface: "lockedVault", safeIdentity } };
+  }
+  // ---------------------------------------------------------------------
+  // FEAT-016 licence authority operations (Phase 6)
+  //
+  // Closed licence operations hosted inside the ONE credential authority.
+  // Signing uses the session concrete signing key; the encrypted pending
+  // licence journal is AES-GCM sealed under the session KEK (purpose-bound
+  // AAD, two-slot CAS, read-back verified). Exact signed bytes and
+  // signatures never leave this boundary.
+  // ---------------------------------------------------------------------
+  /**
+   * Current authenticated licence actor (public signing address). Null unless
+   * the engine holds an authenticated session. Page proposals are always
+   * re-verified against this authority-owned truth.
+   */
+  licenceActor() {
+    if (this.session === null || this.phase !== "authenticated") {
+      return null;
+    }
+    return { signingAddress: this.session.record.keyBinding.signingAddress };
+  }
+  /**
+   * One fresh signed `GetMyEntitlement` query. The authority mints a new UTC
+   * `signedAt`, signs the frozen canonical envelope bytes with the user's
+   * signing key, and hands the resulting three headers to the injected
+   * submit function (same-origin BFF). Failures map to the closed transport
+   * vocabulary; nothing here throws.
+   */
+  async licenceQuery(submit) {
+    if (this.session === null || this.phase !== "authenticated") {
+      return { ok: false, status: "UNAVAILABLE" };
+    }
+    try {
+      const signed = signLicenceQueryEnvelope({
+        actorAddress: this.session.record.keyBinding.signingAddress,
+        signedAt: licenceFreshTimestampUtc(this.nowMs()),
+        signingPrivateKeyHex: this.session.signingPrivateKey
+      });
+      if (!signed.ok) {
+        return { ok: false, status: "UNAVAILABLE" };
+      }
+      return await submit(signed.headers);
+    } catch {
+      return { ok: false, status: "UNAVAILABLE" };
+    }
+  }
+  /**
+   * Sign one canonical unsigned licence envelope into the exact sealed form
+   * (deterministic RFC 6979; byte-identical reuse across retry/restart). The
+   * caller persists the sealed bytes through `licenceJournalWrite` before
+   * the first submission.
+   */
+  licenceSignBaseline(unsignedJson) {
+    if (this.session === null || this.phase !== "authenticated") {
+      return { ok: false, code: "not-authenticated" };
+    }
+    const sealed = sealLicenceTransaction({
+      unsignedJson,
+      signingPrivateKeyHex: this.session.signingPrivateKey,
+      signingAddress: this.session.record.keyBinding.signingAddress
+    });
+    if (!sealed.ok) {
+      return { ok: false, code: sealed.code === "malformed-unsigned" ? "malformed" : "signature-failed" };
+    }
+    return { ok: true, signedJson: sealed.signedJson, signedDigest: sealed.signedDigest };
+  }
+  /**
+   * Encrypted two-slot CAS journal write (read-back verified). Values are
+   * opaque; the host validates the pending-licence record JSON before and
+   * after encryption. The journal survives Lock/restart and is readable
+   * again after the next successful unlock (KEK re-derivation).
+   */
+  async licenceJournalWrite(recordJson) {
+    if (this.session === null || this.phase === "locked" || this.phase === "noLocalUser") {
+      return { ok: false, reason: "not-authenticated" };
+    }
+    if (typeof recordJson !== "string" || recordJson.length === 0 || recordJson.length > 65536) {
+      return { ok: false, reason: "malformed" };
+    }
+    const aad = this.licenceJournalAad();
+    try {
+      const nonce = this.suite.randomBytes(12);
+      const encrypted = await this.suite.aes256GcmEncrypt({ key: this.session.kek, nonce, plaintext: utf8Bytes(recordJson), aad });
+      const blob = { v: 1, nonce: b64url(nonce), ct: b64url(joinCipherAndTag(encrypted.ciphertext, encrypted.tag)) };
+      const pointerResult = await this.storage.readRecord(LICENCE_JOURNAL_STORE, LICENCE_JOURNAL_POINTER_KEY);
+      if (!pointerResult.ok) {
+        return { ok: false, reason: "storage-unavailable" };
+      }
+      const pointer = pointerResult.value.record ?? "";
+      const target = pointer === "slot-b" ? "slot-a" : "slot-b";
+      const write = await this.storage.writeRecord(LICENCE_JOURNAL_STORE, target, blob);
+      if (!write.ok) {
+        return { ok: false, reason: "storage-unavailable" };
+      }
+      const readBack = await this.storage.readRecord(LICENCE_JOURNAL_STORE, target);
+      if (!readBack.ok || readBack.value.record === void 0) {
+        return { ok: false, reason: "storage-unavailable" };
+      }
+      const decrypted = await this.decryptLicenceJournalBlob(readBack.value.record);
+      if (decrypted === null || decrypted !== recordJson) {
+        return { ok: false, reason: "corrupt" };
+      }
+      const pointerWrite = await this.storage.writeRecord(LICENCE_JOURNAL_STORE, LICENCE_JOURNAL_POINTER_KEY, target);
+      if (!pointerWrite.ok) {
+        return { ok: false, reason: "storage-unavailable" };
+      }
+      return { ok: true };
+    } catch {
+      return { ok: false, reason: "storage-unavailable" };
+    }
+  }
+  /** Read the committed journal record (two-slot rollback on corruption). */
+  async licenceJournalRead() {
+    if (this.session === null || this.phase === "locked" || this.phase === "noLocalUser") {
+      return { ok: false, reason: "not-authenticated" };
+    }
+    try {
+      const pointerResult = await this.storage.readRecord(LICENCE_JOURNAL_STORE, LICENCE_JOURNAL_POINTER_KEY);
+      if (!pointerResult.ok) {
+        return { ok: false, reason: "storage-unavailable" };
+      }
+      const pointer = pointerResult.value.record ?? "";
+      if (pointer === "" || !LICENCE_JOURNAL_SLOT_KEYS.includes(pointer)) {
+        return { ok: true, recordJson: null };
+      }
+      const slot = await this.storage.readRecord(LICENCE_JOURNAL_STORE, pointer);
+      if (slot.ok && slot.value.record !== void 0) {
+        const decrypted = await this.decryptLicenceJournalBlob(slot.value.record);
+        if (decrypted !== null) {
+          return { ok: true, recordJson: decrypted };
+        }
+      }
+      const otherKey = pointer === "slot-b" ? "slot-a" : "slot-b";
+      const other = await this.storage.readRecord(LICENCE_JOURNAL_STORE, otherKey);
+      if (other.ok && other.value.record !== void 0) {
+        const decrypted = await this.decryptLicenceJournalBlob(other.value.record);
+        if (decrypted !== null) {
+          return { ok: true, recordJson: decrypted };
+        }
+      }
+      return { ok: false, reason: "corrupt" };
+    } catch {
+      return { ok: false, reason: "storage-unavailable" };
+    }
+  }
+  /** Clear the encrypted licence journal (identity removal / resolution). */
+  async licenceJournalClear() {
+    try {
+      for (const key of [...LICENCE_JOURNAL_SLOT_KEYS, LICENCE_JOURNAL_POINTER_KEY]) {
+        const deleted = await this.storage.deleteRecord(LICENCE_JOURNAL_STORE, key);
+        if (!deleted.ok) {
+          return { ok: false, reason: "storage-unavailable" };
+        }
+      }
+      return { ok: true };
+    } catch {
+      return { ok: false, reason: "storage-unavailable" };
+    }
+  }
+  /** Purpose-bound AAD for the encrypted licence journal. */
+  licenceJournalAad() {
+    return canonicalizeJsonBytes({ purpose: LICENCE_PENDING_AAD_LABEL, namespace: LICENCE_PENDING_STORE_NAMESPACE });
+  }
+  async decryptLicenceJournalBlob(blob) {
+    if (this.session === null) {
+      return null;
+    }
+    if (typeof blob !== "object" || blob === null || blob.v !== 1) {
+      return null;
+    }
+    const nonce = typeof blob.nonce === "string" ? unb64url(blob.nonce) : null;
+    const ctValue = typeof blob.ct === "string" ? unb64url(blob.ct) : null;
+    if (nonce === null || ctValue === null || nonce.byteLength !== 12) {
+      return null;
+    }
+    let parts;
+    try {
+      parts = splitCipherAndTag(ctValue);
+    } catch {
+      return null;
+    }
+    try {
+      const plaintext = await this.suite.aes256GcmDecrypt({
+        key: this.session.kek,
+        nonce,
+        ciphertext: parts.ciphertext,
+        tag: parts.tag,
+        aad: this.licenceJournalAad()
+      });
+      return utf8Text(plaintext);
+    } catch {
+      return null;
+    }
   }
   // ---------------------------------------------------------------------
   // Internal helpers
@@ -27332,7 +27809,1011 @@ function parseCurrentRecord(text, expectedGeneration) {
   }
 }
 
+// src/lib/licensing/projection.ts
+var MAX_SAFE_TEXT_LENGTH = 512;
+var MAX_OPTION_COUNT = 64;
+var MAX_OPTION_TEXT_LENGTH = 256;
+var MAX_REFERENCE_LENGTH = 128;
+function isBoundedText(value, max = MAX_SAFE_TEXT_LENGTH) {
+  return typeof value === "string" && value.length > 0 && value.length <= max;
+}
+function isRecordValue2(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function isIsoUtc2(value) {
+  if (typeof value !== "string" || value.length === 0 || value.length > 64) {
+    return false;
+  }
+  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/.test(value);
+}
+function isKnownFamily(value) {
+  return value === "direct" || value === "veritas" || value === "enterprise";
+}
+function buildLicenceSafeProjection(actorBinding, networkBinding, active) {
+  if (!active || typeof active !== "object") {
+    return { ok: false, reason: "missing-active-view" };
+  }
+  if (!isBoundedText(active.LicenceReference, MAX_REFERENCE_LENGTH)) {
+    return { ok: false, reason: "malformed-required-field" };
+  }
+  if (!isBoundedText(active.PlanId) || !isBoundedText(active.PlanFamily)) {
+    return { ok: false, reason: "malformed-required-field" };
+  }
+  if (!isKnownFamily(active.PlanFamily)) {
+    return { ok: false, reason: "unknown-plan-family" };
+  }
+  if (active.AssignedCatalogueVersion !== "hushvoting-licence-catalogue/v1.0.0") {
+    return { ok: false, reason: "incompatible-catalogue-version" };
+  }
+  if (!isBoundedText(active.DisplayName)) {
+    return { ok: false, reason: "malformed-required-field" };
+  }
+  if (!isIsoUtc2(active.EffectiveFromUtc)) {
+    return { ok: false, reason: "malformed-required-field" };
+  }
+  if (active.ExpiresAtUtc !== void 0 && !isIsoUtc2(active.ExpiresAtUtc)) {
+    return { ok: false, reason: "malformed-required-field" };
+  }
+  if (active.TermKind !== void 0 && !isBoundedText(active.TermKind)) {
+    return { ok: false, reason: "malformed-required-field" };
+  }
+  if (active.TermYears !== void 0 && (!Number.isInteger(active.TermYears) || active.TermYears < 0)) {
+    return { ok: false, reason: "malformed-required-field" };
+  }
+  if (active.EligibleVoterCap !== void 0 && (!Number.isInteger(active.EligibleVoterCap) || active.EligibleVoterCap < 0)) {
+    return { ok: false, reason: "malformed-required-field" };
+  }
+  if (!Array.isArray(active.HigherOptions) || !Array.isArray(active.AllowedGovernanceOptionIds)) {
+    return { ok: false, reason: "malformed-required-field" };
+  }
+  if (active.HigherOptions.length > MAX_OPTION_COUNT) {
+    return { ok: false, reason: "unbounded-value" };
+  }
+  if (active.AllowedGovernanceOptionIds.length > MAX_OPTION_COUNT) {
+    return { ok: false, reason: "unbounded-value" };
+  }
+  if (!active.AllowedGovernanceOptionIds.every(
+    (option) => isBoundedText(option, MAX_OPTION_TEXT_LENGTH)
+  )) {
+    return { ok: false, reason: "malformed-required-field" };
+  }
+  if (active.HigherOptions.length > 0 && typeof active.HigherOptions[0] === "string") {
+    return { ok: false, reason: "malformed-required-field" };
+  }
+  if (active.HigherOptions.some(
+    (option) => !isRecordValue2(option) || !isBoundedText(option.PlanId) || !isBoundedText(option.DisplayName) || !isBoundedText(option.SafeDescription)
+  )) {
+    return { ok: false, reason: "malformed-required-field" };
+  }
+  if (active.Enterprise !== void 0 && (!isBoundedText(active.Enterprise.PlanId) || !isBoundedText(active.Enterprise.DisplayName) || !isBoundedText(active.Enterprise.SafeDescription))) {
+    return { ok: false, reason: "malformed-required-field" };
+  }
+  const projection = {
+    kind: "licence-safe-projection",
+    schemaVersion: 1,
+    identityBinding: actorBinding,
+    networkBinding,
+    licenceReference: active.LicenceReference,
+    planId: active.PlanId,
+    planFamily: active.PlanFamily,
+    displayName: active.DisplayName,
+    effectiveFromUtc: active.EffectiveFromUtc,
+    expiresAtUtc: active.ExpiresAtUtc,
+    termKind: active.TermKind,
+    termYears: active.TermYears,
+    eligibleVoterCap: active.EligibleVoterCap,
+    unlimitedElections: active.UnlimitedElections,
+    allowedGovernanceOptionIds: [...active.AllowedGovernanceOptionIds],
+    provenance: "indexed-query"
+  };
+  return { ok: true, projection };
+}
+
+// src/lib/licensing/parser.ts
+var MAX_SAFE_TEXT_LENGTH2 = 512;
+function isBoundedString3(value, max = MAX_SAFE_TEXT_LENGTH2) {
+  return typeof value === "string" && value.length > 0 && value.length <= max;
+}
+function isRecord(value) {
+  return typeof value === "object" && value !== null;
+}
+function parseNoActiveTemplate(value) {
+  if (!isRecord(value)) {
+    return null;
+  }
+  if (value.TransitionIntent !== LICENCE_TRANSITION_INTENT_BASELINE_FREE) {
+    return null;
+  }
+  if (value.RequestedPlanId !== LICENCE_PLAN_DIRECT_FREE) {
+    return null;
+  }
+  if (!isBoundedString3(value.ObservedCatalogueVersion)) {
+    return null;
+  }
+  return {
+    TransitionIntent: LICENCE_TRANSITION_INTENT_BASELINE_FREE,
+    RequestedPlanId: LICENCE_PLAN_DIRECT_FREE,
+    ObservedCatalogueVersion: value.ObservedCatalogueVersion
+  };
+}
+function parseEntitlementQueryResult(result, actorBinding, networkBinding) {
+  if (!isRecord(result)) {
+    return { outcome: "malformed" };
+  }
+  if (result.ok === false) {
+    switch (result.status) {
+      case "UNAUTHENTICATED":
+        return { outcome: "unauthenticated" };
+      case "PERMISSION_DENIED":
+        return { outcome: "permissionDenied" };
+      case "INVALID_ARGUMENT":
+        return { outcome: "invalidArgument" };
+      case "UNIMPLEMENTED":
+        return { outcome: "unimplemented" };
+      case "UNAVAILABLE":
+        return { outcome: "unavailable", code: "licence_authority_unavailable" };
+      case "DEADLINE_EXCEEDED":
+      case "UNKNOWN":
+      default:
+        return { outcome: "transportFailure" };
+    }
+  }
+  switch (result.state) {
+    case "active": {
+      if (!isRecord(result.active)) {
+        return { outcome: "malformed" };
+      }
+      const built = buildLicenceSafeProjection(actorBinding, networkBinding, result.active);
+      if (!built.ok) {
+        if (built.reason === "unknown-plan-family" || built.reason === "incompatible-catalogue-version") {
+          return { outcome: "unsupported", reason: built.reason };
+        }
+        return { outcome: "malformed" };
+      }
+      return { outcome: "ready", projection: built.projection };
+    }
+    case "noActive": {
+      const template = parseNoActiveTemplate(result.template);
+      if (template === null) {
+        return { outcome: "malformed" };
+      }
+      return { outcome: "noActive", template };
+    }
+    case "unavailable": {
+      if (!isBoundedString3(result.code)) {
+        return { outcome: "malformed" };
+      }
+      return { outcome: "unavailable", code: result.code };
+    }
+    default:
+      return { outcome: "malformed" };
+  }
+}
+
+// src/lib/licensing/policy.ts
+var ENTITLEMENT_QUERY_POLL_INTERVAL_MS = 3e3;
+var ENTITLEMENT_CONFIRMATION_DELAYED_MS = 3e4;
+function classifyQueryOutcome(outcome) {
+  switch (outcome.outcome) {
+    case "ready":
+      return "ready";
+    case "noActive":
+      return "noActive";
+    case "unavailable":
+      return "unavailable";
+    case "unsupported":
+      return "unsupported";
+    case "unauthenticated":
+      return "authenticationFailure";
+    case "permissionDenied":
+    case "invalidArgument":
+    case "unimplemented":
+      return "terminalGuidance";
+    case "transportFailure":
+      return "transient";
+    case "malformed":
+      return "malformed";
+  }
+}
+
+// src/lib/licensing/direct-free.ts
+function buildDirectFreeUnsignedTransaction(template, transactionId, transactionTimestampUtc) {
+  if (template.TransitionIntent !== LICENCE_TRANSITION_INTENT_BASELINE_FREE || template.RequestedPlanId !== LICENCE_PLAN_DIRECT_FREE) {
+    return { ok: false, reason: "not-server-template" };
+  }
+  if (template.ObservedCatalogueVersion.length === 0 || template.ObservedCatalogueVersion.length > 256) {
+    return { ok: false, reason: "stale-or-unbounded-catalogue" };
+  }
+  const payload = {
+    TransitionIntent: LICENCE_TRANSITION_INTENT_BASELINE_FREE,
+    RequestedPlanId: LICENCE_PLAN_DIRECT_FREE,
+    ObservedCatalogueVersion: template.ObservedCatalogueVersion
+  };
+  const payloadSize = licencePayloadSizeBytes(payload);
+  const canonicalUnsignedJson = serializeLicenceUnsignedTransaction({
+    TransactionId: transactionId,
+    PayloadKind: "71370664-5eb4-4ce9-b96a-d7e7ffe53db5",
+    TransactionTimeStamp: transactionTimestampUtc,
+    Payload: payload,
+    PayloadSize: payloadSize
+  });
+  return {
+    ok: true,
+    payload,
+    payloadSize,
+    canonicalUnsignedJson,
+    digest: licenceTransactionDigest(canonicalUnsignedJson)
+  };
+}
+function decideSubmissionOutcome(outcome) {
+  switch (outcome) {
+    case "accepted":
+    case "pending":
+      return { kind: "reconcileByQuery" };
+    case "alreadyExists":
+      return { kind: "queryImmediately" };
+    case "terminalRejected":
+      return { kind: "failClosed" };
+    case "uncertain":
+      return { kind: "preserveAndReconcile" };
+  }
+}
+
+// src/lib/licensing/coordinator.ts
+var LicenceEntitlementCoordinator = class {
+  constructor(actorBinding, networkBinding, ports) {
+    this.actorBinding = actorBinding;
+    this.networkBinding = networkBinding;
+    this.ports = ports;
+    this.phase = "resolving";
+    this.projection = null;
+    this.pendingTransactionId = null;
+    this.pendingRecord = null;
+    this.consecutiveUnauthenticated = 0;
+    this.attemptCount = 0;
+    this.inFlight = false;
+    this.cancelled = false;
+    this.needsImmediateQuery = false;
+    this.lastQueryAtMs = null;
+    this.reachableElapsedMs = 0;
+    this.lastReachableAtMs = null;
+    this.confirmationStartedReachableMs = null;
+    this.lastOutcomeCode = null;
+  }
+  snapshot() {
+    return {
+      phase: this.phase,
+      projection: this.projection,
+      pendingTransactionId: this.pendingTransactionId,
+      consecutiveUnauthenticated: this.consecutiveUnauthenticated,
+      reachableElapsedMs: this.reachableElapsedMs,
+      lastOutcomeCode: this.lastOutcomeCode
+    };
+  }
+  /** Query-first start: restart, after-auth, and explicit bootstrap recovery. */
+  async start() {
+    this.cancelled = false;
+    this.attemptCount = 0;
+    this.consecutiveUnauthenticated = 0;
+    this.projection = null;
+    this.phase = "resolving";
+    await this.runFreshQuery("start");
+    return this.snapshot();
+  }
+  /**
+   * One host-driven poll cycle. Query cadence is 3 s of reachable time, at
+   * most one call in flight; the 30 s window accumulates foreground/reachable
+   * monotonic time only and enters delayed confirmation at the threshold or
+   * immediately when the host reports paused.
+   */
+  async tick(eligibility) {
+    this.advanceReachable(eligibility);
+    if (!eligibility.authenticated || !eligibility.foregrounded || !eligibility.reachable || this.inFlight) {
+      return this.snapshot();
+    }
+    if (this.phase !== "awaitingIndex" && this.phase !== "confirmationDelayed" && this.phase !== "entitlementUnavailable") {
+      return this.snapshot();
+    }
+    if (this.lastQueryAtMs !== null && this.ports.nowMs() - this.lastQueryAtMs < ENTITLEMENT_QUERY_POLL_INTERVAL_MS) {
+      return this.snapshot();
+    }
+    await this.runFreshQuery("poll");
+    return this.snapshot();
+  }
+  /** Connectivity events: paused -> immediate delayed; offline -> gate and stop. */
+  async onConnectivity(event) {
+    if (event === "offline" || event === "reconnecting") {
+      if (this.phase !== "lockedOut") {
+        this.phase = "resolving";
+      }
+      this.projection = null;
+      this.reachableElapsedMs = 0;
+      this.lastReachableAtMs = null;
+      this.lastOutcomeCode = "offline";
+      return this.snapshot();
+    }
+    if (event === "paused") {
+      if (this.phase === "awaitingIndex") {
+        this.phase = "confirmationDelayed";
+        this.lastOutcomeCode = "chain-paused";
+      }
+      return this.snapshot();
+    }
+    this.reachableElapsedMs = 0;
+    this.lastReachableAtMs = this.ports.nowMs();
+    if (this.phase === "resolving" || this.phase === "confirmationDelayed" || this.phase === "entitlementUnavailable") {
+      await this.runFreshQuery("reconnect");
+    }
+    return this.snapshot();
+  }
+  /** User/UI Retry: resubmits the exact sealed transaction (never a replacement). */
+  async retryExact() {
+    if (this.pendingRecord === null || this.pendingTransactionId === null) {
+      await this.start();
+      return this.snapshot();
+    }
+    this.confirmationStartedReachableMs = this.reachableElapsedMs;
+    this.lastOutcomeCode = "retry-exact";
+    await this.submitPending(this.pendingRecord);
+    return this.snapshot();
+  }
+  /** Manual/UI Retry after recoverable error states (fresh query first). */
+  async recoverFromError() {
+    if (this.pendingRecord !== null && this.pendingTransactionId !== null) {
+      await this.retryExact();
+      return this.snapshot();
+    }
+    await this.runFreshQuery("recovery");
+    return this.snapshot();
+  }
+  /**
+   * Revalidation triggers (foreground/resume, reconnect, expiry wake-up,
+   * account entry, authoritative rejection): gate first, then fresh query.
+   */
+  async revalidate(trigger) {
+    this.projection = null;
+    this.lastOutcomeCode = `revalidate:${trigger}`;
+    await this.runFreshQuery(trigger);
+    return this.snapshot();
+  }
+  /** Lock/invalidation: stop work, clear ephemeral projection, ignore late results. */
+  async lock() {
+    this.cancelled = true;
+    this.inFlight = false;
+    this.projection = null;
+    this.pendingRecord = null;
+    this.pendingTransactionId = null;
+    this.phase = "lockedOut";
+    this.lastOutcomeCode = "locked";
+    return this.snapshot();
+  }
+  advanceReachable(eligibility) {
+    const now = this.ports.nowMs();
+    if (eligibility.authenticated && eligibility.foregrounded && eligibility.reachable) {
+      if (this.lastReachableAtMs === null) {
+        this.lastReachableAtMs = now;
+      } else {
+        this.reachableElapsedMs += Math.max(0, now - this.lastReachableAtMs);
+        this.lastReachableAtMs = now;
+      }
+      if (this.confirmationStartedReachableMs !== null && this.reachableElapsedMs - this.confirmationStartedReachableMs >= ENTITLEMENT_CONFIRMATION_DELAYED_MS && (this.phase === "awaitingIndex" || this.phase === "baselineSubmitting")) {
+        this.phase = "confirmationDelayed";
+        this.lastOutcomeCode = "confirmation-delayed-30s";
+      }
+    } else {
+      this.lastReachableAtMs = null;
+    }
+  }
+  /** One serialized query with the single fresh-envelope UNAUTHENTICATED retry. */
+  async runFreshQuery(reason) {
+    if (this.inFlight || this.cancelled) {
+      return;
+    }
+    this.inFlight = true;
+    try {
+      for (let attempt = 1; attempt <= 2; attempt += 1) {
+        if (this.cancelled) {
+          return;
+        }
+        this.attemptCount += 1;
+        const transport = await this.ports.queryTransport();
+        if (this.cancelled) {
+          return;
+        }
+        this.lastQueryAtMs = this.ports.nowMs();
+        const outcome = parseEntitlementQueryResult(
+          transport,
+          this.actorBinding,
+          this.networkBinding
+        );
+        if (outcome.outcome === "unauthenticated" && attempt === 1 && reason !== "retry") {
+          this.consecutiveUnauthenticated = 1;
+          this.lastOutcomeCode = "unauthenticated-retry-once";
+          continue;
+        }
+        if (outcome.outcome === "unauthenticated") {
+          this.consecutiveUnauthenticated = 2;
+          this.projection = null;
+          this.pendingRecord = null;
+          this.pendingTransactionId = null;
+          this.phase = "lockedOut";
+          this.lastOutcomeCode = "unauthenticated-forced-lock";
+          return;
+        }
+        this.consecutiveUnauthenticated = 0;
+        await this.applyQueryOutcome(outcome, reason);
+        return;
+      }
+    } finally {
+      this.inFlight = false;
+    }
+  }
+  async applyQueryOutcome(outcome, reason) {
+    const cls = classifyQueryOutcome(outcome);
+    switch (cls) {
+      case "ready": {
+        if (outcome.outcome !== "ready") return;
+        this.reconcilePendingAgainstActive(outcome.projection.licenceReference);
+        this.projection = outcome.projection;
+        this.phase = "entitlementReady";
+        this.lastOutcomeCode = "ready";
+        return;
+      }
+      case "noActive": {
+        if (outcome.outcome !== "noActive") return;
+        this.projection = null;
+        await this.handleNoActive(outcome.template, reason);
+        return;
+      }
+      case "unavailable":
+        this.projection = null;
+        this.phase = "entitlementUnavailable";
+        this.lastOutcomeCode = outcome.outcome === "unavailable" ? outcome.code : "unavailable";
+        return;
+      case "unsupported":
+        this.projection = null;
+        this.phase = "entitlementUnsupported";
+        this.lastOutcomeCode = outcome.outcome === "unsupported" ? outcome.reason === "unknown-plan-family" ? "plan-family-unknown" : "catalogue-incompatible" : "unsupported";
+        return;
+      case "authenticationFailure":
+        this.phase = "lockedOut";
+        this.lastOutcomeCode = "unauthenticated-forced-lock";
+        return;
+      case "transient":
+        this.projection = null;
+        this.lastOutcomeCode = "transport-uncertain";
+        this.phase = this.pendingRecord !== null && this.pendingTransactionId !== null ? "awaitingIndex" : "entitlementUnavailable";
+        return;
+      case "malformed":
+        this.projection = null;
+        this.phase = "entitlementRepair";
+        this.lastOutcomeCode = "malformed-response";
+        return;
+      case "terminalGuidance":
+        this.projection = null;
+        this.phase = "entitlementUnsupported";
+        this.lastOutcomeCode = "terminal-guidance";
+        return;
+    }
+    void reason;
+  }
+  async handleNoActive(template, reason) {
+    const bound = await this.findBoundPending();
+    if (bound !== null) {
+      if (reason === "poll") {
+        this.pendingRecord = bound;
+        this.pendingTransactionId = bound.transactionId;
+        if (this.phase !== "confirmationDelayed") {
+          this.phase = "awaitingIndex";
+          this.lastOutcomeCode = "still-waiting-no-auto-resubmit";
+        }
+        return;
+      }
+      this.pendingRecord = bound;
+      this.pendingTransactionId = bound.transactionId;
+      this.lastOutcomeCode = "no-active-resubmit-exact";
+      await this.submitPending(bound);
+      return;
+    }
+    this.phase = "baselineSigning";
+    this.lastOutcomeCode = "constructing-baseline";
+    const identity = this.ports.nextBaselineIdentity();
+    const built = buildDirectFreeUnsignedTransaction(template, identity.transactionId, identity.timestampUtc);
+    if (!built.ok) {
+      this.phase = "entitlementRepair";
+      this.lastOutcomeCode = "template-rejected";
+      return;
+    }
+    const record = {
+      schemaVersion: 1,
+      purpose: LICENCE_PENDING_PURPOSE,
+      transaction: { exactJson: built.canonicalUnsignedJson, digest: built.digest },
+      transactionId: identity.transactionId,
+      identityBinding: this.actorBinding,
+      networkBinding: this.networkBinding,
+      targetBinding: "web-sharedworker",
+      createdUtc: identity.timestampUtc,
+      attemptEvidence: [],
+      recoveryState: "sealed"
+    };
+    const saved = this.ports.savePending(record);
+    if (!saved.ok) {
+      this.phase = "entitlementRepair";
+      this.lastOutcomeCode = "journal-unavailable";
+      return;
+    }
+    this.pendingRecord = record;
+    this.pendingTransactionId = record.transactionId;
+    await this.submitPending(record);
+  }
+  async findBoundPending() {
+    if (this.pendingTransactionId !== null) {
+      const direct = this.ports.loadPending(this.pendingTransactionId);
+      if (direct.ok && direct.record !== void 0) {
+        return direct.record;
+      }
+    }
+    const byIdentity = this.ports.loadPendingForIdentity(this.actorBinding, this.networkBinding);
+    if (byIdentity.ok && byIdentity.record !== void 0) {
+      return byIdentity.record;
+    }
+    return null;
+  }
+  reconcilePendingAgainstActive(activeLicenceReference) {
+    if (this.pendingTransactionId === null) {
+      return;
+    }
+    const pendingIsActive = activeLicenceReference === this.pendingTransactionId;
+    this.retirePending(pendingIsActive ? "confirmed-indexed" : "superseded");
+    this.pendingRecord = null;
+    this.pendingTransactionId = null;
+  }
+  async submitPending(record) {
+    if (this.cancelled) {
+      return;
+    }
+    this.inFlight = true;
+    this.phase = "baselineSubmitting";
+    this.confirmationStartedReachableMs = this.reachableElapsedMs;
+    try {
+      const admission = await this.ports.submitBaseline(record);
+      if (this.cancelled) {
+        return;
+      }
+      this.recordAttempt(record, admission);
+      const decision = decideSubmissionOutcome(admission);
+      switch (decision.kind) {
+        case "reconcileByQuery":
+          this.phase = "awaitingIndex";
+          this.lastOutcomeCode = admission === "accepted" ? "accepted" : "pending";
+          break;
+        case "queryImmediately":
+          this.phase = "resolving";
+          this.lastOutcomeCode = "already-exists-query-now";
+          this.needsImmediateQuery = true;
+          break;
+        case "failClosed":
+          this.phase = "entitlementRepair";
+          this.lastOutcomeCode = "terminal-rejected";
+          break;
+        case "preserveAndReconcile":
+          this.phase = "awaitingIndex";
+          this.lastOutcomeCode = "submit-uncertain";
+          break;
+      }
+    } finally {
+      this.inFlight = false;
+    }
+    if (this.needsImmediateQuery && !this.cancelled) {
+      this.needsImmediateQuery = false;
+      await this.runFreshQuery("already-exists");
+    }
+  }
+  recordAttempt(record, admission) {
+    const evidence = {
+      at: new Date(this.ports.nowMs()).toISOString(),
+      outcome: admission === "accepted" ? "accepted" : admission === "pending" ? "pending" : admission === "alreadyExists" ? "alreadyExists" : admission === "terminalRejected" ? "terminalRejected" : "uncertain"
+    };
+    const updated = {
+      ...record,
+      recoveryState: admission === "terminalRejected" ? "unrecoverable" : record.recoveryState === "sealed" ? admission === "accepted" ? "waitingAccepted" : "waitingPending" : record.recoveryState,
+      attemptEvidence: [...record.attemptEvidence, evidence]
+    };
+    this.ports.savePending(updated);
+    this.pendingRecord = updated;
+  }
+  retirePending(state) {
+    if (this.pendingTransactionId !== null) {
+      const loaded = this.ports.loadPending(this.pendingTransactionId);
+      if (loaded.ok && loaded.record !== void 0) {
+        const updated = {
+          ...loaded.record,
+          recoveryState: state === "confirmed-indexed" ? "confirmedIndexed" : "superseded"
+        };
+        this.ports.savePending(updated);
+      }
+      this.ports.deletePending(this.pendingTransactionId);
+    }
+  }
+};
+
+// src/lib/licensing/session-contract.ts
+var LICENCE_REVALIDATION_TRIGGERS = [
+  "foreground",
+  "reconnect",
+  "expiry",
+  "account-entry",
+  "authoritative-rejection",
+  "explicit-recovery"
+];
+function isLicenceRevalidationTrigger(value) {
+  return typeof value === "string" && LICENCE_REVALIDATION_TRIGGERS.includes(value);
+}
+function isLicenceConnectivityInput(value) {
+  return value === "online" || value === "offline" || value === "paused" || value === "reconnecting";
+}
+
+// src/lib/browser-vault/production/licence-session.ts
+function snapshotFromCoordinator(snapshot) {
+  return {
+    phase: snapshot.phase,
+    projection: snapshot.projection,
+    lastOutcomeCode: snapshot.lastOutcomeCode,
+    pendingTransactionId: snapshot.pendingTransactionId
+  };
+}
+var LicenceBootstrapSession = class {
+  constructor(deps) {
+    this.deps = deps;
+    this.coordinator = null;
+    this.eligibility = {
+      foregrounded: true,
+      reachable: true,
+      paused: false
+    };
+    this.mirror = /* @__PURE__ */ new Map();
+    this.durableHealthy = true;
+    this.actorSigningAddress = null;
+    this.networkBinding = null;
+    this.lastProgressKey = null;
+    this.lastConnectivity = null;
+  }
+  /** True while an authenticated session is bound (loop keep-alive). */
+  isActive() {
+    return this.coordinator !== null && this.deps.engine.licenceActor() !== null;
+  }
+  /** Current safe snapshot (null before the session is bound). */
+  snapshot() {
+    return this.coordinator === null ? null : snapshotFromCoordinator(this.coordinator.snapshot());
+  }
+  /**
+   * Start/resume query-first bootstrap after authentication or restart.
+   * `networkBinding` is re-verified against the authority-owned manifest.
+   */
+  async start(networkBinding) {
+    const actor = this.deps.engine.licenceActor();
+    if (actor === null) {
+      return { ok: false, reason: "not-authenticated" };
+    }
+    if (typeof networkBinding !== "string" || networkBinding.length === 0 || networkBinding.length > 256) {
+      return { ok: false, reason: "invalid-input" };
+    }
+    if (networkBinding !== this.deps.expectedNetworkBinding) {
+      return { ok: false, reason: "invalid-input" };
+    }
+    if (this.coordinator !== null && (this.actorSigningAddress !== actor.signingAddress || this.networkBinding !== networkBinding)) {
+      this.teardown();
+    }
+    if (this.coordinator !== null) {
+      const result = await this.pumpOnce();
+      return result.ok ? { ok: true, snapshot: result.snapshot } : { ok: false, reason: "authority-unavailable" };
+    }
+    this.actorSigningAddress = actor.signingAddress;
+    this.networkBinding = networkBinding;
+    const hydrated = await this.hydrateDurable();
+    if (!hydrated.ok) {
+      this.durableHealthy = false;
+    }
+    this.coordinator = new LicenceEntitlementCoordinator(
+      actor.signingAddress,
+      networkBinding,
+      this.buildPorts()
+    );
+    const started = await this.coordinator.start();
+    const snapshot = snapshotFromCoordinator(started);
+    await this.flushDurable();
+    this.emitProgress(snapshot);
+    return { ok: true, snapshot };
+  }
+  /** Page-pushed eligibility/lifecycle/connectivity inputs. */
+  async updateEligibility(input) {
+    if (this.coordinator === null) {
+      return { ok: false, reason: "not-authenticated" };
+    }
+    const foregrounded = input.foregrounded ?? this.eligibility.foregrounded;
+    if (typeof foregrounded !== "boolean") {
+      return { ok: false, reason: "invalid-input" };
+    }
+    this.eligibility = { ...this.eligibility, foregrounded };
+    if (input.connectivity !== void 0) {
+      if (!isLicenceConnectivityInput(input.connectivity)) {
+        return { ok: false, reason: "invalid-input" };
+      }
+      if (input.connectivity !== this.lastConnectivity) {
+        this.lastConnectivity = input.connectivity;
+        await this.coordinator.onConnectivity(input.connectivity);
+        this.applyConnectivityEligibility(input.connectivity);
+      }
+    }
+    return this.pumpOnce();
+  }
+  /** User/UI control intents (Retry, recovery, revalidation triggers). */
+  async control(kind, trigger) {
+    if (this.coordinator === null || this.deps.engine.licenceActor() === null) {
+      return { ok: false, reason: "not-authenticated" };
+    }
+    switch (kind) {
+      case "retry": {
+        await this.coordinator.retryExact();
+        break;
+      }
+      case "recover": {
+        await this.coordinator.recoverFromError();
+        break;
+      }
+      case "revalidate": {
+        if (!isLicenceRevalidationTrigger(trigger)) {
+          return { ok: false, reason: "invalid-input" };
+        }
+        await this.coordinator.revalidate(trigger);
+        break;
+      }
+      default:
+        return { ok: false, reason: "invalid-input" };
+    }
+    await this.flushDurable();
+    const snapshot = snapshotFromCoordinator(this.coordinator.snapshot());
+    this.emitProgress(snapshot);
+    return { ok: true, snapshot };
+  }
+  /** One serialized pump cycle (authority-owned loop; ~1 s cadence). */
+  async pump() {
+    const result = await this.pumpOnce();
+    return result.ok ? result.snapshot : null;
+  }
+  /** Teardown: drop coordinator + mirror + binding (never the durable journal). */
+  teardown() {
+    this.coordinator = null;
+    this.mirror.clear();
+    this.actorSigningAddress = null;
+    this.networkBinding = null;
+    this.lastConnectivity = null;
+    this.lastProgressKey = null;
+    this.durableHealthy = true;
+    this.eligibility = { foregrounded: true, reachable: true, paused: false };
+  }
+  async pumpOnce() {
+    if (this.coordinator === null) {
+      return { ok: false, reason: "not-authenticated" };
+    }
+    if (this.deps.engine.licenceActor() === null) {
+      this.teardown();
+      return { ok: false, reason: "not-authenticated" };
+    }
+    const snapshot = await this.coordinator.tick({
+      authenticated: true,
+      foregrounded: this.eligibility.foregrounded,
+      reachable: this.eligibility.reachable,
+      paused: this.eligibility.paused
+    });
+    const safe = snapshotFromCoordinator(snapshot);
+    await this.flushDurable();
+    this.emitProgress(safe);
+    return { ok: true, snapshot: safe };
+  }
+  applyConnectivityEligibility(connectivity) {
+    switch (connectivity) {
+      case "online":
+        this.eligibility = { ...this.eligibility, reachable: true, paused: false };
+        break;
+      case "paused":
+        this.eligibility = { ...this.eligibility, reachable: true, paused: true };
+        break;
+      case "offline":
+      case "reconnecting":
+        this.eligibility = { ...this.eligibility, reachable: false, paused: false };
+        break;
+    }
+  }
+  buildPorts() {
+    return {
+      nowMs: () => this.deps.nowMs(),
+      queryTransport: async () => {
+        const actor = this.deps.engine.licenceActor();
+        if (actor === null) {
+          return { ok: false, status: "UNAVAILABLE" };
+        }
+        return this.deps.engine.licenceQuery((headers) => this.deps.querySubmit(headers));
+      },
+      submitBaseline: async (record) => this.submitBaseline(record),
+      nextBaselineIdentity: () => ({ transactionId: createUuidV4(), timestampUtc: new Date(this.deps.nowMs()).toISOString() }),
+      savePending: (record) => this.mirrorSave(record),
+      loadPending: (transactionId) => this.mirrorLoad(transactionId),
+      loadPendingForIdentity: (identityBinding, networkBinding) => this.mirrorLoadForIdentity(identityBinding, networkBinding),
+      deletePending: (transactionId) => this.mirrorDelete(transactionId)
+    };
+  }
+  /**
+   * Exact-bytes seam (Phase 3 review note 1): if the coordinator hands an
+   * unsigned envelope, the authority seals it deterministically, persists the
+   * exact signed form to the encrypted durable journal, and ONLY then submits
+   * the exact signed transaction through the canonical ingress.
+   */
+  async submitBaseline(record) {
+    let exactJson = record.transaction.exactJson;
+    let digest = record.transaction.digest;
+    if (!isLicenceSignedTransactionJson(exactJson)) {
+      const actor = this.deps.engine.licenceActor();
+      if (actor === null) {
+        return "terminalRejected";
+      }
+      const sealed = this.deps.engine.licenceSignBaseline(exactJson);
+      if (!sealed.ok) {
+        return "terminalRejected";
+      }
+      exactJson = sealed.signedJson;
+      digest = sealed.signedDigest;
+    }
+    const signedRecord = {
+      ...record,
+      transaction: { exactJson, digest },
+      submittedUtc: new Date(this.deps.nowMs()).toISOString()
+    };
+    const persisted = await this.writeDurable(signedRecord);
+    if (!persisted.ok) {
+      this.durableHealthy = false;
+      return "uncertain";
+    }
+    return this.deps.transactionSubmit(exactJson);
+  }
+  async writeDurable(record) {
+    const validated = parsePendingLicenceRecordJson(serializePendingLicenceRecord(record));
+    if (validated === null) {
+      return { ok: false };
+    }
+    const result = await this.deps.engine.licenceJournalWrite(serializePendingLicenceRecord(validated));
+    if (result.ok) {
+      this.mirror.set(record.transactionId, validated);
+      this.durableHealthy = true;
+    }
+    return { ok: result.ok };
+  }
+  /**
+   * Flush the in-memory mirror to the encrypted durable journal after every
+   * step. The durable record always carries the exact signed form (sealed
+   * deterministically here when the coordinator mirrored an unsigned staging
+   * envelope). An empty mirror clears the durable journal.
+   */
+  async flushDurable() {
+    if (this.mirror.size === 0) {
+      const cleared = await this.deps.engine.licenceJournalClear();
+      if (!cleared.ok) {
+        this.durableHealthy = false;
+      }
+      return;
+    }
+    const record = this.mirror.values().next().value;
+    if (record === void 0) {
+      return;
+    }
+    let durableRecord = record;
+    if (!isLicenceSignedTransactionJson(record.transaction.exactJson)) {
+      const sealed = this.deps.engine.licenceSignBaseline(record.transaction.exactJson);
+      if (sealed.ok) {
+        durableRecord = { ...record, transaction: { exactJson: sealed.signedJson, digest: sealed.signedDigest } };
+      }
+    }
+    const result = await this.deps.engine.licenceJournalWrite(serializePendingLicenceRecord(durableRecord));
+    if (result.ok) {
+      this.durableHealthy = true;
+      this.mirror.set(durableRecord.transactionId, durableRecord);
+    } else {
+      this.durableHealthy = false;
+    }
+  }
+  async hydrateDurable() {
+    const read = await this.deps.engine.licenceJournalRead();
+    if (!read.ok) {
+      return { ok: false };
+    }
+    if (read.recordJson === null) {
+      return { ok: true };
+    }
+    const record = parsePendingLicenceRecordJson(read.recordJson);
+    if (record === null) {
+      return { ok: false };
+    }
+    this.mirror.set(record.transactionId, record);
+    this.durableHealthy = true;
+    return { ok: true };
+  }
+  mirrorSave(record) {
+    if (this.actorSigningAddress !== null && record.identityBinding !== this.actorSigningAddress) {
+      return { ok: false, reason: "binding-mismatch" };
+    }
+    if (!this.durableHealthy) {
+      return { ok: false, reason: "storage-unavailable" };
+    }
+    const validated = parsePendingLicenceRecordJson(serializePendingLicenceRecord(record));
+    if (validated === null) {
+      return { ok: false, reason: "corrupt" };
+    }
+    this.mirror.set(record.transactionId, validated);
+    return { ok: true };
+  }
+  mirrorLoad(transactionId) {
+    const record = this.mirror.get(transactionId);
+    if (record === void 0) {
+      return { ok: false, reason: "not-found" };
+    }
+    return { ok: true, record };
+  }
+  mirrorLoadForIdentity(identityBinding, networkBinding) {
+    for (const record of this.mirror.values()) {
+      if (record.identityBinding === identityBinding && record.networkBinding === networkBinding) {
+        return { ok: true, record };
+      }
+    }
+    return { ok: false };
+  }
+  mirrorDelete(transactionId) {
+    this.mirror.delete(transactionId);
+  }
+  /** Emit safe progress only when the observable surface changed. */
+  emitProgress(snapshot) {
+    const key = `${snapshot.phase}|${snapshot.lastOutcomeCode ?? ""}|${snapshot.projection === null ? "-" : snapshot.projection.licenceReference}`;
+    if (key === this.lastProgressKey) {
+      return;
+    }
+    this.lastProgressKey = key;
+    this.deps.onProgress({ ...snapshot, emittedAtMs: this.deps.nowMs() });
+  }
+};
+
+// src/lib/licensing/licence-bff-http.ts
+function parseLicenceBffReply(body) {
+  if (body === null || typeof body !== "object" || Array.isArray(body)) {
+    return { ok: false, status: "UNKNOWN" };
+  }
+  const reply = body.reply;
+  if (reply === null || reply === void 0 || typeof reply !== "object" || Array.isArray(reply)) {
+    return { ok: false, status: "UNKNOWN" };
+  }
+  return reply;
+}
+
 // src/lib/browser-vault/production/worker-env.ts
+var BFF_LICENCE_QUERY_PATH = "/api/licence-entitlement";
+var LICENCE_BOOTSTRAP_LOOP_INTERVAL_MS = 1e3;
+function httpStatusToLicenceTransport(status) {
+  switch (status) {
+    case 400:
+      return "INVALID_ARGUMENT";
+    case 401:
+    case 403:
+      return "UNAUTHENTICATED";
+    case 404:
+    case 501:
+      return "UNIMPLEMENTED";
+    case 408:
+    case 504:
+      return "DEADLINE_EXCEEDED";
+    case 503:
+      return "UNAVAILABLE";
+    default:
+      return "UNKNOWN";
+  }
+}
 var BFF_IDENTITY_LOOKUP_PATH = "/api/identity";
 var BFF_BLOCKCHAIN_SUBMIT_PATH = "/api/blockchain";
 var LOOKUP_TIMEOUT_MS = 1e4;
@@ -27533,6 +29014,124 @@ function createProductionWorkerEnvironment(params) {
     },
     onForceCleanup: params.onForceCleanup
   });
+  let licenceSession = null;
+  let licenceLoopTimer = null;
+  const licenceBffQuerySubmit = async (headers) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), LOOKUP_TIMEOUT_MS);
+    try {
+      const response = await (params.fetchImpl ?? fetch)(BFF_LICENCE_QUERY_PATH, {
+        method: "POST",
+        headers: {
+          [LICENCE_QUERY_SIGNATORY_HEADER]: headers.signatory,
+          [LICENCE_QUERY_SIGNED_AT_HEADER]: headers.signedAt,
+          [LICENCE_QUERY_SIGNATURE_HEADER]: headers.signature,
+          "content-type": "application/json"
+        },
+        body: "{}",
+        cache: "no-store",
+        signal: controller.signal
+      });
+      if (!response.ok) {
+        const status = httpStatusToLicenceTransport(response.status);
+        return { ok: false, status };
+      }
+      const body = await response.json();
+      return parseLicenceBffReply(body);
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        return { ok: false, status: "DEADLINE_EXCEEDED" };
+      }
+      return { ok: false, status: "UNAVAILABLE" };
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+  const licenceTransactionSubmit = async (signedJson) => {
+    const submit = createWorkerBffTransactionSubmit(params.fetchImpl);
+    const result = await submit(signedJson);
+    if (!result.ok) {
+      return "uncertain";
+    }
+    switch (result.reply.status) {
+      case "ACCEPTED":
+        return "accepted";
+      case "PENDING":
+        return "pending";
+      case "ALREADY_EXISTS":
+        return "alreadyExists";
+      case "REJECTED":
+        return "terminalRejected";
+      default:
+        return "uncertain";
+    }
+  };
+  const publishLicenceProgress = (payload) => {
+    try {
+      params.broadcast({
+        kind: "licence-progress",
+        phase: payload.phase,
+        projection: payload.projection ?? null,
+        lastOutcomeCode: payload.lastOutcomeCode,
+        pendingTransactionId: payload.pendingTransactionId,
+        emittedAtMs: payload.emittedAtMs
+      });
+    } catch {
+    }
+  };
+  const ensureLicenceLoop = (session) => {
+    licenceSession = session;
+    if (licenceLoopTimer !== null) {
+      return;
+    }
+    const loop = async () => {
+      const current = licenceSession;
+      if (current === null || !current.isActive()) {
+        stopLicenceLoop();
+        return;
+      }
+      try {
+        await current.pump();
+      } finally {
+        if (licenceSession !== null && licenceSession.isActive()) {
+          licenceLoopTimer = setTimeout(() => void loop(), LICENCE_BOOTSTRAP_LOOP_INTERVAL_MS);
+        } else {
+          stopLicenceLoop();
+        }
+      }
+    };
+    licenceLoopTimer = setTimeout(() => void loop(), LICENCE_BOOTSTRAP_LOOP_INTERVAL_MS);
+  };
+  const stopLicenceLoop = () => {
+    if (licenceLoopTimer !== null) {
+      clearTimeout(licenceLoopTimer);
+      licenceLoopTimer = null;
+    }
+    licenceSession = null;
+  };
+  const stopLicenceSession = () => {
+    licenceSession?.teardown();
+    stopLicenceLoop();
+  };
+  const getOrCreateLicenceSession = () => {
+    if (licenceSession !== null) {
+      return licenceSession;
+    }
+    if (engine.licenceActor() === null) {
+      return null;
+    }
+    const session = new LicenceBootstrapSession({
+      engine,
+      nowMs: () => Date.now(),
+      expectedNetworkBinding: manifest.canonicalNetworkId,
+      querySubmit: licenceBffQuerySubmit,
+      transactionSubmit: licenceTransactionSubmit,
+      onProgress: publishLicenceProgress
+    });
+    licenceSession = session;
+    ensureLicenceLoop(session);
+    return session;
+  };
   const executeOperation = async (request) => {
     const operation = request.operation;
     const payload = request.payload ?? {};
@@ -27643,10 +29242,12 @@ function createProductionWorkerEnvironment(params) {
         return toAuthorityResult(outcomeFromSealed(outcome));
       }
       case "lockAll": {
+        stopLicenceSession();
         const outcome = engine.lock();
         return toAuthorityResult(outcomeFromSealed(outcome));
       }
       case "removeLocalUser": {
+        stopLicenceSession();
         emitDiagnosticBeacon({ kind: "removal-step", operation: "before-engine-removal" });
         const outcome = await engine.removeLocalUser();
         emitDiagnosticBeacon({ kind: "removal-step", operation: "after-engine-removal", outcome: outcome.code });
@@ -27685,9 +29286,50 @@ function createProductionWorkerEnvironment(params) {
         const outcome = await engine.inspectStartup();
         return toAuthorityResult(outcomeFromSealed(outcome));
       }
+      case "licenceBootstrapStart": {
+        const networkBinding = typeof payload.networkBinding === "string" ? payload.networkBinding : "";
+        if (networkBinding.length === 0 || networkBinding.length > 256 || networkBinding !== manifest.canonicalNetworkId) {
+          return toAuthorityResult({ outcome: "INVALID_INPUT", payload: { reason: "network-binding" } });
+        }
+        const session = getOrCreateLicenceSession();
+        if (session === null) {
+          return toAuthorityResult({ outcome: "INVALID_INPUT", payload: { reason: "not-authenticated" } });
+        }
+        const result = await session.start(networkBinding);
+        return toLicenceStepResult(result);
+      }
+      case "licenceBootstrapControl": {
+        const control = typeof payload.control === "string" ? payload.control : "";
+        const trigger = payload.trigger;
+        const session = licenceSession;
+        if (session === null) {
+          return toAuthorityResult({ outcome: "INVALID_INPUT", payload: { reason: "not-authenticated" } });
+        }
+        const result = await session.control(control, trigger);
+        return toLicenceStepResult(result);
+      }
+      case "licenceBootstrapEligibility": {
+        const session = licenceSession;
+        if (session === null) {
+          return toAuthorityResult({ outcome: "INVALID_INPUT", payload: { reason: "not-authenticated" } });
+        }
+        const foreground = payload.foreground;
+        const connectivity = payload.connectivity;
+        const result = await session.updateEligibility({
+          ...typeof foreground === "boolean" ? { foregrounded: foreground } : {},
+          ...typeof connectivity === "string" ? { connectivity } : {}
+        });
+        return toLicenceStepResult(result);
+      }
       default:
         return { outcome: "INVALID_INPUT", retryable: false, allowedActions: [], supportCode: void 0 };
     }
+  }
+  function toLicenceStepResult(result) {
+    if (result.ok) {
+      return toAuthorityResult({ outcome: "OK", payload: { kind: "licence-bootstrap-step", ok: true, snapshot: result.snapshot } });
+    }
+    return toAuthorityResult({ outcome: "INVALID_INPUT", payload: { kind: "licence-bootstrap-step", ok: false, reason: result.reason } });
   }
   function emitDiagnosticBeacon(status) {
     try {

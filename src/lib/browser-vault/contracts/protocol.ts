@@ -123,7 +123,14 @@ export type BrowserOperationKind =
   | 'retainTransactionDigest'
   | 'submitIdentityTransaction'
   | 'promoteLifecycle'
-  | 'inspectStartup';
+  | 'inspectStartup'
+  // FEAT-016 additive: closed entitlement-bootstrap operations. Signing,
+  // journal custody, submission, and the reconciliation loop stay inside the
+  // authority; these page requests only drive safe steps and receive safe
+  // snapshots/progress.
+  | 'licenceBootstrapStart'
+  | 'licenceBootstrapControl'
+  | 'licenceBootstrapEligibility';
 
 /**
  * Operation request. Carries NO secret payload: password/mnemonic/file bytes are
@@ -251,8 +258,22 @@ export interface GlobalInvalidation {
   readonly reason: 'lock' | 'removal' | 'takeover' | 'update-mismatch' | 'authority-loss' | 'cleanup-failed';
 }
 
+/**
+ * FEAT-016 additive: safe entitlement progress broadcast (authority → pages).
+ * Carries only the closed snapshot vocabulary — never secrets, signatures,
+ * exact bytes, journal state, or transport details.
+ */
+export interface LicenceProgressEvent {
+  readonly kind: 'licence-progress';
+  readonly phase: string;
+  readonly projection: unknown | null;
+  readonly lastOutcomeCode: string | null;
+  readonly pendingTransactionId: string | null;
+  readonly emittedAtMs: number;
+}
+
 /** Closed union of authority → page events. */
-export type BrowserWorkerEvent = OperationOutcome | GlobalInvalidation | HandshakeAccepted | HandshakeRejected | CapabilityIssued;
+export type BrowserWorkerEvent = OperationOutcome | GlobalInvalidation | HandshakeAccepted | HandshakeRejected | CapabilityIssued | LicenceProgressEvent;
 
 /**
  * Runtime schema validation — the ONLY admission gate for inbound messages.
@@ -307,6 +328,10 @@ const OPERATION_PAYLOAD_SCHEMAS: Readonly<Record<string, readonly string[]>> = {
   submitIdentityTransaction: ['alias', 'visibility'],
   promoteLifecycle: ['status'],
   inspectStartup: [],
+  // FEAT-016 additive: closed entitlement-bootstrap control payloads.
+  licenceBootstrapStart: ['networkBinding'],
+  licenceBootstrapControl: ['control', 'trigger'],
+  licenceBootstrapEligibility: ['foreground', 'connectivity'],
 };
 
 /** Secret-shaped field names that may never appear in operation payloads. */
@@ -457,6 +482,10 @@ const OPERATION_KINDS: ReadonlySet<string> = new Set<BrowserOperationKind>([
   'submitIdentityTransaction',
   'promoteLifecycle',
   'inspectStartup',
+  // FEAT-016 additive.
+  'licenceBootstrapStart',
+  'licenceBootstrapControl',
+  'licenceBootstrapEligibility',
 ]);
 
 function validateSecretTransfer(record: Record<string, unknown>): SecretTransferMessage | null {

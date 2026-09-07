@@ -100,6 +100,11 @@ export const FRESH_CAPABILITY_REQUIRED_BY_OPERATION: Readonly<Record<BrowserOper
   submitIdentityTransaction: null,
   promoteLifecycle: null,
   inspectStartup: null,
+  // FEAT-016 additive: entitlement bootstrap steps require no fresh
+  // password capability (authenticated session only).
+  licenceBootstrapStart: null,
+  licenceBootstrapControl: null,
+  licenceBootstrapEligibility: null,
 } as const;
 
 /** Safe session projection vocabulary for clients (never secrets). */

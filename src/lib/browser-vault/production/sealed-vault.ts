@@ -49,6 +49,9 @@ import { validateMnemonicForProducer } from '../../identity-compatibility/mnemon
 import { signMessage } from '../../identity-compatibility/signature';
 import { serializeUnsignedTransaction } from '../../identity-compatibility/canonical';
 import { createUuidV4, corpusTimestamp, describeCanonicalTransaction } from '../../identity-creation/profile';
+import { sealLicenceTransaction, signLicenceQueryEnvelope, licenceFreshTimestampUtc, type LicenceQuerySignature } from '../../licensing/sealing';
+import type { LicenceQueryTransportResult } from '../../licensing/contracts';
+import { LICENCE_PENDING_AAD_LABEL, LICENCE_PENDING_STORE_NAMESPACE } from '../../licensing/pending-transaction';
 import type { CurrentNetworkBinding, CurrentKeyBinding, CurrentProtectionModeClass } from '../../vault-core/contracts/current-binding';
 import { THROTTLE_SCHEDULE, THROTTLE_MAX_SECONDS, MAX_FAILED_PASSWORD_COUNT, type RemovalStage } from '../../vault-core/contracts/sidecar';
 import type { VaultPreviewV1 } from '../../vault-core/contracts/preview';
@@ -57,6 +60,10 @@ import { RECORD_BOUNDS } from '../../vault-core/contracts/records';
 
 /** Credential-KEK HKDF label (sealed suite v1). */
 const CREDENTIAL_KEK_LABEL = 'hush/vault/v1/credential-kek' as const;
+/** Encrypted licence journal store + fixed keys (schema v2 additive). */
+const LICENCE_JOURNAL_STORE = 'licenceJournal' as const;
+const LICENCE_JOURNAL_POINTER_KEY = 'pointer' as const;
+const LICENCE_JOURNAL_SLOT_KEYS = ['slot-a', 'slot-b'] as const;
 /** KDF salt extension namespace (additive FEAT-010, non-critical, tolerated by v1). */
 const KDF_SALT_EXTENSION = 'hush.vault.kdf-salt' as const;
 /** Vault database name (sealed FEAT-004). */
@@ -1222,6 +1229,11 @@ export class SealedVaultEngine {
       await this.storage.deleteRecord('vaultSlots', slotKey);
     }
     await this.storage.deleteRecord('vaultJournal', 'current');
+    // FEAT-016: identity removal deletes local encrypted licence pending
+    // state with the vault (never chain/server licence history).
+    for (const key of [...LICENCE_JOURNAL_SLOT_KEYS, LICENCE_JOURNAL_POINTER_KEY]) {
+      await this.storage.deleteRecord(LICENCE_JOURNAL_STORE, key);
+    }
 
     await persist('clearing-caches');
     for (const key of ['throttle', 'removalTombstone', 'lease', 'persistenceAck', 'epoch'] as const) {
@@ -1271,6 +1283,210 @@ export class SealedVaultEngine {
       abbreviatedSigningAddress: `${envelope.preview.signingAddressPrefix}…${envelope.preview.signingAddressSuffix}`,
     };
     return { code: 'OK', detail: { surface: 'lockedVault', safeIdentity } };
+  }
+
+  // ---------------------------------------------------------------------
+  // FEAT-016 licence authority operations (Phase 6)
+  //
+  // Closed licence operations hosted inside the ONE credential authority.
+  // Signing uses the session concrete signing key; the encrypted pending
+  // licence journal is AES-GCM sealed under the session KEK (purpose-bound
+  // AAD, two-slot CAS, read-back verified). Exact signed bytes and
+  // signatures never leave this boundary.
+  // ---------------------------------------------------------------------
+
+  /**
+   * Current authenticated licence actor (public signing address). Null unless
+   * the engine holds an authenticated session. Page proposals are always
+   * re-verified against this authority-owned truth.
+   */
+  licenceActor(): { readonly signingAddress: string } | null {
+    if (this.session === null || this.phase !== 'authenticated') {
+      return null;
+    }
+    return { signingAddress: this.session.record.keyBinding.signingAddress };
+  }
+
+  /**
+   * One fresh signed `GetMyEntitlement` query. The authority mints a new UTC
+   * `signedAt`, signs the frozen canonical envelope bytes with the user's
+   * signing key, and hands the resulting three headers to the injected
+   * submit function (same-origin BFF). Failures map to the closed transport
+   * vocabulary; nothing here throws.
+   */
+  async licenceQuery(submit: (headers: LicenceQuerySignature) => Promise<LicenceQueryTransportResult>): Promise<LicenceQueryTransportResult> {
+    if (this.session === null || this.phase !== 'authenticated') {
+      return { ok: false, status: 'UNAVAILABLE' };
+    }
+    try {
+      const signed = signLicenceQueryEnvelope({
+        actorAddress: this.session.record.keyBinding.signingAddress,
+        signedAt: licenceFreshTimestampUtc(this.nowMs()),
+        signingPrivateKeyHex: this.session.signingPrivateKey,
+      });
+      if (!signed.ok) {
+        return { ok: false, status: 'UNAVAILABLE' };
+      }
+      return await submit(signed.headers);
+    } catch {
+      return { ok: false, status: 'UNAVAILABLE' };
+    }
+  }
+
+  /**
+   * Sign one canonical unsigned licence envelope into the exact sealed form
+   * (deterministic RFC 6979; byte-identical reuse across retry/restart). The
+   * caller persists the sealed bytes through `licenceJournalWrite` before
+   * the first submission.
+   */
+  licenceSignBaseline(unsignedJson: string): { readonly ok: true; readonly signedJson: string; readonly signedDigest: string } | { readonly ok: false; readonly code: 'not-authenticated' | 'malformed' | 'signature-failed' } {
+    if (this.session === null || this.phase !== 'authenticated') {
+      return { ok: false, code: 'not-authenticated' };
+    }
+    const sealed = sealLicenceTransaction({
+      unsignedJson,
+      signingPrivateKeyHex: this.session.signingPrivateKey,
+      signingAddress: this.session.record.keyBinding.signingAddress,
+    });
+    if (!sealed.ok) {
+      return { ok: false, code: sealed.code === 'malformed-unsigned' ? 'malformed' : 'signature-failed' };
+    }
+    return { ok: true, signedJson: sealed.signedJson, signedDigest: sealed.signedDigest };
+  }
+
+  /**
+   * Encrypted two-slot CAS journal write (read-back verified). Values are
+   * opaque; the host validates the pending-licence record JSON before and
+   * after encryption. The journal survives Lock/restart and is readable
+   * again after the next successful unlock (KEK re-derivation).
+   */
+  async licenceJournalWrite(recordJson: string): Promise<{ readonly ok: true } | { readonly ok: false; readonly reason: 'not-authenticated' | 'storage-unavailable' | 'corrupt' | 'malformed' }> {
+    if (this.session === null || this.phase === 'locked' || this.phase === 'noLocalUser') {
+      return { ok: false, reason: 'not-authenticated' };
+    }
+    if (typeof recordJson !== 'string' || recordJson.length === 0 || recordJson.length > 65_536) {
+      return { ok: false, reason: 'malformed' };
+    }
+    const aad = this.licenceJournalAad();
+    try {
+      const nonce = this.suite.randomBytes(12);
+      const encrypted = await this.suite.aes256GcmEncrypt({ key: this.session.kek, nonce, plaintext: utf8Bytes(recordJson), aad });
+      const blob = { v: 1 as const, nonce: b64url(nonce), ct: b64url(joinCipherAndTag(encrypted.ciphertext, encrypted.tag)) };
+      const pointerResult = await this.storage.readRecord(LICENCE_JOURNAL_STORE, LICENCE_JOURNAL_POINTER_KEY);
+      if (!pointerResult.ok) {
+        return { ok: false, reason: 'storage-unavailable' };
+      }
+      const pointer = (pointerResult.value.record as string | undefined) ?? '';
+      const target = pointer === 'slot-b' ? 'slot-a' : 'slot-b';
+      const write = await this.storage.writeRecord(LICENCE_JOURNAL_STORE, target, blob);
+      if (!write.ok) {
+        return { ok: false, reason: 'storage-unavailable' };
+      }
+      // Read-back verification: the slot must decrypt to the exact bytes.
+      const readBack = await this.storage.readRecord(LICENCE_JOURNAL_STORE, target);
+      if (!readBack.ok || readBack.value.record === undefined) {
+        return { ok: false, reason: 'storage-unavailable' };
+      }
+      const decrypted = await this.decryptLicenceJournalBlob(readBack.value.record as { v?: unknown; nonce?: unknown; ct?: unknown });
+      if (decrypted === null || decrypted !== recordJson) {
+        return { ok: false, reason: 'corrupt' };
+      }
+      const pointerWrite = await this.storage.writeRecord(LICENCE_JOURNAL_STORE, LICENCE_JOURNAL_POINTER_KEY, target);
+      if (!pointerWrite.ok) {
+        return { ok: false, reason: 'storage-unavailable' };
+      }
+      return { ok: true };
+    } catch {
+      return { ok: false, reason: 'storage-unavailable' };
+    }
+  }
+
+  /** Read the committed journal record (two-slot rollback on corruption). */
+  async licenceJournalRead(): Promise<{ readonly ok: true; readonly recordJson: string | null } | { readonly ok: false; readonly reason: 'not-authenticated' | 'storage-unavailable' | 'corrupt' }> {
+    if (this.session === null || this.phase === 'locked' || this.phase === 'noLocalUser') {
+      return { ok: false, reason: 'not-authenticated' };
+    }
+    try {
+      const pointerResult = await this.storage.readRecord(LICENCE_JOURNAL_STORE, LICENCE_JOURNAL_POINTER_KEY);
+      if (!pointerResult.ok) {
+        return { ok: false, reason: 'storage-unavailable' };
+      }
+      const pointer = (pointerResult.value.record as string | undefined) ?? '';
+      if (pointer === '' || !(LICENCE_JOURNAL_SLOT_KEYS as readonly string[]).includes(pointer)) {
+        return { ok: true, recordJson: null };
+      }
+      const slot = await this.storage.readRecord(LICENCE_JOURNAL_STORE, pointer);
+      if (slot.ok && slot.value.record !== undefined) {
+        const decrypted = await this.decryptLicenceJournalBlob(slot.value.record as { v?: unknown; nonce?: unknown; ct?: unknown });
+        if (decrypted !== null) {
+          return { ok: true, recordJson: decrypted };
+        }
+      }
+      // Committed slot corrupt/unreadable: previous-slot rollback.
+      const otherKey = pointer === 'slot-b' ? 'slot-a' : 'slot-b';
+      const other = await this.storage.readRecord(LICENCE_JOURNAL_STORE, otherKey);
+      if (other.ok && other.value.record !== undefined) {
+        const decrypted = await this.decryptLicenceJournalBlob(other.value.record as { v?: unknown; nonce?: unknown; ct?: unknown });
+        if (decrypted !== null) {
+          return { ok: true, recordJson: decrypted };
+        }
+      }
+      return { ok: false, reason: 'corrupt' };
+    } catch {
+      return { ok: false, reason: 'storage-unavailable' };
+    }
+  }
+
+  /** Clear the encrypted licence journal (identity removal / resolution). */
+  async licenceJournalClear(): Promise<{ readonly ok: true } | { readonly ok: false; readonly reason: 'storage-unavailable' }> {
+    try {
+      for (const key of [...LICENCE_JOURNAL_SLOT_KEYS, LICENCE_JOURNAL_POINTER_KEY]) {
+        const deleted = await this.storage.deleteRecord(LICENCE_JOURNAL_STORE, key);
+        if (!deleted.ok) {
+          return { ok: false, reason: 'storage-unavailable' };
+        }
+      }
+      return { ok: true };
+    } catch {
+      return { ok: false, reason: 'storage-unavailable' };
+    }
+  }
+
+  /** Purpose-bound AAD for the encrypted licence journal. */
+  private licenceJournalAad(): Uint8Array {
+    return canonicalizeJsonBytes({ purpose: LICENCE_PENDING_AAD_LABEL, namespace: LICENCE_PENDING_STORE_NAMESPACE });
+  }
+
+  private async decryptLicenceJournalBlob(blob: { v?: unknown; nonce?: unknown; ct?: unknown }): Promise<string | null> {
+    if (this.session === null) {
+      return null;
+    }
+    if (typeof blob !== 'object' || blob === null || blob.v !== 1) {
+      return null;
+    }
+    const nonce = typeof blob.nonce === 'string' ? unb64url(blob.nonce) : null;
+    const ctValue = typeof blob.ct === 'string' ? unb64url(blob.ct) : null;
+    if (nonce === null || ctValue === null || nonce.byteLength !== 12) {
+      return null;
+    }
+    let parts: { readonly ciphertext: Uint8Array; readonly tag: Uint8Array };
+    try {
+      parts = splitCipherAndTag(ctValue);
+    } catch {
+      return null;
+    }
+    try {
+      const plaintext = await this.suite.aes256GcmDecrypt({
+        key: this.session.kek,
+        nonce,
+        ciphertext: parts.ciphertext,
+        tag: parts.tag,
+        aad: this.licenceJournalAad(),
+      });
+      return utf8Text(plaintext);
+    } catch {
+      return null;
+    }
   }
 
   // ---------------------------------------------------------------------

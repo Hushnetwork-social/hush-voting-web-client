@@ -21,9 +21,40 @@ import type { AuthorityEnvironment } from '../authority/authority';
 import { resolveManifest, ISOLATED_DEVNET_MANIFEST } from '../../runtime/manifests';
 import type { DeploymentManifest } from '../../runtime/deployment';
 import { SealedVaultEngine, type SealedOutcome } from './sealed-vault';
+import { LicenceBootstrapSession, type LicenceBootstrapSessionDeps } from './licence-session';
 import type { VaultStorageSession } from '../storage/wrapper';
 import type { SuiteCryptoOperations } from '../../vault-core/contracts/ports';
-import type { RuntimeConfigId } from '../contracts/protocol';
+import type { RuntimeConfigId, BrowserWorkerEvent } from '../contracts/protocol';
+import { LICENCE_QUERY_SIGNATURE_HEADER, LICENCE_QUERY_SIGNED_AT_HEADER, LICENCE_QUERY_SIGNATORY_HEADER, type LicenceTransportStatus } from '../../licensing/contracts';
+import { parseLicenceBffReply } from '../../licensing/licence-bff-http';
+import type { LicenceProgressPayload, LicenceBootstrapStepResult, LicenceConnectivityInput } from '../../licensing/session-contract';
+
+/** Same-origin BFF licence-entitlement query path (server-only route). */
+const BFF_LICENCE_QUERY_PATH = '/api/licence-entitlement' as const;
+
+/** Authority-owned entitlement reconciliation pump cadence (ms). */
+const LICENCE_BOOTSTRAP_LOOP_INTERVAL_MS = 1_000 as const;
+
+/** Map an HTTP status from the licence BFF to the closed transport status. */
+function httpStatusToLicenceTransport(status: number): LicenceTransportStatus {
+  switch (status) {
+    case 400:
+      return 'INVALID_ARGUMENT';
+    case 401:
+    case 403:
+      return 'UNAUTHENTICATED';
+    case 404:
+    case 501:
+      return 'UNIMPLEMENTED';
+    case 408:
+    case 504:
+      return 'DEADLINE_EXCEEDED';
+    case 503:
+      return 'UNAVAILABLE';
+    default:
+      return 'UNKNOWN';
+  }
+}
 
 /** Same-origin BFF identity lookup path (server-only route; no NEXT_PUBLIC). */
 const BFF_IDENTITY_LOOKUP_PATH = '/api/identity' as const;
@@ -296,6 +327,141 @@ export function createProductionWorkerEnvironment(params: {
     onForceCleanup: params.onForceCleanup,
   });
 
+  // ---------------------------------------------------------------------
+  // FEAT-016 entitlement-bootstrap session (worker-owned reconciliation loop)
+  // ---------------------------------------------------------------------
+  let licenceSession: LicenceBootstrapSession | null = null;
+  let licenceLoopTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Same-origin BFF signed-query submit (three frozen headers only). */
+  const licenceBffQuerySubmit: LicenceBootstrapSessionDeps['querySubmit'] = async (headers) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), LOOKUP_TIMEOUT_MS);
+    try {
+      const response = await (params.fetchImpl ?? fetch)(BFF_LICENCE_QUERY_PATH, {
+        method: 'POST',
+        headers: {
+          [LICENCE_QUERY_SIGNATORY_HEADER]: headers.signatory,
+          [LICENCE_QUERY_SIGNED_AT_HEADER]: headers.signedAt,
+          [LICENCE_QUERY_SIGNATURE_HEADER]: headers.signature,
+          'content-type': 'application/json',
+        },
+        body: '{}',
+        cache: 'no-store',
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        const status = httpStatusToLicenceTransport(response.status);
+        return { ok: false, status };
+      }
+      const body: unknown = await response.json();
+      return parseLicenceBffReply(body);
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        return { ok: false, status: 'DEADLINE_EXCEEDED' };
+      }
+      return { ok: false, status: 'UNAVAILABLE' };
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+
+  /** Canonical transaction ingress submission mapped to admission vocabulary. */
+  const licenceTransactionSubmit: LicenceBootstrapSessionDeps['transactionSubmit'] = async (signedJson) => {
+    const submit = createWorkerBffTransactionSubmit(params.fetchImpl);
+    const result = await submit(signedJson);
+    if (!result.ok) {
+      return 'uncertain';
+    }
+    switch (result.reply.status) {
+      case 'ACCEPTED':
+        return 'accepted';
+      case 'PENDING':
+        return 'pending';
+      case 'ALREADY_EXISTS':
+        return 'alreadyExists';
+      case 'REJECTED':
+        return 'terminalRejected';
+      default:
+        return 'uncertain';
+    }
+  };
+
+  /** Publish one safe progress broadcast to every connected client. */
+  const publishLicenceProgress = (payload: LicenceProgressPayload): void => {
+    try {
+      params.broadcast({
+        kind: 'licence-progress',
+        phase: payload.phase,
+        projection: payload.projection ?? null,
+        lastOutcomeCode: payload.lastOutcomeCode,
+        pendingTransactionId: payload.pendingTransactionId,
+        emittedAtMs: payload.emittedAtMs,
+      } as BrowserWorkerEvent);
+    } catch {
+      // A dead broadcast channel never compromises the authority.
+    }
+  };
+
+  /** One authority-owned serialized pump loop (~1 s cadence; self-stopping). */
+  const ensureLicenceLoop = (session: LicenceBootstrapSession): void => {
+    licenceSession = session;
+    if (licenceLoopTimer !== null) {
+      return;
+    }
+    const loop = async (): Promise<void> => {
+      const current = licenceSession;
+      if (current === null || !current.isActive()) {
+        stopLicenceLoop();
+        return;
+      }
+      try {
+        await current.pump();
+      } finally {
+        if (licenceSession !== null && licenceSession.isActive()) {
+          licenceLoopTimer = setTimeout(() => void loop(), LICENCE_BOOTSTRAP_LOOP_INTERVAL_MS);
+        } else {
+          stopLicenceLoop();
+        }
+      }
+    };
+    licenceLoopTimer = setTimeout(() => void loop(), LICENCE_BOOTSTRAP_LOOP_INTERVAL_MS);
+  };
+
+  const stopLicenceLoop = (): void => {
+    if (licenceLoopTimer !== null) {
+      clearTimeout(licenceLoopTimer);
+      licenceLoopTimer = null;
+    }
+    licenceSession = null;
+  };
+
+  const stopLicenceSession = (): void => {
+    licenceSession?.teardown();
+    stopLicenceLoop();
+  };
+
+  /** Create (or reuse) the licence session for the current engine/epoch. */
+  const getOrCreateLicenceSession = (): LicenceBootstrapSession | null => {
+    if (licenceSession !== null) {
+      return licenceSession;
+    }
+    if (engine.licenceActor() === null) {
+      return null;
+    }
+    const session = new LicenceBootstrapSession({
+      engine,
+      nowMs: () => Date.now(),
+      expectedNetworkBinding: manifest.canonicalNetworkId,
+      querySubmit: licenceBffQuerySubmit,
+      transactionSubmit: licenceTransactionSubmit,
+      onProgress: publishLicenceProgress,
+    });
+    licenceSession = session;
+    ensureLicenceLoop(session);
+    return session;
+  };
+
   const executeOperation: AuthorityEnvironment['executeOperation'] = async (request) => {
     const operation = request.operation;
     const payload = request.payload ?? {};
@@ -410,10 +576,12 @@ export function createProductionWorkerEnvironment(params: {
           return toAuthorityResult(outcomeFromSealed(outcome));
         }
         case 'lockAll': {
+          stopLicenceSession();
           const outcome = engine.lock();
           return toAuthorityResult(outcomeFromSealed(outcome));
         }
         case 'removeLocalUser': {
+          stopLicenceSession();
           emitDiagnosticBeacon({ kind: 'removal-step', operation: 'before-engine-removal' });
           const outcome = await engine.removeLocalUser();
           emitDiagnosticBeacon({ kind: 'removal-step', operation: 'after-engine-removal', outcome: outcome.code });
@@ -452,9 +620,52 @@ export function createProductionWorkerEnvironment(params: {
           const outcome = await engine.inspectStartup();
           return toAuthorityResult(outcomeFromSealed(outcome));
         }
+        case 'licenceBootstrapStart': {
+          const networkBinding = typeof payload.networkBinding === 'string' ? payload.networkBinding : '';
+          if (networkBinding.length === 0 || networkBinding.length > 256 || networkBinding !== manifest.canonicalNetworkId) {
+            return toAuthorityResult({ outcome: 'INVALID_INPUT', payload: { reason: 'network-binding' } });
+          }
+          const session = getOrCreateLicenceSession();
+          if (session === null) {
+            return toAuthorityResult({ outcome: 'INVALID_INPUT', payload: { reason: 'not-authenticated' } });
+          }
+          const result = await session.start(networkBinding);
+          return toLicenceStepResult(result);
+        }
+        case 'licenceBootstrapControl': {
+          const control = typeof payload.control === 'string' ? payload.control : '';
+          const trigger = payload.trigger;
+          const session = licenceSession;
+          if (session === null) {
+            return toAuthorityResult({ outcome: 'INVALID_INPUT', payload: { reason: 'not-authenticated' } });
+          }
+          const result = await session.control(control, trigger);
+          return toLicenceStepResult(result);
+        }
+        case 'licenceBootstrapEligibility': {
+          const session = licenceSession;
+          if (session === null) {
+            return toAuthorityResult({ outcome: 'INVALID_INPUT', payload: { reason: 'not-authenticated' } });
+          }
+          const foreground = payload.foreground;
+          const connectivity = payload.connectivity;
+          const result = await session.updateEligibility({
+            ...(typeof foreground === 'boolean' ? { foregrounded: foreground } : {}),
+            ...(typeof connectivity === 'string' ? { connectivity: connectivity as LicenceConnectivityInput } : {}),
+          });
+          return toLicenceStepResult(result);
+        }
         default:
           return { outcome: 'INVALID_INPUT', retryable: false, allowedActions: [], supportCode: undefined };
       }
+  }
+
+  /** Wrap one licence bootstrap step result into the authority vocabulary. */
+  function toLicenceStepResult(result: LicenceBootstrapStepResult): { readonly outcome: string; readonly retryable: boolean; readonly allowedActions: readonly string[]; readonly payload?: unknown } {
+    if (result.ok) {
+      return toAuthorityResult({ outcome: 'OK', payload: { kind: 'licence-bootstrap-step', ok: true, snapshot: result.snapshot } });
+    }
+    return toAuthorityResult({ outcome: 'INVALID_INPUT', payload: { kind: 'licence-bootstrap-step', ok: false, reason: result.reason } });
   }
 
   /** Diagnostic beacon (BroadcastChannel; never affects operations). */
