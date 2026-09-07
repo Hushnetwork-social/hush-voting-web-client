@@ -41,7 +41,6 @@ function noopHandlers(): LicenceWorkspaceActionHandlers {
     onReturnToWorkspace: vi.fn(),
     onViewCurrentLicence: vi.fn(),
     onViewProgress: vi.fn(),
-    onReviewPlan: vi.fn(),
   };
 }
 

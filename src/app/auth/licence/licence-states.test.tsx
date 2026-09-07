@@ -41,7 +41,6 @@ function noopHandlers(overrides: Partial<LicenceWorkspaceActionHandlers> = {}): 
     onReturnToWorkspace: vi.fn(),
     onViewCurrentLicence: vi.fn(),
     onViewProgress: vi.fn(),
-    onReviewPlan: vi.fn(),
     ...overrides,
   };
 }
@@ -73,9 +72,8 @@ const directFreeInput = () => presentationInput();
 describe('LicenceWorkspace options surface (L1/L2)', () => {
   it('renders a single step heading, current detail first, then higher options in server order', async () => {
     const handlers = noopHandlers();
-    const view = renderWorkspace(workspaceFacts(directFreeInput(), 'options'), handlers, {
-      onReviewPlan: handlers.onReviewPlan,
-    });
+    const onReviewPlan = vi.fn();
+    const view = renderWorkspace(workspaceFacts(directFreeInput(), 'options'), handlers, { onReviewPlan });
 
     expect(screen.getByRole('heading', { level: 1, name: 'Licence' })).toBeInTheDocument();
     // Current licence band precedes the higher-plans band.
@@ -91,7 +89,7 @@ describe('LicenceWorkspace options surface (L1/L2)', () => {
     expect(screen.getByText('HushVoting! Veritas 10k')).toBeInTheDocument();
 
     await userEvent.setup().click(reviewButtons[0]);
-    expect(handlers.onReviewPlan).toHaveBeenCalledWith('hushvoting.veritas.500');
+    expect(onReviewPlan).toHaveBeenCalledWith('hushvoting.veritas.500');
     void view;
   });
 
@@ -133,9 +131,7 @@ describe('LicenceWorkspace options surface (L1/L2)', () => {
       throw new Error('pending options facts required');
     }
     expect(facts.selectionLocked).toBe(true);
-    const view = render(
-      <LicenceWorkspace facts={facts} handlers={handlers} onReviewPlan={handlers.onReviewPlan} />,
-    );
+    const view = render(<LicenceWorkspace facts={facts} handlers={handlers} />);
     // No second upgrade selection can be made; the only path is View progress.
     expect(screen.queryByRole('button', { name: 'Review plan' })).toBeNull();
     expect(screen.getByTestId('selection-locked')).toBeInTheDocument();

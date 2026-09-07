@@ -2,13 +2,15 @@
  * FEAT-017 Task 5.1/5.3 — licence workspace action handlers contract shared by
  * every surface component. Phase 6 wires these to the root typed intents; the
  * UI only ever emits one of these deterministic actions.
+ *
+ * Plan selection (`onReviewPlan`) is NOT part of this bag: it is passed as a
+ * dedicated prop to option surfaces so the two concerns (choosing an option vs
+ * committing/leaving an operation) stay separate.
  */
 
 export interface LicenceWorkspaceActionHandlers {
-  /** Review one higher option (selection only — never a transaction). */
-  readonly onReviewPlan?: (planId: string) => void;
   /** Reopen the live progress surface from the options lock summary. */
-  readonly onViewProgress?: () => void;
+  readonly onViewProgress: () => void;
   /** C0 in-app secondary: return to L1 with the draft retained. */
   readonly onBackToPlans: () => void;
   /** C0 primary: activate the exact sealed target. */
