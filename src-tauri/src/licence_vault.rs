@@ -440,6 +440,53 @@ impl LicenceJournalStorage for &MemoryJournalStorage {
     }
 }
 
+/// Test-only base64 (unpadded) decoder returning exactly 64 bytes.
+#[cfg(test)]
+fn base64_decode_to_64(value: &str) -> Result<[u8; 64], String> {
+    const TABLE: &[u8; 128] = &{
+        let mut table = [0xffu8; 128];
+        let mut i = 0;
+        while i < 26 {
+            table[b'A' as usize + i] = i as u8;
+            table[b'a' as usize + i] = (i + 26) as u8;
+            i += 1;
+        }
+        i = 0;
+        while i < 10 {
+            table[b'0' as usize + i] = (i + 52) as u8;
+            i += 1;
+        }
+        table[b'+' as usize] = 62;
+        table[b'/' as usize] = 63;
+        table
+    };
+    let mut bytes = Vec::with_capacity(64);
+    let mut accumulator = 0u32;
+    let mut bits = 0u32;
+    for ch in value.bytes() {
+        let value = if ch == b'=' {
+            break;
+        } else {
+            TABLE[ch as usize]
+        };
+        if value == 0xff {
+            return Err("invalid base64".into());
+        }
+        accumulator = (accumulator << 6) | value as u32;
+        bits += 6;
+        if bits >= 8 {
+            bits -= 8;
+            bytes.push((accumulator >> bits) as u8);
+        }
+    }
+    if bytes.len() != 64 {
+        return Err("not 64 bytes".into());
+    }
+    let mut out = [0u8; 64];
+    out.copy_from_slice(&bytes);
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -478,7 +525,7 @@ mod tests {
             FIXED_TIMESTAMP,
             LICENCE_CATALOGUE_VERSION_V1,
         );
-        assert_eq!(json.as_bytes().len(), 332);
+        assert_eq!(json.len(), 332);
         assert_eq!(sha256_hex_lower(json.as_bytes()), LIC_FIX_001_SHA256);
         assert!(json.contains("\"PayloadSize\":144"));
         // Frozen member order: payload members appear before PayloadSize.
@@ -615,51 +662,4 @@ mod tests {
             );
         }
     }
-}
-
-/// Test-only base64 (unpadded) decoder returning exactly 64 bytes.
-#[cfg(test)]
-fn base64_decode_to_64(value: &str) -> Result<[u8; 64], String> {
-    const TABLE: &[u8; 128] = &{
-        let mut table = [0xffu8; 128];
-        let mut i = 0;
-        while i < 26 {
-            table[b'A' as usize + i] = i as u8;
-            table[b'a' as usize + i] = (i + 26) as u8;
-            i += 1;
-        }
-        i = 0;
-        while i < 10 {
-            table[b'0' as usize + i] = (i + 52) as u8;
-            i += 1;
-        }
-        table[b'+' as usize] = 62;
-        table[b'/' as usize] = 63;
-        table
-    };
-    let mut bytes = Vec::with_capacity(64);
-    let mut accumulator = 0u32;
-    let mut bits = 0u32;
-    for ch in value.bytes() {
-        let value = if ch == b'=' {
-            break;
-        } else {
-            TABLE[ch as usize]
-        };
-        if value == 0xff {
-            return Err("invalid base64".into());
-        }
-        accumulator = (accumulator << 6) | value as u32;
-        bits += 6;
-        if bits >= 8 {
-            bits -= 8;
-            bytes.push((accumulator >> bits) as u8);
-        }
-    }
-    if bytes.len() != 64 {
-        return Err("not 64 bytes".into());
-    }
-    let mut out = [0u8; 64];
-    out.copy_from_slice(&bytes);
-    Ok(out)
 }
