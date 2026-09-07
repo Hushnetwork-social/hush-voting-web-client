@@ -366,6 +366,15 @@ export class LicenceBootstrapSession {
     if (record === null) {
       return { ok: false };
     }
+    // Binding-scoped hydration: a durable record from another identity or
+    // network is never loaded into this session (query-first restart; a
+    // returned original network reconciles after its own re-authentication).
+    if (
+      record.identityBinding !== this.actorSigningAddress ||
+      record.networkBinding !== this.networkBinding
+    ) {
+      return { ok: true };
+    }
     this.mirror.set(record.transactionId, record);
     this.durableHealthy = true;
     return { ok: true };
