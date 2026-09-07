@@ -17,7 +17,6 @@ import { AuthenticatedUserMenu } from './AuthenticatedUserMenu';
 import { AuthenticatedLicenceRoot } from './AuthenticatedLicenceRoot';
 import { useLicenceRootFacts } from '../../lib/auth/web/use-licence-root';
 import type { LicenceAccountActionKind } from './licence/account-licence-summary';
-import { currentSurfaceForOpen } from './AuthenticatedLicenceRoot';
 import {
   BLOCKCHAIN_INDEX_POLL_INTERVAL_MS,
   BlockchainIndexTracker,
@@ -450,8 +449,6 @@ export default function AuthRoot({ machineInputProvider }: AuthRootProps = {}) {
             onRefreshForEntry: () =>
               entitlementBridge.handleLicenceWorkspaceIntent({ type: 'LICENCE.REFRESH_ACCOUNT_ENTRY' }),
           };
-    const currentSurface = currentSurfaceForOpen(licenceOpen, licenceInput);
-    void currentSurface;
 
     const defaultWorkspace = (
       <section className="hero" aria-labelledby="authenticated-title">
