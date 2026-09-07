@@ -14,6 +14,10 @@ import type { TrustedTargetDescriptor } from '../../lib/runtime/target';
 import type { TargetAwareActorRegistration, TargetClass } from '../../lib/auth/composition-target';
 import { AuthGate } from './AuthGate';
 import { AuthenticatedUserMenu } from './AuthenticatedUserMenu';
+import { AuthenticatedLicenceRoot } from './AuthenticatedLicenceRoot';
+import { useLicenceRootFacts } from '../../lib/auth/web/use-licence-root';
+import type { LicenceAccountActionKind } from './licence/account-licence-summary';
+import { currentSurfaceForOpen } from './AuthenticatedLicenceRoot';
 import {
   BLOCKCHAIN_INDEX_POLL_INTERVAL_MS,
   BlockchainIndexTracker,
@@ -293,6 +297,8 @@ export default function AuthRoot({ machineInputProvider }: AuthRootProps = {}) {
   }, [authorityGeneration, machineInputProvider, lockSession]);
 
   const projection = useAuthProjection(adapter);
+  const { input: licenceInput, account: licenceAccount } = useLicenceRootFacts(entitlementBridge, projection);
+  const [licenceOpen, setLicenceOpen] = useState(false);
   useEffect(() => {
     protectedAccessRef.current = projection?.protectedAccess === true;
   }, [projection?.protectedAccess]);
@@ -419,6 +425,46 @@ export default function AuthRoot({ machineInputProvider }: AuthRootProps = {}) {
   const protectedAllowed = synchronouslyPermitsProtectedContent(projection);
 
   if (protectedAllowed) {
+    const identity =
+      projection?.authenticatedIdentity !== null && projection?.authenticatedIdentity !== undefined
+        ? projection.authenticatedIdentity
+        : null;
+    const licenceMenu =
+      licenceInput !== null && licenceAccount !== null && identity !== null
+        ? {
+            facts: licenceAccount,
+            onLicenceAction: (_action: LicenceAccountActionKind) => {
+              setLicenceOpen(true);
+            },
+          }
+        : null;
+    const licenceActions =
+      entitlementBridge === null
+        ? null
+        : {
+            onActivate: (targetPlanId: string) =>
+              entitlementBridge.handleLicenceWorkspaceIntent({ type: 'LICENCE.ACTIVATE', targetPlanId }),
+            onRetryExact: () => entitlementBridge.handleLicenceWorkspaceIntent({ type: 'LICENCE.RETRY_EXACT' }),
+            onAcknowledgeOutcome: () =>
+              entitlementBridge.handleLicenceWorkspaceIntent({ type: 'LICENCE.ACKNOWLEDGE_OUTCOME' }),
+            onRefreshForEntry: () =>
+              entitlementBridge.handleLicenceWorkspaceIntent({ type: 'LICENCE.REFRESH_ACCOUNT_ENTRY' }),
+          };
+    const currentSurface = currentSurfaceForOpen(licenceOpen, licenceInput);
+    void currentSurface;
+
+    const defaultWorkspace = (
+      <section className="hero" aria-labelledby="authenticated-title">
+        <div>
+          <h1 id="authenticated-title">You are signed in on this device.</h1>
+          <p className="hero-summary">
+            Election workflows arrive with downstream features. This surface proves
+            the protected boundary only mounts after authentication.
+          </p>
+        </div>
+      </section>
+    );
+
     return (
       <main className="app-shell antialiased" data-testid="authenticated-shell">
         <header className="topbar">
@@ -435,22 +481,29 @@ export default function AuthRoot({ machineInputProvider }: AuthRootProps = {}) {
             </span>
             <span>HushVoting!</span>
           </span>
-          {projection?.authenticatedIdentity !== null && projection?.authenticatedIdentity !== undefined ? (
+          {identity !== null ? (
             <AuthenticatedUserMenu
-              identity={projection.authenticatedIdentity}
+              identity={identity}
               onLock={() => handlers.dispatch({ type: 'INTENT.LOCK' })}
+              licence={licenceMenu}
             />
           ) : (
             <span className="foundation-badge">Authenticated</span>
           )}
         </header>
-        <section className="hero" aria-labelledby="authenticated-title">
-          <h1 id="authenticated-title">You are signed in on this device.</h1>
-          <p className="hero-summary">
-            Election workflows arrive with downstream features. This surface proves
-            the protected boundary only mounts after authentication.
-          </p>
-        </section>
+
+        {licenceActions !== null && licenceInput !== null ? (
+          <AuthenticatedLicenceRoot
+            input={licenceInput}
+            actions={licenceActions}
+            open={licenceOpen}
+            onClose={() => setLicenceOpen(false)}
+          >
+            {defaultWorkspace}
+          </AuthenticatedLicenceRoot>
+        ) : (
+          defaultWorkspace
+        )}
       </main>
     );
   }
