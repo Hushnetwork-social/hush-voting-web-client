@@ -337,4 +337,89 @@ describe('FEAT-016 multi-client worker authority (Task 6.4)', () => {
       expect(refused.outcome).toBe('INVALID_INPUT');
     }
   });
+
+  it('FEAT-017 one confirmed-upgrade operation spans tabs (activate, coalesce, acknowledge)', async () => {
+    const storage = new MemoryVaultStorage();
+    const server: FakeServer = {
+      signingAddress: '',
+      encryptionAddress: '',
+      queryCalls: 0,
+      submitCalls: 0,
+      // First query after auth returns an ACTIVE Direct Free licence with the
+      // three higher Veritas options; later queries return the SAME active
+      // truth (the upgrade seals but never indexes in this fixture).
+      querySequence: [
+        {
+          ok: true,
+          state: 'active',
+          active: {
+            LicenceReference: '5f2d9e11-3c44-4a80-b8e7-6b2f1a0c9d3e',
+            PlanId: LICENCE_PLAN_DIRECT_FREE,
+            PlanFamily: 'direct',
+            DisplayName: 'HushVoting! Direct Free',
+            SafeDescription: 'Free community licence',
+            EligibleVoterCap: 100,
+            UnlimitedElections: true,
+            TermKind: 'perpetual',
+            TermYears: 0,
+            EffectiveFromUtc: '2026-09-06T00:00:00.000Z',
+            AssignedCatalogueVersion: LICENCE_CATALOGUE_VERSION_V1,
+            AllowedGovernanceOptionIds: [],
+            HigherOptions: [
+              { PlanId: 'hushvoting.veritas.500', DisplayName: 'HushVoting! Veritas 500', SafeDescription: 'Up to 500 voters', EligibleVoterCap: 500, UnlimitedElections: true, TermKind: 'annual', TermYears: 1 },
+              { PlanId: 'hushvoting.veritas.2000', DisplayName: 'HushVoting! Veritas 2k', SafeDescription: 'Up to 2,000 voters', EligibleVoterCap: 2000, UnlimitedElections: true, TermKind: 'annual', TermYears: 1 },
+            ],
+          },
+        },
+      ],
+      submitStatus: 'PENDING',
+    };
+    const { authority, ports } = createAuthority(storage, server);
+    const tab1 = ports[0];
+    const tab2 = ports[1];
+    await authenticate(tab1, authority, server);
+
+    // Tab 1 starts bootstrap → ready with the active Direct Free licence.
+    const start = await dispatchOp(tab1, authority, 'licenceBootstrapStart', { networkBinding: NETWORK_BINDING });
+    expect(start.kind).toBe('operation-outcome');
+    if (start.kind !== 'operation-outcome') return;
+    expect(start.outcome).toBe('OK');
+    const startPayload = start.payload as { ok?: boolean; snapshot?: { phase?: string; projection?: { planId?: string } | null } };
+    expect(startPayload.snapshot?.phase).toBe('entitlementReady');
+    expect(startPayload.snapshot?.projection?.planId).toBe(LICENCE_PLAN_DIRECT_FREE);
+
+    // Tab 1 activates the 2k plan through the CLOSED authority op.
+    const confirm = await dispatchOp(tab1, authority, 'licenceUpgradeConfirm', { targetPlanId: 'hushvoting.veritas.2000' });
+    expect(confirm.kind).toBe('operation-outcome');
+    if (confirm.kind !== 'operation-outcome') return;
+    expect(confirm.outcome).toBe('OK');
+    const confirmPayload = confirm.payload as { ok?: boolean; snapshot?: { upgradeOperation?: { status?: string } | null } };
+    expect(confirmPayload.snapshot?.upgradeOperation?.status).toBe('pending');
+    expect(server.submitCalls).toBe(1);
+
+    // Tab 2 sees the SAME live operation and asking again coalesces: no
+    // second submission/transaction is ever created (D017-03 cross-tab).
+    const duplicate = await dispatchOp(tab2, authority, 'licenceUpgradeConfirm', { targetPlanId: 'hushvoting.veritas.500' });
+    expect(duplicate.kind).toBe('operation-outcome');
+    if (duplicate.kind !== 'operation-outcome') return;
+    expect(duplicate.outcome).toBe('OK');
+    const dupPayload = duplicate.payload as { ok?: boolean; snapshot?: { upgradeOperation?: { status?: string } | null } };
+    // The authority kept the original operation (still pending, still the 2k
+    // target) and did not mint a second transaction.
+    expect(dupPayload.snapshot?.upgradeOperation?.status).toBe('pending');
+    expect(server.submitCalls).toBe(1);
+
+    // Acknowledge from the second tab is a safe no-op step (no live terminal
+    // was surfaced) and never fabricates success.
+    const ack = await dispatchOp(tab2, authority, 'licenceUpgradeAcknowledge');
+    expect(ack.kind).toBe('operation-outcome');
+    if (ack.kind === 'operation-outcome') {
+      expect(ack.outcome).toBe('OK');
+    }
+    expect(server.submitCalls).toBe(1);
+
+    // Progress broadcasts to every tab carry only safe, exact-free fields.
+    for (const event of progressEvents(tab1)) assertSecretFree(JSON.stringify(event));
+    for (const event of progressEvents(tab2)) assertSecretFree(JSON.stringify(event));
+  });
 });
