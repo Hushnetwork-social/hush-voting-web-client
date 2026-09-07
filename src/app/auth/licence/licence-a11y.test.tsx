@@ -147,3 +147,20 @@ describe('visual-token CSS contract (44 px targets + reduced motion)', () => {
     expect(css).toMatch(/licence-workspace \*/);
   });
 });
+
+describe('responsive/reflow CSS contract (320 px + 200% zoom + no clipping)', () => {
+  it('globals.css reflows licence surfaces to one column at 800px/480px and never clips overflow at 320px', () => {
+    const css = fs.readFileSync(path.resolve(process.cwd(), 'src/app/globals.css'), 'utf8');
+    // The licence compare grid (current vs target) collapses below 800px;
+    // option and metric grids use auto-fit minmax so they wrap at 320px.
+    expect(css).toMatch(/@media \(max-width: 800px\)[\s\S]*?\.licence-compare-grid\s*\{[\s\S]*?grid-template-columns:\s*1fr/);
+    expect(css).toMatch(/\.licence-option-grid\s*\{[\s\S]*?grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(16rem,\s*1fr\)\)/);
+    expect(css).toMatch(/\.licence-metric-grid\s*\{[\s\S]*?grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(11rem,\s*1fr\)\)/);
+    // The two grids also collapse to a single column in the 800px media query.
+    expect(css).toMatch(/@media \(max-width: 800px\)[\s\S]*?\.licence-option-grid,\s*\.licence-metric-grid\s*\{[\s\S]*?grid-template-columns:\s*1fr/);
+    // Long public references must wrap instead of overflowing the container.
+    expect(css).toMatch(/\.licence-reference-full,[\s\S]*?overflow-wrap:\s*anywhere/);
+    // Full-width host region exists (data-view host) with fluid layout.
+    expect(css).toMatch(/\.licence-workspace-host/);
+  });
+});
