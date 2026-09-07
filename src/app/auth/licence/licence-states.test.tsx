@@ -122,6 +122,27 @@ describe('LicenceWorkspace options surface (L1/L2)', () => {
     expect(screen.queryByText(/hushvoting\.veritas\.\d+/)).toBeNull();
     void view;
   });
+
+  it('D017-03: one live operation locks further selection on the options surface', async () => {
+    const onViewProgress = vi.fn();
+    const handlers = noopHandlers({ onViewProgress });
+    const pendingInput = presentationInput({ upgradeOperation: upgradeOperationOf('pending') });
+    const facts = workspaceFacts(pendingInput, 'options');
+    // The options view still projects while pending, with the lock + target.
+    if (facts === null || facts.view !== 'options') {
+      throw new Error('pending options facts required');
+    }
+    expect(facts.selectionLocked).toBe(true);
+    const view = render(
+      <LicenceWorkspace facts={facts} handlers={handlers} onReviewPlan={handlers.onReviewPlan} />,
+    );
+    // No second upgrade selection can be made; the only path is View progress.
+    expect(screen.queryByRole('button', { name: 'Review plan' })).toBeNull();
+    expect(screen.getByTestId('selection-locked')).toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'View progress' }));
+    expect(onViewProgress).toHaveBeenCalledTimes(1);
+    void view;
+  });
 });
 
 describe('LicenceWorkspace confirmation (C0)', () => {
@@ -270,7 +291,13 @@ describe('N0 pending indicator + N1 activation notification', () => {
       <LicenceActivationNotification facts={facts} onViewLicence={onViewLicence} onDismiss={onDismiss} />,
     );
     const notice = screen.getByTestId('licence-activation-notification');
-    expect(notice.getAttribute('role')).toBe('status');
+    // The message lives in a polite live region; interactive actions are NOT
+    // wrapped by the status role (buttons must remain operable for AT users).
+    const message = screen.getByTestId('licence-notification-message');
+    expect(message.getAttribute('role')).toBe('status');
+    expect(message.getAttribute('aria-live')).toBe('polite');
+    expect(notice).toContainElement(screen.getByRole('button', { name: 'View licence' }));
+    expect(notice).toContainElement(screen.getByRole('button', { name: 'Dismiss' }));
     expect(screen.getByText('Your HushVoting! Veritas 2k licence is now active')).toBeInTheDocument();
     // Competing-device activation never becomes a local N1.
     const competing = projectActivationNotification(

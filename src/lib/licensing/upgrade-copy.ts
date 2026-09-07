@@ -42,7 +42,6 @@ export const LICENCE_UPGRADE_COPY = {
   actionReturnToWorkspace: 'Return to workspace',
   actionViewCurrentLicence: 'View current licence',
   actionCopy: 'Copy',
-  actionBack: 'Back',
   accountRefLabel: 'Ref',
 
   // Status / pending / notification copy.

@@ -58,8 +58,14 @@ export function LicenceActivationNotification({
     return null;
   }
   return (
-    <div className="licence-activation-notification" role="status" aria-live="polite" data-testid="licence-activation-notification">
-      <p className="licence-notification-message">{facts.message}</p>
+    <div
+      className="licence-activation-notification"
+      aria-label={facts.message}
+      data-testid="licence-activation-notification"
+    >
+      <p className="licence-notification-message" role="status" aria-live="polite" data-testid="licence-notification-message">
+        {facts.message}
+      </p>
       <div className="licence-notification-actions">
         <button type="button" className="licence-notification-link" onClick={onViewLicence}>
           {licenceUpgradeCopy('actionViewLicence')}
