@@ -5,6 +5,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AuthAdapter, useAuthProjection, synchronouslyPermitsProtectedContent } from '../../lib/auth/react/adapter';
 import { buildEmptyActors } from '../../lib/auth/composition';
 import { emitTelemetry } from '../../lib/auth/telemetry';
+import { EntitlementBridge } from '../../lib/auth/web/entitlement-bridge';
+import type { BrowserVaultClient } from '../../lib/browser-vault/production/client';
 import type { AllowlistedTelemetryEvent } from '../../lib/auth/ports';
 import type { AuthIntent, CapabilityId } from '../../lib/auth/types';
 import type { AuthMachineInput } from '../../lib/auth/state/machine';
@@ -24,6 +26,13 @@ const TELEMETRY_PREFERENCE = { explicitOptIn: false };
 /** Module-level secret sink (set by buildMachineInput; read by the adapter). */
 let activeSecretSink: ((operationId: string, secret: string) => void) | null = null;
 let activeLockSink: (() => Promise<boolean>) | null = null;
+
+/**
+ * The real web SharedWorker client + network binding used by the current
+ * composition instance (set by `buildMachineInput` when the runtime target
+ * is a plain browser). Native/harness compositions leave this null.
+ */
+let activeWebComposition: { readonly client: BrowserVaultClient; readonly networkBinding: string } | null = null;
 
 const FIRST_RUN_INTENTS = new Set<AuthIntent['type']>([
   'INTENT.CREATE_USER',
@@ -80,6 +89,7 @@ function coarseStage(authState: string): AllowlistedTelemetryEvent['coarseStage'
 async function buildMachineInput(): Promise<AuthMachineInput> {
   activeSecretSink = null;
   activeLockSink = null;
+  activeWebComposition = null;
   if (process.env.NODE_ENV !== 'production' && process.env.NEXT_PUBLIC_HUSH_TEST_HARNESS === '1') {
     // Build-isolated synthetic harness (tests only; reached ONLY through the
     // separately named `npm run dev:harness` command; statically pruned from
@@ -131,11 +141,17 @@ async function buildMachineInput(): Promise<AuthMachineInput> {
   if (handshake === null) {
     try {
       const webModule = await import('../../lib/auth/web/web-composition');
-      webComposition = webModule.getWebComposition(manifest);
+      const composition = webModule.getWebComposition(manifest);
+      webComposition = composition;
+      activeWebComposition = {
+        client: composition.client,
+        networkBinding: manifest.canonicalNetworkId,
+      };
       activeSecretSink = webModule.submitWebSecret;
       activeLockSink = webModule.lockWebSession;
     } catch {
       webComposition = null;
+      activeWebComposition = null;
     }
   }
 
@@ -223,20 +239,58 @@ export default function AuthRoot({ machineInputProvider }: AuthRootProps = {}) {
     setAuthorityGeneration((current) => current + 1);
   }, []);
 
+  const [entitlementBridge, setEntitlementBridge] = useState<EntitlementBridge | null>(null);
+
+  /** Real session Lock: worker wipe first, then the machine locks. */
+  const lockSession = useCallback(async (adapter: AuthAdapter | null): Promise<void> => {
+    if (activeLockSink === null) {
+      adapter?.send({ type: 'INTENT.LOCK' });
+      return;
+    }
+    if (await activeLockSink()) {
+      adapter?.send({ type: 'INTENT.LOCK' });
+    }
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     let createdAdapter: AuthAdapter | null = null;
+    let createdBridge: EntitlementBridge | null = null;
     void (machineInputProvider ?? buildMachineInput)().then((input) => {
-      if (!cancelled) {
-        createdAdapter = new AuthAdapter(input, { secretSink: activeSecretSink ?? undefined });
-        setAdapter(createdAdapter);
+      if (cancelled) {
+        return;
+      }
+      createdAdapter = new AuthAdapter(input, { secretSink: activeSecretSink ?? undefined });
+      setAdapter(createdAdapter);
+      if (
+        activeWebComposition !== null &&
+        input.entitlementRequired !== false &&
+        typeof document !== 'undefined'
+      ) {
+        createdBridge = new EntitlementBridge({
+          adapter: createdAdapter,
+          client: activeWebComposition.client,
+          networkBinding: activeWebComposition.networkBinding,
+          lockSession: async () => {
+            await lockSession(createdAdapter);
+            return true;
+          },
+          isForegrounded: () => document.visibilityState === 'visible',
+          subscribeVisibility: (handler) => {
+            document.addEventListener('visibilitychange', handler);
+            return () => document.removeEventListener('visibilitychange', handler);
+          },
+        });
+        createdBridge.start();
+        setEntitlementBridge(createdBridge);
       }
     });
     return () => {
       cancelled = true;
+      createdBridge?.stop();
       createdAdapter?.stop();
     };
-  }, [authorityGeneration, machineInputProvider]);
+  }, [authorityGeneration, machineInputProvider, lockSession]);
 
   const projection = useAuthProjection(adapter);
   useEffect(() => {
@@ -325,16 +379,12 @@ export default function AuthRoot({ machineInputProvider }: AuthRootProps = {}) {
   const handlers = useMemo(
     () => ({
       dispatch: (intent: AuthIntent) => {
+        if (intent.type === 'INTENT.ENTITLEMENT_RETRY') {
+          entitlementBridge?.handleIntent(intent);
+          return;
+        }
         if (intent.type === 'INTENT.LOCK') {
-          const completeLock = async () => {
-            if (activeLockSink === null) {
-              if (machineInputProvider === undefined) return;
-            } else if (!(await activeLockSink())) {
-              return;
-            }
-            adapter?.send(intent);
-          };
-          void completeLock();
+          void lockSession(adapter);
           return;
         }
         if (FIRST_RUN_INTENTS.has(intent.type)) {
@@ -352,8 +402,18 @@ export default function AuthRoot({ machineInputProvider }: AuthRootProps = {}) {
       },
       submitSecret: (secret: string) => adapter?.submitSecret(secret),
     }),
-    [adapter, machineInputProvider],
+    [adapter, entitlementBridge, lockSession],
   );
+
+  // FEAT-016: the entitlement bridge observes every projection transition
+  // and drives the authority-owned bootstrap session (start/eligibility/
+  // revalidation). React remains non-authoritative.
+  useEffect(() => {
+    if (entitlementBridge === null || projection === null) {
+      return;
+    }
+    entitlementBridge.observe(projection);
+  }, [projection, entitlementBridge]);
 
   // Synchronous protected boundary: no protected content behind the gate.
   const protectedAllowed = synchronouslyPermitsProtectedContent(projection);

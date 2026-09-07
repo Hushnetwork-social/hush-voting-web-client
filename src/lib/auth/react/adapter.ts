@@ -49,6 +49,10 @@ export interface AuthRenderProjection {
   readonly entitlementStage: EntitlementStageCode | null;
   /** True only in `entitlementReady` with a live authenticated identity. */
   readonly entitlementReady: boolean;
+  /** Current machine session epoch (guard for scoped machine events). */
+  readonly sessionEpoch: number;
+  /** True when the strict entitlement gate applies (false only in auth harness). */
+  readonly entitlementRequired: boolean;
   readonly safeIdentity: { alias: string; abbreviatedSigningAddress: string } | null;
   readonly authenticatedIdentity: AuthenticatedIdentityMetadata | null;
   readonly outcomeCode: string | null;
@@ -105,6 +109,7 @@ function projectSnapshot(snapshot: AuthSnapshot): AuthRenderProjection {
     supportCode?: string | null;
     onboardingKind?: string | null;
     entitlementRequired?: boolean;
+    sessionEpoch?: number;
   };
   const entitlementReady =
     entitlementStage === 'entitlementReady' && context.authenticatedIdentity !== null;
@@ -122,6 +127,8 @@ function projectSnapshot(snapshot: AuthSnapshot): AuthRenderProjection {
     protectedAccess: authState === 'authenticated' && boundaryReady,
     entitlementStage,
     entitlementReady,
+    sessionEpoch: typeof context.sessionEpoch === 'number' ? context.sessionEpoch : 1,
+    entitlementRequired: context.entitlementRequired !== false,
     safeIdentity: context.safeIdentity ?? null,
     authenticatedIdentity: context.authenticatedIdentity ?? null,
     outcomeCode: context.outcomeCode ?? null,
