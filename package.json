@@ -96,7 +96,16 @@
     "identity-happypath:secret-scan": "node scripts/identity-happypath/secret-scan.mjs",
     "identity-happypath:quality": "node scripts/identity-happypath/quality.mjs",
     "identity-happypath:selftest": "node scripts/identity-happypath/selftest.mjs",
-    "identity-happypath:gates": "npm run identity-happypath:selftest && npm run identity-happypath:coverage && npm run identity-happypath:secret-scan && npm run identity-happypath:quality"
+    "identity-happypath:gates": "npm run identity-happypath:selftest && npm run identity-happypath:coverage && npm run identity-happypath:secret-scan && npm run identity-happypath:quality",
+    "test:entitlement-bootstrap:bdd": "playwright test --config playwright.entitlement-bootstrap.config.ts",
+    "entitlement-bootstrap:coverage": "node scripts/entitlement-bootstrap/coverage.mjs",
+    "entitlement-bootstrap:wiring": "node scripts/entitlement-bootstrap/wiring.mjs",
+    "entitlement-bootstrap:secret-scan": "node scripts/entitlement-bootstrap/secret-scan.mjs",
+    "entitlement-bootstrap:property-scan": "node scripts/entitlement-bootstrap/property-scan.mjs",
+    "entitlement-bootstrap:artifact-scan": "node scripts/entitlement-bootstrap/artifact-scan.mjs",
+    "entitlement-bootstrap:quality": "node scripts/entitlement-bootstrap/quality.mjs",
+    "entitlement-bootstrap:selftest": "node scripts/entitlement-bootstrap/selftest.mjs",
+    "entitlement-bootstrap:gates": "npm run entitlement-bootstrap:selftest && npm run entitlement-bootstrap:wiring && npm run entitlement-bootstrap:coverage && npm run entitlement-bootstrap:secret-scan && npm run entitlement-bootstrap:property-scan && npm run entitlement-bootstrap:artifact-scan && npm run entitlement-bootstrap:quality"
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.14.4",

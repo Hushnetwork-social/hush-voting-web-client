@@ -57,3 +57,4 @@ conformance/archive/
 # Playwright-bdd generated specs
 .features-gen/
 .features-gen-auth-lifecycle/
+.features-gen-entitlement-bootstrap/
