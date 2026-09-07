@@ -1,0 +1,74 @@
+{
+  "schema": "feat016-pairing-ledger-v1",
+  "feature": "FEAT-016",
+  "generatedAt": "2026-09-07",
+  "notes": "One-to-one browser journey <-> server TwinTest mapping. Every backend-dependent Playwright scenario carries the same canonical EPIC acceptance ID as its real server TwinTest method; both execute through their real controlled compositions with non-zero discovery. Browser journeys additionally require the controlled real HushServerNode fixture (EXT-016-001) for the full production-composition run.",
+  "entries": [
+    {
+      "scenarioId": "AT-LIC-002",
+      "browserFeature": "features/licence-entitlements/direct-free-bootstrap.feature",
+      "browserScenario": "A no-active user enters only after signed Direct Free is indexed",
+      "serverClass": "HushVotingLicenceVerticalSmokeTwinTests",
+      "serverMethod": "DirectFree_TraversesTheRealPipeline",
+      "filter": "Category=FEAT-016&Category=TwinTest&Category=NON_E2E",
+      "twinRunState": "PASS",
+      "twinRunCounts": "6/6 focused FEAT-016 TwinTests (real gRPC -> mempool -> block -> index -> query)",
+      "resultArtifact": "FEAT-016 focused TwinTest run 2026-09-07 (server commit b472626)"
+    },
+    {
+      "scenarioId": "AT-LIC-003",
+      "browserFeature": "features/licence-entitlements/failure-recovery.feature",
+      "browserScenario": "Entitlement authority failure never fabricates a plan",
+      "serverClass": "HushVotingLicensingEntitlementTwinTests",
+      "serverMethod": "Database_outage_returns_storage_unavailable_and_never_invents_entitlement",
+      "filter": "Category=FEAT-016&Category=TwinTest&Category=NON_E2E",
+      "twinRunState": "PASS",
+      "twinRunCounts": "6/6 focused FEAT-016 TwinTests (real PostgreSQL outage -> unavailable, never invents)",
+      "resultArtifact": "FEAT-016 focused TwinTest run 2026-09-07 (server commit b472626)"
+    },
+    {
+      "scenarioId": "AT-LIC-007",
+      "browserFeature": "features/licence-entitlements/failure-recovery.feature",
+      "browserScenario": "Delayed confirmation retries the exact licence transaction",
+      "serverClass": "HushVotingLicensingActivationTwinTests",
+      "serverMethod": "Identical_command_replay_returns_the_original_outcome_without_mutation",
+      "filter": "Category=FEAT-016&Category=TwinTest&Category=NON_E2E",
+      "twinRunState": "PASS",
+      "twinRunCounts": "6/6 focused FEAT-016 TwinTests (identical replay -> original outcome, no mutation)",
+      "resultArtifact": "FEAT-016 focused TwinTest run 2026-09-07 (server commit b472626)"
+    },
+    {
+      "scenarioId": "AT-LIC-010",
+      "browserFeature": "features/licence-entitlements/failure-recovery.feature",
+      "browserScenario": "Expiry triggers authoritative Direct Free bootstrap",
+      "serverClass": "HushVotingLicensingEntitlementTwinTests",
+      "serverMethod": "Annual_assignment_at_upper_exclusive_boundary_expires_to_direct_free_atomically",
+      "filter": "Category=FEAT-016&Category=TwinTest&Category=NON_E2E",
+      "twinRunState": "PASS",
+      "twinRunCounts": "6/6 focused FEAT-016 TwinTests (upper-exclusive annual expiry -> no-active -> Direct Free)",
+      "resultArtifact": "FEAT-016 focused TwinTest run 2026-09-07 (server commit b472626)"
+    },
+    {
+      "scenarioId": "AT-LIC-011",
+      "browserFeature": "features/licence-entitlements/gate-safety-accessibility.feature",
+      "browserScenario": "Lock prevents a late entitlement result from restoring access",
+      "serverClass": "HushVotingLicenceEntitlementQueryTwinTests",
+      "serverMethod": "Another_actor_never_observes_the_first_actors_entitlement",
+      "filter": "Category=FEAT-016&Category=TwinTest&Category=NON_E2E",
+      "twinRunState": "PASS",
+      "twinRunCounts": "6/6 focused FEAT-016 TwinTests (actor B never observes actor A's entitlement after replacement)",
+      "resultArtifact": "FEAT-016 focused TwinTest run 2026-09-07 (server commit b472626; new pairing seam)"
+    },
+    {
+      "scenarioId": "AT-LIC-012",
+      "browserFeature": "features/licence-entitlements/gate-safety-accessibility.feature",
+      "browserScenario": "Incompatible active projection cannot become Direct Free",
+      "serverClass": "HushVotingLicenceVerticalSmokeTwinTests",
+      "serverMethod": "ClientAuthoredCatalogue_IsRejected_ByRealValidator",
+      "filter": "Category=FEAT-016&Category=TwinTest&Category=NON_E2E",
+      "twinRunState": "PASS",
+      "twinRunCounts": "6/6 focused FEAT-016 TwinTests (client-authored/unknown catalogue rejected before mempool)",
+      "resultArtifact": "FEAT-016 focused TwinTest run 2026-09-07 (server commit b472626)"
+    }
+  ]
+}
