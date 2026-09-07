@@ -22065,7 +22065,11 @@ var OPERATION_PAYLOAD_SCHEMAS = {
   // FEAT-016 additive: closed entitlement-bootstrap control payloads.
   licenceBootstrapStart: ["networkBinding"],
   licenceBootstrapControl: ["control", "trigger"],
-  licenceBootstrapEligibility: ["foreground", "connectivity"]
+  licenceBootstrapEligibility: ["foreground", "connectivity"],
+  // FEAT-017 additive: confirmed-upgrade activation carries only the bounded
+  // server plan handle; acknowledge carries no payload.
+  licenceUpgradeConfirm: ["targetPlanId"],
+  licenceUpgradeAcknowledge: []
 };
 var FORBIDDEN_PAYLOAD_MARKERS = ["password", "mnemonic", "secret", "key", "salt", "nonce", "decrypted", "bundle", "private", "fileBytes", "bytes"];
 function hasSecretShapedField(value) {
@@ -22207,7 +22211,10 @@ var OPERATION_KINDS = /* @__PURE__ */ new Set([
   // FEAT-016 additive.
   "licenceBootstrapStart",
   "licenceBootstrapControl",
-  "licenceBootstrapEligibility"
+  "licenceBootstrapEligibility",
+  // FEAT-017 additive: closed confirmed-upgrade op kinds.
+  "licenceUpgradeConfirm",
+  "licenceUpgradeAcknowledge"
 ]);
 function validateSecretTransfer(record) {
   if (!hasNoUnknownFields(record, ["kind", "operationId", "clientChannel", "authorityEpoch", "purpose", "value"])) {
@@ -22342,7 +22349,11 @@ var FRESH_CAPABILITY_REQUIRED_BY_OPERATION = {
   // password capability (authenticated session only).
   licenceBootstrapStart: null,
   licenceBootstrapControl: null,
-  licenceBootstrapEligibility: null
+  licenceBootstrapEligibility: null,
+  // FEAT-017 additive: confirmed-upgrade ops require no fresh password
+  // capability (authenticated session only; same rule as bootstrap ops).
+  licenceUpgradeConfirm: null,
+  licenceUpgradeAcknowledge: null
 };
 
 // src/lib/browser-vault/authority/authority.ts
@@ -29108,7 +29119,9 @@ function snapshotFromCoordinator(snapshot) {
     phase: snapshot.phase,
     projection: snapshot.projection,
     lastOutcomeCode: snapshot.lastOutcomeCode,
-    pendingTransactionId: snapshot.pendingTransactionId
+    pendingTransactionId: snapshot.pendingTransactionId,
+    upgradeOperation: snapshot.upgradeOperation,
+    upgradeNotificationEligible: snapshot.upgradeNotificationEligible
   };
 }
 var LicenceBootstrapSession = class {
@@ -29220,6 +29233,38 @@ var LicenceBootstrapSession = class {
       default:
         return { ok: false, reason: "invalid-input" };
     }
+    await this.flushDurable();
+    const snapshot = snapshotFromCoordinator(this.coordinator.snapshot());
+    this.emitProgress(snapshot);
+    return { ok: true, snapshot };
+  }
+  /**
+   * FEAT-017 Task 6.1 — one closed confirmed-upgrade activation routed
+   * through the SAME serialized authority session. The page hands a bounded
+   * server plan handle; the coordinator re-queries fresh truth, seals exactly
+   * one confirmed_upgrade record, and the existing journal/loop/retry own
+   * everything after that. A second request while an operation is live
+   * coalesces (never a second transaction).
+   */
+  async confirmUpgrade(targetPlanId) {
+    if (this.coordinator === null || this.deps.engine.licenceActor() === null) {
+      return { ok: false, reason: "not-authenticated" };
+    }
+    if (typeof targetPlanId !== "string" || !isBoundedPlanId(targetPlanId)) {
+      return { ok: false, reason: "invalid-input" };
+    }
+    await this.coordinator.confirmUpgrade(targetPlanId);
+    await this.flushDurable();
+    const snapshot = snapshotFromCoordinator(this.coordinator.snapshot());
+    this.emitProgress(snapshot);
+    return { ok: true, snapshot };
+  }
+  /** FEAT-017 Task 6.1 — acknowledge a surfaced terminal upgrade outcome. */
+  async acknowledgeUpgradeOutcome() {
+    if (this.coordinator === null || this.deps.engine.licenceActor() === null) {
+      return { ok: false, reason: "not-authenticated" };
+    }
+    this.coordinator.acknowledgeUpgradeOutcome();
     await this.flushDurable();
     const snapshot = snapshotFromCoordinator(this.coordinator.snapshot());
     this.emitProgress(snapshot);
@@ -29423,7 +29468,8 @@ var LicenceBootstrapSession = class {
   }
   /** Emit safe progress only when the observable surface changed. */
   emitProgress(snapshot) {
-    const key = `${snapshot.phase}|${snapshot.lastOutcomeCode ?? ""}|${snapshot.projection === null ? "-" : snapshot.projection.licenceReference}`;
+    const upgradeKey = snapshot.upgradeOperation === null ? "none" : `${snapshot.upgradeOperation.status}:${snapshot.upgradeOperation.operation?.pendingTransactionId ?? "-"}`;
+    const key = `${snapshot.phase}|${snapshot.lastOutcomeCode ?? ""}|${snapshot.projection === null ? "-" : snapshot.projection.licenceReference}|${upgradeKey}|${snapshot.upgradeNotificationEligible ? "n1" : "no-n1"}`;
     if (key === this.lastProgressKey) {
       return;
     }
@@ -29726,6 +29772,8 @@ function createProductionWorkerEnvironment(params) {
         projection: payload.projection ?? null,
         lastOutcomeCode: payload.lastOutcomeCode,
         pendingTransactionId: payload.pendingTransactionId,
+        upgradeOperation: payload.upgradeOperation ?? null,
+        upgradeNotificationEligible: payload.upgradeNotificationEligible === true,
         emittedAtMs: payload.emittedAtMs
       });
     } catch {
@@ -29971,6 +30019,23 @@ function createProductionWorkerEnvironment(params) {
           ...typeof foreground === "boolean" ? { foregrounded: foreground } : {},
           ...typeof connectivity === "string" ? { connectivity } : {}
         });
+        return toLicenceStepResult(result);
+      }
+      case "licenceUpgradeConfirm": {
+        const session = licenceSession;
+        if (session === null) {
+          return toAuthorityResult({ outcome: "INVALID_INPUT", payload: { reason: "not-authenticated" } });
+        }
+        const targetPlanId = typeof payload.targetPlanId === "string" ? payload.targetPlanId : "";
+        const result = await session.confirmUpgrade(targetPlanId);
+        return toLicenceStepResult(result);
+      }
+      case "licenceUpgradeAcknowledge": {
+        const session = licenceSession;
+        if (session === null) {
+          return toAuthorityResult({ outcome: "INVALID_INPUT", payload: { reason: "not-authenticated" } });
+        }
+        const result = await session.acknowledgeUpgradeOutcome();
         return toLicenceStepResult(result);
       }
       default:

@@ -44,7 +44,8 @@ export function useLicenceRootFacts(
     if (bridge === null || projection === null) {
       return { input: null, account: null };
     }
-    // Re-evaluate when a new safe broadcast arrives.
+    // Re-evaluate when a new safe broadcast arrives (version is the
+    // intentional re-computation dependency).
     void version;
     const mirror = bridge.licenceFacts();
     const input = presentationInputFromMirror({ mirror, projection });
@@ -55,9 +56,6 @@ export function useLicenceRootFacts(
       input,
       account: projectAccountLicenceSummary(input, defaultTimeZone()),
     };
-    // version is an intentional dependency: new mirror broadcasts must
-    // recompute the projections.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bridge, projection, version]);
 }
 

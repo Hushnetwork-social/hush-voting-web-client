@@ -21,7 +21,7 @@
  * Normative source: FEAT-017 FeatureDescription D017-01…06; design contract
  * A0/L1/L2/C0/P0/D0/R0/S0/N0/N1; Task 6.1 behavior spec.
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { LicenceUpgradePresentationInput, LicenceWorkspaceView } from '../../../lib/licensing/upgrade-presentation';
 import {
   draftFromHigherOption,
@@ -94,7 +94,6 @@ export function LicenceWorkspaceHost({
 }: LicenceWorkspaceHostProps) {
   const [draft, setDraft] = useState<LicenceDraftSelection | null>(null);
   const [reviewingConfirmation, setReviewingConfirmation] = useState(false);
-  const previousViewRef = useRef<LicenceWorkspaceView | null>(null);
 
   // Restored authority view. Draft can only surface while the user is on the
   // confirmation step and the pure model still accepts it.
@@ -109,16 +108,10 @@ export function LicenceWorkspaceHost({
         : restoredView
     : null;
 
-  // Whenever the authority moves to a terminal/live surface while a draft
-  // exists, the draft is inert and must not resurface later (D017-04).
-  useEffect(() => {
-    if (restoredView !== 'options') {
-      setReviewingConfirmation(false);
-      setDraft((current) => (draftStillFresh(input, current) ? current : null));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [restoredView, input]);
-
+  // A stale draft (fresh truth changed) can never reach confirmation: the
+  // pure model clears it when it no longer matches fresh options. When the
+  // authority moves away from options the confirmation flag is inert.
+  const effectiveDraft = view === 'confirmation' && draftOk ? draft : null;
   const handlers = useMemo<LicenceWorkspaceActionHandlers>(
     () => ({
       onViewProgress: () => {
@@ -169,16 +162,10 @@ export function LicenceWorkspaceHost({
     return null;
   }
 
-  // If a new authority view superseded the local draft selection, drop it.
-  const effectiveDraft = view === 'confirmation' && draftOk ? draft : null;
-
   const facts = projectLicenceWorkspaceViewFacts(input, view, effectiveDraft, timeZone);
   if (facts === null) {
     return null;
   }
-  const changedView = previousViewRef.current !== view;
-  previousViewRef.current = view;
-  void changedView;
 
   return (
     <div className="licence-workspace-host" data-testid="licence-workspace-host" data-view={view}>
