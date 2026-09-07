@@ -157,6 +157,10 @@ export interface LicenceProgress {
   readonly projection: unknown | null;
   readonly lastOutcomeCode: string | null;
   readonly pendingTransactionId: string | null;
+  /** FEAT-017 page-safe confirmed-upgrade operation view (null when none). */
+  readonly upgradeOperation: unknown | null;
+  /** FEAT-017 one-shot local-success notification eligibility. */
+  readonly upgradeNotificationEligible: boolean;
   readonly emittedAtMs: number;
 }
 
@@ -453,6 +457,8 @@ export class BrowserVaultClient {
           projection: progress.projection ?? null,
           lastOutcomeCode: progress.lastOutcomeCode,
           pendingTransactionId: progress.pendingTransactionId,
+          upgradeOperation: progress.upgradeOperation ?? null,
+          upgradeNotificationEligible: progress.upgradeNotificationEligible === true,
           emittedAtMs: progress.emittedAtMs,
         });
         break;

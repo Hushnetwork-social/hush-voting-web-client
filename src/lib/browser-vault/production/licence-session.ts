@@ -40,7 +40,11 @@ import type {
   LicenceProgressPayload,
   LicenceRevalidationTrigger,
 } from '../../licensing/session-contract';
-import { isLicenceConnectivityInput, isLicenceRevalidationTrigger } from '../../licensing/session-contract';
+import {
+  isLicenceConnectivityInput,
+  isLicenceRevalidationTrigger,
+} from '../../licensing/session-contract';
+import { isBoundedPlanId } from '../../licensing/upgrade';
 import { createUuidV4 } from '../../identity-creation/profile';
 
 /** Safe snapshot of one coordinator (no journal/transport internals). */
@@ -50,6 +54,8 @@ function snapshotFromCoordinator(snapshot: CoordinatorSnapshot): LicenceBootstra
     projection: snapshot.projection,
     lastOutcomeCode: snapshot.lastOutcomeCode,
     pendingTransactionId: snapshot.pendingTransactionId,
+    upgradeOperation: snapshot.upgradeOperation,
+    upgradeNotificationEligible: snapshot.upgradeNotificationEligible,
   };
 }
 
@@ -193,6 +199,40 @@ export class LicenceBootstrapSession {
       default:
         return { ok: false, reason: 'invalid-input' };
     }
+    await this.flushDurable();
+    const snapshot = snapshotFromCoordinator(this.coordinator.snapshot());
+    this.emitProgress(snapshot);
+    return { ok: true, snapshot };
+  }
+
+  /**
+   * FEAT-017 Task 6.1 — one closed confirmed-upgrade activation routed
+   * through the SAME serialized authority session. The page hands a bounded
+   * server plan handle; the coordinator re-queries fresh truth, seals exactly
+   * one confirmed_upgrade record, and the existing journal/loop/retry own
+   * everything after that. A second request while an operation is live
+   * coalesces (never a second transaction).
+   */
+  async confirmUpgrade(targetPlanId: unknown): Promise<LicenceBootstrapStepResult> {
+    if (this.coordinator === null || this.deps.engine.licenceActor() === null) {
+      return { ok: false, reason: 'not-authenticated' };
+    }
+    if (typeof targetPlanId !== 'string' || !isBoundedPlanId(targetPlanId)) {
+      return { ok: false, reason: 'invalid-input' };
+    }
+    await this.coordinator.confirmUpgrade(targetPlanId);
+    await this.flushDurable();
+    const snapshot = snapshotFromCoordinator(this.coordinator.snapshot());
+    this.emitProgress(snapshot);
+    return { ok: true, snapshot };
+  }
+
+  /** FEAT-017 Task 6.1 — acknowledge a surfaced terminal upgrade outcome. */
+  async acknowledgeUpgradeOutcome(): Promise<LicenceBootstrapStepResult> {
+    if (this.coordinator === null || this.deps.engine.licenceActor() === null) {
+      return { ok: false, reason: 'not-authenticated' };
+    }
+    this.coordinator.acknowledgeUpgradeOutcome();
     await this.flushDurable();
     const snapshot = snapshotFromCoordinator(this.coordinator.snapshot());
     this.emitProgress(snapshot);
@@ -418,7 +458,11 @@ export class LicenceBootstrapSession {
 
   /** Emit safe progress only when the observable surface changed. */
   private emitProgress(snapshot: LicenceBootstrapSnapshot): void {
-    const key = `${snapshot.phase}|${snapshot.lastOutcomeCode ?? ''}|${snapshot.projection === null ? '-' : snapshot.projection.licenceReference}`;
+    const upgradeKey =
+      snapshot.upgradeOperation === null
+        ? 'none'
+        : `${snapshot.upgradeOperation.status}:${snapshot.upgradeOperation.operation?.pendingTransactionId ?? '-'}`;
+    const key = `${snapshot.phase}|${snapshot.lastOutcomeCode ?? ''}|${snapshot.projection === null ? '-' : snapshot.projection.licenceReference}|${upgradeKey}|${snapshot.upgradeNotificationEligible ? 'n1' : 'no-n1'}`;
     if (key === this.lastProgressKey) {
       return;
     }

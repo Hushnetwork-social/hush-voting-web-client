@@ -32,10 +32,35 @@ export interface LicenceBootstrapSnapshot {
   readonly lastOutcomeCode: string | null;
   /** Opaque pending transaction id when one exists (public on-chain ref). */
   readonly pendingTransactionId: string | null;
+  /**
+   * FEAT-017 additive page-safe confirmed-upgrade operation view (null when
+   * no upgrade operation or terminal upgrade outcome is present). Never
+   * carries exact bytes, signatures, bindings, or journal state.
+   */
+  readonly upgradeOperation: LicenceUpgradeSafeOperation | null;
+  /**
+   * FEAT-017 additive one-shot local-success notification eligibility. True
+   * only between the exact-UUID reconciliation that confirmed the local
+   * upgrade and the authority-side acknowledgement (Task 3.3).
+   */
+  readonly upgradeNotificationEligible: boolean;
 }
 
 /** Closed page→authority control intents (retry/recovery/revalidation). */
 export type LicenceBootstrapControlKind = 'retry' | 'recover' | 'revalidate';
+
+/**
+ * FEAT-017 additive closed confirmed-upgrade control kinds routed through the
+ * SAME serialized authority op (`licenceBootstrapControl`). The page never
+ * signs, journals, or constructs anything: `confirm-upgrade` asks the closed
+ * authority to re-query fresh truth and seal exactly one confirmed_upgrade
+ * record; `acknowledge-upgrade` clears the one-shot terminal outcome/notice.
+ */
+export type LicenceUpgradeControlKind = 'confirm-upgrade' | 'acknowledge-upgrade';
+
+export function isLicenceUpgradeControlKind(value: unknown): value is LicenceUpgradeControlKind {
+  return value === 'confirm-upgrade' || value === 'acknowledge-upgrade';
+}
 
 /** Revalidation trigger vocabulary (closed; bounds the payload). */
 export type LicenceRevalidationTrigger =

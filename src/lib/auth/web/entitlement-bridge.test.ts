@@ -71,10 +71,26 @@ class FakeAdapter {
 }
 
 class FakeClient {
-  progressHandler: ((p: { phase: string; projection: unknown; lastOutcomeCode: string | null; pendingTransactionId: string | null; emittedAtMs: number }) => void) | null = null;
+  progressHandler: ((p: {
+    phase: string;
+    projection: unknown;
+    lastOutcomeCode: string | null;
+    pendingTransactionId: string | null;
+    upgradeOperation: unknown | null;
+    upgradeNotificationEligible: boolean;
+    emittedAtMs: number;
+  }) => void) | null = null;
   readonly dispatched: Array<{ operation: string; payload: Record<string, unknown> | undefined }> = [];
   queue: ClientOperationResult[] = [];
-  onLicenceProgress(handler: (p: { phase: string; projection: unknown; lastOutcomeCode: string | null; pendingTransactionId: string | null; emittedAtMs: number }) => void): void {
+  onLicenceProgress(handler: (p: {
+    phase: string;
+    projection: unknown;
+    lastOutcomeCode: string | null;
+    pendingTransactionId: string | null;
+    upgradeOperation: unknown | null;
+    upgradeNotificationEligible: boolean;
+    emittedAtMs: number;
+  }) => void): void {
     this.progressHandler = handler;
   }
   async dispatch(operation: string, payload?: Record<string, unknown>): Promise<ClientOperationResult> {
@@ -185,7 +201,7 @@ describe('EntitlementBridge', () => {
     expect(client.dispatched.map((d) => d.operation)).toEqual(['licenceBootstrapEligibility', 'licenceBootstrapStart']);
     expect(client.dispatched.find((d) => d.operation === 'licenceBootstrapStart')?.payload).toEqual({ networkBinding: 'hushnetwork-devnet' });
     // Progress broadcast applies the safe stage with the machine epoch.
-    client.progressHandler?.({ phase: 'awaitingIndex', projection: null, lastOutcomeCode: 'accepted', pendingTransactionId: null, emittedAtMs: 1 });
+    client.progressHandler?.({ phase: 'awaitingIndex', projection: null, lastOutcomeCode: 'accepted', pendingTransactionId: null, upgradeOperation: null, upgradeNotificationEligible: false, emittedAtMs: 1 });
     const stageEvent = adapter.sent.find((m) => (m as { type?: string }).type === 'ENTITLEMENT.STAGE');
     expect(stageEvent).toEqual({ type: 'ENTITLEMENT.STAGE', stage: 'awaitingIndex', epoch: 7 });
     bridge.stop();
@@ -199,7 +215,7 @@ describe('EntitlementBridge', () => {
     await Promise.resolve();
     await Promise.resolve();
     adapter.current = projection({ authState: 'locked', entitlementStage: null });
-    client.progressHandler?.({ phase: 'entitlementReady', projection: null, lastOutcomeCode: 'ready', pendingTransactionId: null, emittedAtMs: 2 });
+    client.progressHandler?.({ phase: 'entitlementReady', projection: null, lastOutcomeCode: 'ready', pendingTransactionId: null, upgradeOperation: null, upgradeNotificationEligible: false, emittedAtMs: 2 });
     expect(adapter.sent.some((m) => (m as { type?: string }).type === 'ENTITLEMENT.STAGE' && (m as { stage?: string }).stage === 'entitlementReady')).toBe(false);
     bridge.stop();
   });
@@ -266,7 +282,7 @@ describe('EntitlementBridge', () => {
     bridge.observe(adapter.current);
     await Promise.resolve();
     await Promise.resolve();
-    client.progressHandler?.({ phase: 'lockedOut', projection: null, lastOutcomeCode: 'unauthenticated-forced-lock', pendingTransactionId: null, emittedAtMs: 3 });
+    client.progressHandler?.({ phase: 'lockedOut', projection: null, lastOutcomeCode: 'unauthenticated-forced-lock', pendingTransactionId: null, upgradeOperation: null, upgradeNotificationEligible: false, emittedAtMs: 3 });
     expect(lockCalls.length).toBe(1);
     // The machine never receives a fabricated stage for lockedOut.
     expect(adapter.sent.some((m) => (m as { stage?: string }).stage === 'lockedOut')).toBe(false);

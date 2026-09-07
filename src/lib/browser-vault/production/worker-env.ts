@@ -396,6 +396,8 @@ export function createProductionWorkerEnvironment(params: {
         projection: payload.projection ?? null,
         lastOutcomeCode: payload.lastOutcomeCode,
         pendingTransactionId: payload.pendingTransactionId,
+        upgradeOperation: payload.upgradeOperation ?? null,
+        upgradeNotificationEligible: payload.upgradeNotificationEligible === true,
         emittedAtMs: payload.emittedAtMs,
       } as BrowserWorkerEvent);
     } catch {

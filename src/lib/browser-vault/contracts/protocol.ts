@@ -259,9 +259,12 @@ export interface GlobalInvalidation {
 }
 
 /**
- * FEAT-016 additive: safe entitlement progress broadcast (authority → pages).
- * Carries only the closed snapshot vocabulary — never secrets, signatures,
- * exact bytes, journal state, or transport details.
+ * FEAT-016/017 additive: safe entitlement progress broadcast (authority →
+ * pages). Carries only the closed snapshot vocabulary — never secrets,
+ * signatures, exact bytes, journal state, or transport details. FEAT-017 adds
+ * the page-safe confirmed-upgrade operation view and its one-shot
+ * notification eligibility so the root composition can render Account,
+ * workspace, and N0/N1 surfaces from real authority state.
  */
 export interface LicenceProgressEvent {
   readonly kind: 'licence-progress';
@@ -269,6 +272,8 @@ export interface LicenceProgressEvent {
   readonly projection: unknown | null;
   readonly lastOutcomeCode: string | null;
   readonly pendingTransactionId: string | null;
+  readonly upgradeOperation: unknown | null;
+  readonly upgradeNotificationEligible: boolean;
   readonly emittedAtMs: number;
 }
 
