@@ -1,0 +1,142 @@
+{
+  "schema": "feat017-evidence-manifest-v1",
+  "feature": "FEAT-017",
+  "generatedAt": "2026-09-07",
+  "notes": "Executed 2026-09-07 (continue-implementation, Phase 7). Client revision 1704c1b (branch feat/FEAT-017-account-licence-and-upgrade-experience); server revision on branch feat/FEAT-017-account-licence-and-upgrade-experience (hush-server-node, parent b472626). EXECUTABLE_ROOT rows record browser-journey wiring state; the full production-composition run requires the controlled real HushServerNode fixture (EXT-017-001, release readiness only). Regression ids AT-LIC-003/007/010/011/012 are FEAT-016-owned journeys that stay green through the entitlement catalog and are cross-checked by the journey-wiring gate.",
+  "rows": [
+    {
+      "stableId": "AT-LIC-001",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "6/6 focused FEAT-017 TwinTests",
+      "command": "dotnet test HushNode.IntegrationTests/HushNode.IntegrationTests.csproj --no-build --filter Category=FEAT-017&Category=TwinTest&Category=NON_E2E",
+      "revision": "feat/FEAT-017 server (pairing metadata commit)"
+    },
+    {
+      "stableId": "AT-LIC-001",
+      "evidenceClass": "EXECUTABLE_ROOT",
+      "state": "NOT_EXECUTED",
+      "note": "full production-composition journey requires the controlled real HushServerNode fixture (EXT-017-001)",
+      "captureDisabled": true
+    },
+    {
+      "stableId": "AT-LIC-004",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "6/6 focused FEAT-017 TwinTests",
+      "command": "dotnet test HushNode.IntegrationTests/HushNode.IntegrationTests.csproj --no-build --filter Category=FEAT-017&Category=TwinTest&Category=NON_E2E",
+      "revision": "feat/FEAT-017 server (pairing metadata commit)"
+    },
+    {
+      "stableId": "AT-LIC-004",
+      "evidenceClass": "EXECUTABLE_ROOT",
+      "state": "NOT_EXECUTED",
+      "note": "full production-composition journey requires the controlled real HushServerNode fixture (EXT-017-001)",
+      "captureDisabled": true
+    },
+    {
+      "stableId": "AT-LIC-005",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "6/6 focused FEAT-017 TwinTests",
+      "command": "dotnet test HushNode.IntegrationTests/HushNode.IntegrationTests.csproj --no-build --filter Category=FEAT-017&Category=TwinTest&Category=NON_E2E",
+      "revision": "feat/FEAT-017 server (pairing metadata commit)"
+    },
+    {
+      "stableId": "AT-LIC-005",
+      "evidenceClass": "EXECUTABLE_ROOT",
+      "state": "NOT_EXECUTED",
+      "note": "full production-composition journey requires the controlled real HushServerNode fixture (EXT-017-001)",
+      "captureDisabled": true
+    },
+    {
+      "stableId": "AT-LIC-006",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "6/6 focused FEAT-017 TwinTests",
+      "command": "dotnet test HushNode.IntegrationTests/HushNode.IntegrationTests.csproj --no-build --filter Category=FEAT-017&Category=TwinTest&Category=NON_E2E",
+      "revision": "feat/FEAT-017 server (pairing metadata commit)"
+    },
+    {
+      "stableId": "AT-LIC-006",
+      "evidenceClass": "EXECUTABLE_ROOT",
+      "state": "NOT_EXECUTED",
+      "note": "full production-composition journey requires the controlled real HushServerNode fixture (EXT-017-001)",
+      "captureDisabled": true
+    },
+    {
+      "stableId": "AT-LIC-008",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "6/6 focused FEAT-017 TwinTests",
+      "command": "dotnet test HushNode.IntegrationTests/HushNode.IntegrationTests.csproj --no-build --filter Category=FEAT-017&Category=TwinTest&Category=NON_E2E",
+      "revision": "feat/FEAT-017 server (pairing metadata commit)"
+    },
+    {
+      "stableId": "AT-LIC-008",
+      "evidenceClass": "EXECUTABLE_ROOT",
+      "state": "NOT_EXECUTED",
+      "note": "full production-composition journey requires the controlled real HushServerNode fixture (EXT-017-001)",
+      "captureDisabled": true
+    },
+    {
+      "stableId": "AT-LIC-009",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "6/6 focused FEAT-017 TwinTests",
+      "command": "dotnet test HushNode.IntegrationTests/HushNode.IntegrationTests.csproj --no-build --filter Category=FEAT-017&Category=TwinTest&Category=NON_E2E",
+      "revision": "feat/FEAT-017 server (pairing metadata commit)"
+    },
+    {
+      "stableId": "AT-LIC-009",
+      "evidenceClass": "EXECUTABLE_ROOT",
+      "state": "NOT_EXECUTED",
+      "note": "full production-composition journey requires the controlled real HushServerNode fixture (EXT-017-001)",
+      "captureDisabled": true
+    },
+    {
+      "stableId": "AT-LIC-015",
+      "evidenceClass": "EXECUTABLE_CLIENT",
+      "state": "PASS",
+      "counts": "component + statechart + history suites green (unit run 2026-09-07)",
+      "command": "npm run test:unit (licence/auth subsets green)",
+      "revision": "1704c1b"
+    },
+    {
+      "stableId": "AT-LIC-015",
+      "evidenceClass": "EXECUTABLE_ROOT",
+      "state": "NOT_EXECUTED",
+      "note": "full production-composition journey requires the controlled real HushServerNode fixture (EXT-017-001)",
+      "captureDisabled": true
+    },
+    {
+      "stableId": "AT-LIC-016",
+      "evidenceClass": "EXECUTABLE_CLIENT",
+      "state": "PASS",
+      "counts": "licence a11y/responsive component suites green (17+ assertions incl. 44px/reduced-motion CSS contract)",
+      "command": "npm run test:unit (licence a11y subset green)",
+      "revision": "1704c1b"
+    },
+    {
+      "stableId": "AT-LIC-016",
+      "evidenceClass": "EXECUTABLE_ROOT",
+      "state": "NOT_EXECUTED",
+      "note": "full production-composition journey requires the controlled real HushServerNode fixture (EXT-017-001)",
+      "captureDisabled": true
+    },
+    {
+      "stableId": "MT-QUAL-ANDROID-017-001",
+      "evidenceClass": "MANUAL",
+      "state": "PENDING",
+      "note": "physical Android hardware-backed licence/upgrade/clipboard/Back/accessibility qualification (release readiness only)",
+      "captureDisabled": true
+    },
+    {
+      "stableId": "MT-QUAL-UBUNTU-017-001",
+      "evidenceClass": "MANUAL",
+      "state": "PENDING",
+      "note": "qualified Ubuntu GUI/native-vault/clipboard/accessibility qualification (release readiness only)",
+      "captureDisabled": true
+    }
+  ]
+}

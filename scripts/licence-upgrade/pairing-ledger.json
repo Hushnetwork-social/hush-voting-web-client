@@ -1,0 +1,74 @@
+{
+  "schema": "feat017-pairing-ledger-v1",
+  "feature": "FEAT-017",
+  "generatedAt": "2026-09-07",
+  "notes": "One-to-one browser journey <-> server TwinTest mapping. Every backend-dependent FEAT-017-owned canonical ID (AT-LIC-001/004/005/006/008/009) maps to a real existing FEAT-013/015 TwinTest method (method-level Category=FEAT-017 + AcceptanceId metadata added; no server licence authority or domain change). Browser journeys additionally require the controlled real HushServerNode fixture (EXT-017-001) for the full production-composition run; the same-ID TwinTests execute against real gRPC/PostgreSQL/Redis/block boundaries now.",
+  "entries": [
+    {
+      "scenarioId": "AT-LIC-001",
+      "browserFeature": "features/licence-upgrade/account-licence-summary.feature",
+      "browserScenario": "Account popup shows the exact indexed plan, limits, and shortened public reference",
+      "serverClass": "HushVotingLicensingEntitlementTwinTests",
+      "serverMethod": "Existing_unexpired_assignment_resolves_without_mutation",
+      "filter": "Category=FEAT-017&Category=TwinTest&Category=NON_E2E",
+      "twinRunState": "PASS",
+      "twinRunCounts": "6/6 focused FEAT-017 TwinTests (real PostgreSQL entitlement resolution; existing assignment resolves unchanged)",
+      "resultArtifact": "FEAT-017 focused TwinTest run 2026-09-07 (server commit on feat/FEAT-017-account-licence-and-upgrade-experience)"
+    },
+    {
+      "scenarioId": "AT-LIC-004",
+      "browserFeature": "features/licence-upgrade/account-licence-summary.feature",
+      "browserScenario": "The full-width licence page reflects the exact server catalogue in server order",
+      "serverClass": "HushVotingLicenceEntitlementQueryTwinTests",
+      "serverMethod": "Active_veritas_returns_safe_view_with_higher_option_and_enterprise",
+      "filter": "Category=FEAT-017&Category=TwinTest&Category=NON_E2E",
+      "twinRunState": "PASS",
+      "twinRunCounts": "6/6 focused FEAT-017 TwinTests (query returns exact plan/reference/expiry, higher options only in server order, Enterprise informational)",
+      "resultArtifact": "FEAT-017 focused TwinTest run 2026-09-07 (server commit on feat/FEAT-017-account-licence-and-upgrade-experience)"
+    },
+    {
+      "scenarioId": "AT-LIC-005",
+      "browserFeature": "features/licence-upgrade/account-licence-summary.feature",
+      "browserScenario": "Activation requires explicit informed confirmation and cancel commits nothing",
+      "serverClass": "HushVotingLicensingActivationTwinTests",
+      "serverMethod": "Valid_activation_supersedes_direct_free_and_starts_one_annual_veritas",
+      "filter": "Category=FEAT-017&Category=TwinTest&Category=NON_E2E",
+      "twinRunState": "PASS",
+      "twinRunCounts": "6/6 focused FEAT-017 TwinTests (explicit validated higher activation supersedes Direct Free exactly once with one annual assignment)",
+      "resultArtifact": "FEAT-017 focused TwinTest run 2026-09-07 (server commit on feat/FEAT-017-account-licence-and-upgrade-experience)"
+    },
+    {
+      "scenarioId": "AT-LIC-006",
+      "browserFeature": "features/licence-upgrade/upgrade-activation-progress.feature",
+      "browserScenario": "A strictly higher Veritas plan activates only after indexed confirmation",
+      "serverClass": "HushVotingLicenceVerticalSmokeTwinTests",
+      "serverMethod": "UpgradeTraversesTheRealPipeline_AfterDirectFree",
+      "filter": "Category=FEAT-017&Category=TwinTest&Category=NON_E2E",
+      "twinRunState": "PASS",
+      "twinRunCounts": "6/6 focused FEAT-017 TwinTests (real gRPC -> mempool -> block -> index -> query; Direct Free stays active until the strictly-higher transaction is indexed)",
+      "resultArtifact": "FEAT-017 focused TwinTest run 2026-09-07 (server commit on feat/FEAT-017-account-licence-and-upgrade-experience)"
+    },
+    {
+      "scenarioId": "AT-LIC-008",
+      "browserFeature": "features/licence-upgrade/account-licence-summary.feature",
+      "browserScenario": "Current lower and Enterprise actions cannot mutate the assignment",
+      "serverClass": "HushVotingLicensingActivationTwinTests",
+      "serverMethod": "Same_plan_activation_returns_transition_unchanged_durably",
+      "filter": "Category=FEAT-017&Category=TwinTest&Category=NON_E2E",
+      "twinRunState": "PASS",
+      "twinRunCounts": "6/6 focused FEAT-017 TwinTests (same-plan activation returns unchanged durably; no new assignment). Lower/Enterprise rejection families remain green under FEAT-013 durable-rejection twins.",
+      "resultArtifact": "FEAT-017 focused TwinTest run 2026-09-07 (server commit on feat/FEAT-017-account-licence-and-upgrade-experience)"
+    },
+    {
+      "scenarioId": "AT-LIC-009",
+      "browserFeature": "features/licence-upgrade/upgrade-activation-progress.feature",
+      "browserScenario": "A stale current-plan or catalogue precondition refreshes and requires reselection",
+      "serverClass": "HushVotingLicensingActivationTwinTests",
+      "serverMethod": "Stale_precondition_returns_precondition_conflict_durably",
+      "filter": "Category=FEAT-017&Category=TwinTest&Category=NON_E2E",
+      "twinRunState": "PASS",
+      "twinRunCounts": "6/6 focused FEAT-017 TwinTests (stale expected revision returns precondition-conflict durably with no mutation)",
+      "resultArtifact": "FEAT-017 focused TwinTest run 2026-09-07 (server commit on feat/FEAT-017-account-licence-and-upgrade-experience)"
+    }
+  ]
+}

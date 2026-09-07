@@ -15,7 +15,7 @@
  * Usage: node scripts/licence-upgrade/selftest.mjs
  */
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -118,6 +118,21 @@ try {
     expectRed('journey-wiring', process.execPath, [join(SCRIPT_DIR, 'journey-wiring.mjs')], {
       FEAT017_WIRING_FEATURES: journeyFeaturesSeed,
       FEAT017_WIRING_SKIP_LIST: '1',
+    }),
+  );
+
+  // 7. evidence red-effectiveness: a pairing ledger missing a twin-paired row
+  // must fail the evidence admission validator.
+  const realLedger = JSON.parse(readFileSync(join(SCRIPT_DIR, 'pairing-ledger.json'), 'utf8'));
+  const seededLedgerPath = join(root, 'pairing-seeded.json');
+  const seededLedger = {
+    ...realLedger,
+    entries: realLedger.entries.filter((entry) => entry.scenarioId !== 'AT-LIC-001'),
+  };
+  writeFileSync(seededLedgerPath, JSON.stringify(seededLedger, null, 2));
+  results.push(
+    expectRed('evidence', process.execPath, [join(SCRIPT_DIR, 'evidence.mjs')], {
+      FEAT017_PAIRING_LEDGER: seededLedgerPath,
     }),
   );
 } finally {
