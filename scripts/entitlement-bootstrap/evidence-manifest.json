@@ -2,67 +2,444 @@
   "schema": "feat016-evidence-manifest-v1",
   "feature": "FEAT-016",
   "generatedAt": "2026-09-07",
-  "notes": "Executed 2026-09-07 (continue-implementation, Phase 7). Client revision 351b210 (branch feat/FEAT-016-post-login-entitlement-bootstrap); server revision b472626 (branch feat/FEAT-016-post-login-entitlement-bootstrap). EXECUTABLE_ROOT rows record the browser journey wiring state; the full production-composition run requires the controlled real HushServerNode fixture (EXT-016-001, NOT_SUPPLIED) and is release-readiness evidence, never implementation-failure authority.",
+  "notes": "Executed 2026-09-07 (continue-implementation, Phase 7). Client revision 63ade2b (branch feat/FEAT-016-post-login-entitlement-bootstrap); server revision b472626 (branch feat/FEAT-016-post-login-entitlement-bootstrap). EXECUTABLE_ROOT rows record the browser journey wiring state; the full production-composition run requires the controlled real HushServerNode fixture (EXT-016-001, NOT_SUPPLIED) and is release-readiness evidence, never implementation-failure authority.",
   "rows": [
-    { "stableId": "AT-LIC-002", "evidenceClass": "TWIN", "state": "PASS", "counts": "6/6 focused FEAT-016 TwinTests", "command": "dotnet test HushNode.IntegrationTests/HushNode.IntegrationTests.csproj --no-build --filter Category=FEAT-016&Category=TwinTest&Category=NON_E2E", "revision": "b472626" },
-    { "stableId": "AT-LIC-002", "evidenceClass": "EXECUTABLE_ROOT", "state": "NOT_EXECUTED", "note": "full production-composition journey requires the controlled real HushServerNode fixture (EXT-016-001)", "captureDisabled": true },
-    { "stableId": "AT-LIC-003", "evidenceClass": "TWIN", "state": "PASS", "counts": "6/6 focused FEAT-016 TwinTests", "command": "dotnet test HushNode.IntegrationTests/HushNode.IntegrationTests.csproj --no-build --filter Category=FEAT-016&Category=TwinTest&Category=NON_E2E", "revision": "b472626" },
-    { "stableId": "AT-LIC-003", "evidenceClass": "EXECUTABLE_ROOT", "state": "NOT_EXECUTED", "note": "full production-composition journey requires the controlled real HushServerNode fixture (EXT-016-001)", "captureDisabled": true },
-    { "stableId": "AT-LIC-007", "evidenceClass": "TWIN", "state": "PASS", "counts": "6/6 focused FEAT-016 TwinTests", "command": "dotnet test HushNode.IntegrationTests/HushNode.IntegrationTests.csproj --no-build --filter Category=FEAT-016&Category=TwinTest&Category=NON_E2E", "revision": "b472626" },
-    { "stableId": "AT-LIC-007", "evidenceClass": "EXECUTABLE_ROOT", "state": "NOT_EXECUTED", "note": "full production-composition journey requires the controlled real HushServerNode fixture (EXT-016-001)", "captureDisabled": true },
-    { "stableId": "AT-LIC-010", "evidenceClass": "TWIN", "state": "PASS", "counts": "6/6 focused FEAT-016 TwinTests", "command": "dotnet test HushNode.IntegrationTests/HushNode.IntegrationTests.csproj --no-build --filter Category=FEAT-016&Category=TwinTest&Category=NON_E2E", "revision": "b472626" },
-    { "stableId": "AT-LIC-010", "evidenceClass": "EXECUTABLE_ROOT", "state": "NOT_EXECUTED", "note": "full production-composition journey requires the controlled real HushServerNode fixture (EXT-016-001)", "captureDisabled": true },
-    { "stableId": "AT-LIC-011", "evidenceClass": "TWIN", "state": "PASS", "counts": "6/6 focused FEAT-016 TwinTests", "command": "dotnet test HushNode.IntegrationTests/HushNode.IntegrationTests.csproj --no-build --filter Category=FEAT-016&Category=TwinTest&Category=NON_E2E", "revision": "b472626" },
-    { "stableId": "AT-LIC-011", "evidenceClass": "EXECUTABLE_ROOT", "state": "NOT_EXECUTED", "note": "full production-composition journey requires the controlled real HushServerNode fixture (EXT-016-001)", "captureDisabled": true },
-    { "stableId": "AT-LIC-012", "evidenceClass": "TWIN", "state": "PASS", "counts": "6/6 focused FEAT-016 TwinTests", "command": "dotnet test HushNode.IntegrationTests/HushNode.IntegrationTests.csproj --no-build --filter Category=FEAT-016&Category=TwinTest&Category=NON_E2E", "revision": "b472626" },
-    { "stableId": "AT-LIC-012", "evidenceClass": "EXECUTABLE_ROOT", "state": "NOT_EXECUTED", "note": "full production-composition journey requires the controlled real HushServerNode fixture (EXT-016-001)", "captureDisabled": true },
-
-    { "stableId": "AT-LIC-016-001", "evidenceClass": "EXECUTABLE_CLIENT", "state": "PASS", "counts": "17/17 gate presentation + EntitlementGate ready-mount tests", "command": "npx vitest run src/app/auth/EntitlementGate.test.tsx src/lib/auth/presentation/entitlement-presentation.test.ts", "revision": "351b210" },
-    { "stableId": "AT-LIC-016-001", "evidenceClass": "EXECUTABLE_ROOT", "state": "NOT_EXECUTED", "note": "full production-composition journey requires the controlled real HushServerNode fixture (EXT-016-001)", "captureDisabled": true },
-    { "stableId": "AT-LIC-016-002", "evidenceClass": "EXECUTABLE_CLIENT", "state": "PASS", "counts": "1/1 real multi-client WorkerAuthority licence-session test", "command": "npx vitest run src/lib/browser-vault/production/licence-bootstrap.multiclient.test.ts", "revision": "351b210" },
-    { "stableId": "AT-LIC-016-002", "evidenceClass": "EXECUTABLE_ROOT", "state": "NOT_EXECUTED", "note": "full production-composition journey requires the controlled real HushServerNode fixture (EXT-016-001)", "captureDisabled": true },
-    { "stableId": "AT-LIC-016-003", "evidenceClass": "EXECUTABLE_CLIENT", "state": "PASS", "counts": "26/26 coordinator + licence-bootstrap query-first restart/durable journal tests", "command": "npx vitest run src/lib/licensing/coordinator.test.ts src/lib/browser-vault/production/licence-bootstrap.test.ts", "revision": "351b210" },
-    { "stableId": "AT-LIC-016-003", "evidenceClass": "EXECUTABLE_ROOT", "state": "NOT_EXECUTED", "note": "full production-composition journey requires the controlled real HushServerNode fixture (EXT-016-001)", "captureDisabled": true },
-    { "stableId": "AT-LIC-016-004", "evidenceClass": "EXECUTABLE_CLIENT", "state": "PASS", "counts": "26/26 coordinator + licence-bootstrap paused-chain/delayed tests", "command": "npx vitest run src/lib/licensing/coordinator.test.ts src/lib/browser-vault/production/licence-bootstrap.test.ts", "revision": "351b210" },
-    { "stableId": "AT-LIC-016-004", "evidenceClass": "EXECUTABLE_ROOT", "state": "NOT_EXECUTED", "note": "full production-composition journey requires the controlled real HushServerNode fixture (EXT-016-001)", "captureDisabled": true },
-    { "stableId": "AT-LIC-016-005", "evidenceClass": "EXECUTABLE_CLIENT", "state": "PASS", "counts": "30/30 entitlement-bridge offline/revalidation + auth-ui + page tests", "command": "npx vitest run src/lib/auth/web/entitlement-bridge.test.ts src/app/auth/auth-ui.test.tsx src/app/page.test.tsx", "revision": "351b210" },
-    { "stableId": "AT-LIC-016-005", "evidenceClass": "EXECUTABLE_ROOT", "state": "NOT_EXECUTED", "note": "full production-composition journey requires the controlled real HushServerNode fixture (EXT-016-001)", "captureDisabled": true },
-    { "stableId": "AT-LIC-016-006", "evidenceClass": "EXECUTABLE_CLIENT", "state": "PASS", "counts": "30/30 auth-ui/navigation Back-stays-on-gate + page tests", "command": "npx vitest run src/lib/auth/web/entitlement-bridge.test.ts src/app/auth/auth-ui.test.tsx src/app/page.test.tsx", "revision": "351b210" },
-    { "stableId": "AT-LIC-016-006", "evidenceClass": "EXECUTABLE_ROOT", "state": "NOT_EXECUTED", "note": "full production-composition journey requires the controlled real HushServerNode fixture (EXT-016-001)", "captureDisabled": true },
-    { "stableId": "AT-LIC-016-007", "evidenceClass": "EXECUTABLE_CLIENT", "state": "PASS", "counts": "17/17 gate copy/focus/live-region/reduced-motion accessibility tests", "command": "npx vitest run src/app/auth/EntitlementGate.test.tsx src/lib/auth/presentation/entitlement-presentation.test.ts", "revision": "351b210" },
-    { "stableId": "AT-LIC-016-007", "evidenceClass": "EXECUTABLE_ROOT", "state": "NOT_EXECUTED", "note": "full production-composition journey requires the controlled real HushServerNode fixture (EXT-016-001)", "captureDisabled": true },
-
-    { "stableId": "AC-016-001", "evidenceClass": "EXECUTABLE_CLIENT", "state": "PASS", "counts": "1628/1628 unit incl. statechart/adapter/gate", "command": "npm run test:unit", "revision": "351b210" },
-    { "stableId": "AC-016-002", "evidenceClass": "EXECUTABLE_CLIENT", "state": "PASS", "counts": "1628/1628 unit incl. byte-exact fixture/property", "command": "npm run test:unit", "revision": "351b210" },
-    { "stableId": "AC-016-003", "evidenceClass": "EXECUTABLE_CLIENT", "state": "PASS", "counts": "1628/1628 unit incl. parser/BFF contract", "command": "npm run test:unit", "revision": "351b210" },
-    { "stableId": "AC-016-004", "evidenceClass": "EXECUTABLE_CLIENT", "state": "PASS", "counts": "1628/1628 unit incl. Direct Free vector construction", "command": "npm run test:unit", "revision": "351b210" },
-    { "stableId": "AC-016-005", "evidenceClass": "EXECUTABLE_CLIENT", "state": "PASS", "counts": "1628/1628 unit incl. sealed journal redaction", "command": "npm run test:unit", "revision": "351b210" },
-    { "stableId": "AC-016-006", "evidenceClass": "EXECUTABLE_CLIENT", "state": "PASS", "counts": "1628/1628 unit incl. fail-closed parser/coordinator", "command": "npm run test:unit", "revision": "351b210" },
-    { "stableId": "AC-016-007", "evidenceClass": "EXECUTABLE_CLIENT", "state": "PASS", "counts": "1628/1628 unit incl. deterministic timer/serialization", "command": "npm run test:unit", "revision": "351b210" },
-    { "stableId": "AC-016-008", "evidenceClass": "EXECUTABLE_CLIENT", "state": "PASS", "counts": "1628/1628 unit incl. 30s/paused deterministic timers", "command": "npm run test:unit", "revision": "351b210" },
-    { "stableId": "AC-016-009", "evidenceClass": "EXECUTABLE_CLIENT", "state": "PASS", "counts": "1628/1628 unit incl. exact-reuse vectors + recovery", "command": "npm run test:unit", "revision": "351b210" },
-    { "stableId": "AC-016-010", "evidenceClass": "EXECUTABLE_CLIENT", "state": "PASS", "counts": "1628/1628 unit incl. query-first restart", "command": "npm run test:unit", "revision": "351b210" },
-    { "stableId": "AC-016-011", "evidenceClass": "EXECUTABLE_CLIENT", "state": "PASS", "counts": "1628/1628 unit incl. journal-loss repair", "command": "npm run test:unit", "revision": "351b210" },
-    { "stableId": "AC-016-012", "evidenceClass": "EXECUTABLE_CLIENT", "state": "PASS", "counts": "1/1 real multi-client WorkerAuthority licence-session test", "command": "npx vitest run src/lib/browser-vault/production/licence-bootstrap.multiclient.test.ts", "revision": "351b210" },
-    { "stableId": "AC-016-013", "evidenceClass": "EXECUTABLE_CLIENT", "state": "PASS", "counts": "1628/1628 unit incl. stale-epoch/revocation", "command": "npm run test:unit", "revision": "351b210" },
-    { "stableId": "AC-016-014", "evidenceClass": "EXECUTABLE_CLIENT", "state": "PASS", "counts": "1628/1628 unit incl. fail-closed offline/unavailable", "command": "npm run test:unit", "revision": "351b210" },
-    { "stableId": "AC-016-015", "evidenceClass": "EXECUTABLE_CLIENT", "state": "PASS", "counts": "1628/1628 unit incl. hidden-context + process-end", "command": "npm run test:unit", "revision": "351b210" },
-    { "stableId": "AC-016-016", "evidenceClass": "EXECUTABLE_CLIENT", "state": "PASS", "counts": "1628/1628 unit incl. revalidation triggers", "command": "npm run test:unit", "revision": "351b210" },
-    { "stableId": "AC-016-017", "evidenceClass": "EXECUTABLE_CLIENT", "state": "PASS", "counts": "1628/1628 unit incl. expiry trigger", "command": "npm run test:unit", "revision": "351b210" },
-    { "stableId": "AC-016-018", "evidenceClass": "EXECUTABLE_CLIENT", "state": "PASS", "counts": "1628/1628 unit incl. historical/incompatible projection", "command": "npm run test:unit", "revision": "351b210" },
-    { "stableId": "AC-016-019", "evidenceClass": "EXECUTABLE_STATIC", "state": "PASS", "counts": "property scan 0 forbidden properties (no persistence)", "command": "npm run entitlement-bootstrap:property-scan", "revision": "351b210" },
-    { "stableId": "AC-016-020", "evidenceClass": "EXECUTABLE_CLIENT", "state": "PASS", "counts": "17/17 gate copy/focus/live/Back component tests", "command": "npx vitest run src/app/auth/EntitlementGate.test.tsx src/lib/auth/presentation/entitlement-presentation.test.ts", "revision": "351b210" },
-    { "stableId": "AC-016-021", "evidenceClass": "EXECUTABLE_CLIENT", "state": "PASS", "counts": "1628/1628 unit incl. Web composition + bridge", "command": "npm run test:unit", "revision": "351b210" },
-    { "stableId": "AC-016-021", "evidenceClass": "EXECUTABLE_NATIVE", "state": "PASS", "counts": "333/333 cargo tests incl. native licence authority + no-fallback source guards", "command": "cargo test --manifest-path src-tauri/Cargo.toml --locked", "revision": "351b210" },
-    { "stableId": "AC-016-022", "evidenceClass": "EXECUTABLE_CLIENT", "state": "PASS", "counts": "1628/1628 unit incl. reusable primitive contracts", "command": "npm run test:unit", "revision": "351b210" },
-    { "stableId": "AC-016-023", "evidenceClass": "EXECUTABLE_STATIC", "state": "PASS", "counts": "secret/property scans 0 findings (telemetry allowlist)", "command": "npm run entitlement-bootstrap:secret-scan", "revision": "351b210" },
-    { "stableId": "AC-016-024", "evidenceClass": "TWIN", "state": "PASS", "counts": "6/6 focused FEAT-016 TwinTests + 13/13 journey wiring", "command": "dotnet test HushNode.IntegrationTests/HushNode.IntegrationTests.csproj --no-build --filter Category=FEAT-016&Category=TwinTest&Category=NON_E2E", "revision": "b472626" },
-    { "stableId": "AC-016-025", "evidenceClass": "EXECUTABLE_NATIVE", "state": "PASS", "counts": "333/333 cargo native parity tests", "command": "cargo test --manifest-path src-tauri/Cargo.toml --locked", "revision": "351b210" },
-    { "stableId": "AC-016-026", "evidenceClass": "EXECUTABLE_STATIC", "state": "PASS", "counts": "quality aggregate green incl. cleanup verification", "command": "npm run entitlement-bootstrap:quality", "revision": "351b210" },
-    { "stableId": "AC-016-027", "evidenceClass": "MANUAL", "state": "PENDING", "note": "MT-QUAL-ANDROID-016-001 + MT-QUAL-UBUNTU-016-001 release-readiness only; never implementation completion" },
-    { "stableId": "AC-016-028", "evidenceClass": "EXECUTABLE_STATIC", "state": "PASS", "counts": "property scan 0 forbidden FEAT-017/018 surfaces in gate module", "command": "npm run entitlement-bootstrap:property-scan", "revision": "351b210" },
-
-    { "stableId": "MT-QUAL-ANDROID-016-001", "evidenceClass": "MANUAL", "state": "PENDING", "note": "physical Android hardware-backed smoke; release readiness only" },
-    { "stableId": "MT-QUAL-UBUNTU-016-001", "evidenceClass": "MANUAL", "state": "PENDING", "note": "qualified Ubuntu GUI smoke; release readiness only" }
+    {
+      "stableId": "AT-LIC-002",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "6/6 focused FEAT-016 TwinTests",
+      "command": "dotnet test HushNode.IntegrationTests/HushNode.IntegrationTests.csproj --no-build --filter Category=FEAT-016&Category=TwinTest&Category=NON_E2E",
+      "revision": "b472626"
+    },
+    {
+      "stableId": "AT-LIC-002",
+      "evidenceClass": "EXECUTABLE_ROOT",
+      "state": "NOT_EXECUTED",
+      "note": "full production-composition journey requires the controlled real HushServerNode fixture (EXT-016-001)",
+      "captureDisabled": true
+    },
+    {
+      "stableId": "AT-LIC-003",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "6/6 focused FEAT-016 TwinTests",
+      "command": "dotnet test HushNode.IntegrationTests/HushNode.IntegrationTests.csproj --no-build --filter Category=FEAT-016&Category=TwinTest&Category=NON_E2E",
+      "revision": "b472626"
+    },
+    {
+      "stableId": "AT-LIC-003",
+      "evidenceClass": "EXECUTABLE_ROOT",
+      "state": "NOT_EXECUTED",
+      "note": "full production-composition journey requires the controlled real HushServerNode fixture (EXT-016-001)",
+      "captureDisabled": true
+    },
+    {
+      "stableId": "AT-LIC-007",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "6/6 focused FEAT-016 TwinTests",
+      "command": "dotnet test HushNode.IntegrationTests/HushNode.IntegrationTests.csproj --no-build --filter Category=FEAT-016&Category=TwinTest&Category=NON_E2E",
+      "revision": "b472626"
+    },
+    {
+      "stableId": "AT-LIC-007",
+      "evidenceClass": "EXECUTABLE_ROOT",
+      "state": "NOT_EXECUTED",
+      "note": "full production-composition journey requires the controlled real HushServerNode fixture (EXT-016-001)",
+      "captureDisabled": true
+    },
+    {
+      "stableId": "AT-LIC-010",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "6/6 focused FEAT-016 TwinTests",
+      "command": "dotnet test HushNode.IntegrationTests/HushNode.IntegrationTests.csproj --no-build --filter Category=FEAT-016&Category=TwinTest&Category=NON_E2E",
+      "revision": "b472626"
+    },
+    {
+      "stableId": "AT-LIC-010",
+      "evidenceClass": "EXECUTABLE_ROOT",
+      "state": "NOT_EXECUTED",
+      "note": "full production-composition journey requires the controlled real HushServerNode fixture (EXT-016-001)",
+      "captureDisabled": true
+    },
+    {
+      "stableId": "AT-LIC-011",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "6/6 focused FEAT-016 TwinTests",
+      "command": "dotnet test HushNode.IntegrationTests/HushNode.IntegrationTests.csproj --no-build --filter Category=FEAT-016&Category=TwinTest&Category=NON_E2E",
+      "revision": "b472626"
+    },
+    {
+      "stableId": "AT-LIC-011",
+      "evidenceClass": "EXECUTABLE_ROOT",
+      "state": "NOT_EXECUTED",
+      "note": "full production-composition journey requires the controlled real HushServerNode fixture (EXT-016-001)",
+      "captureDisabled": true
+    },
+    {
+      "stableId": "AT-LIC-012",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "6/6 focused FEAT-016 TwinTests",
+      "command": "dotnet test HushNode.IntegrationTests/HushNode.IntegrationTests.csproj --no-build --filter Category=FEAT-016&Category=TwinTest&Category=NON_E2E",
+      "revision": "b472626"
+    },
+    {
+      "stableId": "AT-LIC-012",
+      "evidenceClass": "EXECUTABLE_ROOT",
+      "state": "NOT_EXECUTED",
+      "note": "full production-composition journey requires the controlled real HushServerNode fixture (EXT-016-001)",
+      "captureDisabled": true
+    },
+    {
+      "stableId": "AT-LIC-016-001",
+      "evidenceClass": "EXECUTABLE_CLIENT",
+      "state": "PASS",
+      "counts": "17/17 gate presentation + EntitlementGate ready-mount tests",
+      "command": "npx vitest run src/app/auth/EntitlementGate.test.tsx src/lib/auth/presentation/entitlement-presentation.test.ts",
+      "revision": "63ade2b"
+    },
+    {
+      "stableId": "AT-LIC-016-001",
+      "evidenceClass": "EXECUTABLE_ROOT",
+      "state": "NOT_EXECUTED",
+      "note": "full production-composition journey requires the controlled real HushServerNode fixture (EXT-016-001)",
+      "captureDisabled": true
+    },
+    {
+      "stableId": "AT-LIC-016-002",
+      "evidenceClass": "EXECUTABLE_CLIENT",
+      "state": "PASS",
+      "counts": "1/1 real multi-client WorkerAuthority licence-session test",
+      "command": "npx vitest run src/lib/browser-vault/production/licence-bootstrap.multiclient.test.ts",
+      "revision": "63ade2b"
+    },
+    {
+      "stableId": "AT-LIC-016-002",
+      "evidenceClass": "EXECUTABLE_ROOT",
+      "state": "NOT_EXECUTED",
+      "note": "full production-composition journey requires the controlled real HushServerNode fixture (EXT-016-001)",
+      "captureDisabled": true
+    },
+    {
+      "stableId": "AT-LIC-016-003",
+      "evidenceClass": "EXECUTABLE_CLIENT",
+      "state": "PASS",
+      "counts": "26/26 coordinator + licence-bootstrap query-first restart/durable journal tests",
+      "command": "npx vitest run src/lib/licensing/coordinator.test.ts src/lib/browser-vault/production/licence-bootstrap.test.ts",
+      "revision": "63ade2b"
+    },
+    {
+      "stableId": "AT-LIC-016-003",
+      "evidenceClass": "EXECUTABLE_ROOT",
+      "state": "NOT_EXECUTED",
+      "note": "full production-composition journey requires the controlled real HushServerNode fixture (EXT-016-001)",
+      "captureDisabled": true
+    },
+    {
+      "stableId": "AT-LIC-016-004",
+      "evidenceClass": "EXECUTABLE_CLIENT",
+      "state": "PASS",
+      "counts": "26/26 coordinator + licence-bootstrap paused-chain/delayed tests",
+      "command": "npx vitest run src/lib/licensing/coordinator.test.ts src/lib/browser-vault/production/licence-bootstrap.test.ts",
+      "revision": "63ade2b"
+    },
+    {
+      "stableId": "AT-LIC-016-004",
+      "evidenceClass": "EXECUTABLE_ROOT",
+      "state": "NOT_EXECUTED",
+      "note": "full production-composition journey requires the controlled real HushServerNode fixture (EXT-016-001)",
+      "captureDisabled": true
+    },
+    {
+      "stableId": "AT-LIC-016-005",
+      "evidenceClass": "EXECUTABLE_CLIENT",
+      "state": "PASS",
+      "counts": "30/30 entitlement-bridge offline/revalidation + auth-ui + page tests",
+      "command": "npx vitest run src/lib/auth/web/entitlement-bridge.test.ts src/app/auth/auth-ui.test.tsx src/app/page.test.tsx",
+      "revision": "63ade2b"
+    },
+    {
+      "stableId": "AT-LIC-016-005",
+      "evidenceClass": "EXECUTABLE_ROOT",
+      "state": "NOT_EXECUTED",
+      "note": "full production-composition journey requires the controlled real HushServerNode fixture (EXT-016-001)",
+      "captureDisabled": true
+    },
+    {
+      "stableId": "AT-LIC-016-006",
+      "evidenceClass": "EXECUTABLE_CLIENT",
+      "state": "PASS",
+      "counts": "30/30 auth-ui/navigation Back-stays-on-gate + page tests",
+      "command": "npx vitest run src/lib/auth/web/entitlement-bridge.test.ts src/app/auth/auth-ui.test.tsx src/app/page.test.tsx",
+      "revision": "63ade2b"
+    },
+    {
+      "stableId": "AT-LIC-016-006",
+      "evidenceClass": "EXECUTABLE_ROOT",
+      "state": "NOT_EXECUTED",
+      "note": "full production-composition journey requires the controlled real HushServerNode fixture (EXT-016-001)",
+      "captureDisabled": true
+    },
+    {
+      "stableId": "AT-LIC-016-007",
+      "evidenceClass": "EXECUTABLE_CLIENT",
+      "state": "PASS",
+      "counts": "17/17 gate copy/focus/live-region/reduced-motion accessibility tests",
+      "command": "npx vitest run src/app/auth/EntitlementGate.test.tsx src/lib/auth/presentation/entitlement-presentation.test.ts",
+      "revision": "63ade2b"
+    },
+    {
+      "stableId": "AT-LIC-016-007",
+      "evidenceClass": "EXECUTABLE_ROOT",
+      "state": "NOT_EXECUTED",
+      "note": "full production-composition journey requires the controlled real HushServerNode fixture (EXT-016-001)",
+      "captureDisabled": true
+    },
+    {
+      "stableId": "AC-016-001",
+      "evidenceClass": "EXECUTABLE_CLIENT",
+      "state": "PASS",
+      "counts": "1628/1628 unit incl. statechart/adapter/gate",
+      "command": "npm run test:unit",
+      "revision": "63ade2b"
+    },
+    {
+      "stableId": "AC-016-002",
+      "evidenceClass": "EXECUTABLE_CLIENT",
+      "state": "PASS",
+      "counts": "1628/1628 unit incl. byte-exact fixture/property",
+      "command": "npm run test:unit",
+      "revision": "63ade2b"
+    },
+    {
+      "stableId": "AC-016-003",
+      "evidenceClass": "EXECUTABLE_CLIENT",
+      "state": "PASS",
+      "counts": "1628/1628 unit incl. parser/BFF contract",
+      "command": "npm run test:unit",
+      "revision": "63ade2b"
+    },
+    {
+      "stableId": "AC-016-004",
+      "evidenceClass": "EXECUTABLE_CLIENT",
+      "state": "PASS",
+      "counts": "1628/1628 unit incl. Direct Free vector construction",
+      "command": "npm run test:unit",
+      "revision": "63ade2b"
+    },
+    {
+      "stableId": "AC-016-005",
+      "evidenceClass": "EXECUTABLE_CLIENT",
+      "state": "PASS",
+      "counts": "1628/1628 unit incl. sealed journal redaction",
+      "command": "npm run test:unit",
+      "revision": "63ade2b"
+    },
+    {
+      "stableId": "AC-016-006",
+      "evidenceClass": "EXECUTABLE_CLIENT",
+      "state": "PASS",
+      "counts": "1628/1628 unit incl. fail-closed parser/coordinator",
+      "command": "npm run test:unit",
+      "revision": "63ade2b"
+    },
+    {
+      "stableId": "AC-016-007",
+      "evidenceClass": "EXECUTABLE_CLIENT",
+      "state": "PASS",
+      "counts": "1628/1628 unit incl. deterministic timer/serialization",
+      "command": "npm run test:unit",
+      "revision": "63ade2b"
+    },
+    {
+      "stableId": "AC-016-008",
+      "evidenceClass": "EXECUTABLE_CLIENT",
+      "state": "PASS",
+      "counts": "1628/1628 unit incl. 30s/paused deterministic timers",
+      "command": "npm run test:unit",
+      "revision": "63ade2b"
+    },
+    {
+      "stableId": "AC-016-009",
+      "evidenceClass": "EXECUTABLE_CLIENT",
+      "state": "PASS",
+      "counts": "1628/1628 unit incl. exact-reuse vectors + recovery",
+      "command": "npm run test:unit",
+      "revision": "63ade2b"
+    },
+    {
+      "stableId": "AC-016-010",
+      "evidenceClass": "EXECUTABLE_CLIENT",
+      "state": "PASS",
+      "counts": "1628/1628 unit incl. query-first restart",
+      "command": "npm run test:unit",
+      "revision": "63ade2b"
+    },
+    {
+      "stableId": "AC-016-011",
+      "evidenceClass": "EXECUTABLE_CLIENT",
+      "state": "PASS",
+      "counts": "1628/1628 unit incl. journal-loss repair",
+      "command": "npm run test:unit",
+      "revision": "63ade2b"
+    },
+    {
+      "stableId": "AC-016-012",
+      "evidenceClass": "EXECUTABLE_CLIENT",
+      "state": "PASS",
+      "counts": "1/1 real multi-client WorkerAuthority licence-session test",
+      "command": "npx vitest run src/lib/browser-vault/production/licence-bootstrap.multiclient.test.ts",
+      "revision": "63ade2b"
+    },
+    {
+      "stableId": "AC-016-013",
+      "evidenceClass": "EXECUTABLE_CLIENT",
+      "state": "PASS",
+      "counts": "1628/1628 unit incl. stale-epoch/revocation",
+      "command": "npm run test:unit",
+      "revision": "63ade2b"
+    },
+    {
+      "stableId": "AC-016-014",
+      "evidenceClass": "EXECUTABLE_CLIENT",
+      "state": "PASS",
+      "counts": "1628/1628 unit incl. fail-closed offline/unavailable",
+      "command": "npm run test:unit",
+      "revision": "63ade2b"
+    },
+    {
+      "stableId": "AC-016-015",
+      "evidenceClass": "EXECUTABLE_CLIENT",
+      "state": "PASS",
+      "counts": "1628/1628 unit incl. hidden-context + process-end",
+      "command": "npm run test:unit",
+      "revision": "63ade2b"
+    },
+    {
+      "stableId": "AC-016-016",
+      "evidenceClass": "EXECUTABLE_CLIENT",
+      "state": "PASS",
+      "counts": "1628/1628 unit incl. revalidation triggers",
+      "command": "npm run test:unit",
+      "revision": "63ade2b"
+    },
+    {
+      "stableId": "AC-016-017",
+      "evidenceClass": "EXECUTABLE_CLIENT",
+      "state": "PASS",
+      "counts": "1628/1628 unit incl. expiry trigger",
+      "command": "npm run test:unit",
+      "revision": "63ade2b"
+    },
+    {
+      "stableId": "AC-016-018",
+      "evidenceClass": "EXECUTABLE_CLIENT",
+      "state": "PASS",
+      "counts": "1628/1628 unit incl. historical/incompatible projection",
+      "command": "npm run test:unit",
+      "revision": "63ade2b"
+    },
+    {
+      "stableId": "AC-016-019",
+      "evidenceClass": "EXECUTABLE_STATIC",
+      "state": "PASS",
+      "counts": "property scan 0 forbidden properties (no persistence)",
+      "command": "npm run entitlement-bootstrap:property-scan",
+      "revision": "63ade2b"
+    },
+    {
+      "stableId": "AC-016-020",
+      "evidenceClass": "EXECUTABLE_CLIENT",
+      "state": "PASS",
+      "counts": "17/17 gate copy/focus/live/Back component tests",
+      "command": "npx vitest run src/app/auth/EntitlementGate.test.tsx src/lib/auth/presentation/entitlement-presentation.test.ts",
+      "revision": "63ade2b"
+    },
+    {
+      "stableId": "AC-016-021",
+      "evidenceClass": "EXECUTABLE_CLIENT",
+      "state": "PASS",
+      "counts": "1628/1628 unit incl. Web composition + bridge",
+      "command": "npm run test:unit",
+      "revision": "63ade2b"
+    },
+    {
+      "stableId": "AC-016-021",
+      "evidenceClass": "EXECUTABLE_NATIVE",
+      "state": "PASS",
+      "counts": "333/333 cargo tests incl. native licence authority + no-fallback source guards",
+      "command": "cargo test --manifest-path src-tauri/Cargo.toml --locked",
+      "revision": "63ade2b"
+    },
+    {
+      "stableId": "AC-016-022",
+      "evidenceClass": "EXECUTABLE_CLIENT",
+      "state": "PASS",
+      "counts": "1628/1628 unit incl. reusable primitive contracts",
+      "command": "npm run test:unit",
+      "revision": "63ade2b"
+    },
+    {
+      "stableId": "AC-016-023",
+      "evidenceClass": "EXECUTABLE_STATIC",
+      "state": "PASS",
+      "counts": "secret/property scans 0 findings (telemetry allowlist)",
+      "command": "npm run entitlement-bootstrap:secret-scan",
+      "revision": "63ade2b"
+    },
+    {
+      "stableId": "AC-016-024",
+      "evidenceClass": "TWIN",
+      "state": "PASS",
+      "counts": "6/6 focused FEAT-016 TwinTests + 13/13 journey wiring",
+      "command": "dotnet test HushNode.IntegrationTests/HushNode.IntegrationTests.csproj --no-build --filter Category=FEAT-016&Category=TwinTest&Category=NON_E2E",
+      "revision": "b472626"
+    },
+    {
+      "stableId": "AC-016-025",
+      "evidenceClass": "EXECUTABLE_NATIVE",
+      "state": "PASS",
+      "counts": "333/333 cargo native parity tests",
+      "command": "cargo test --manifest-path src-tauri/Cargo.toml --locked",
+      "revision": "63ade2b"
+    },
+    {
+      "stableId": "AC-016-026",
+      "evidenceClass": "EXECUTABLE_STATIC",
+      "state": "PASS",
+      "counts": "quality aggregate green incl. cleanup verification",
+      "command": "npm run entitlement-bootstrap:quality",
+      "revision": "63ade2b"
+    },
+    {
+      "stableId": "AC-016-027",
+      "evidenceClass": "MANUAL",
+      "state": "PENDING",
+      "note": "MT-QUAL-ANDROID-016-001 + MT-QUAL-UBUNTU-016-001 release-readiness only; never implementation completion"
+    },
+    {
+      "stableId": "AC-016-028",
+      "evidenceClass": "EXECUTABLE_STATIC",
+      "state": "PASS",
+      "counts": "property scan 0 forbidden FEAT-017/018 surfaces in gate module",
+      "command": "npm run entitlement-bootstrap:property-scan",
+      "revision": "63ade2b"
+    },
+    {
+      "stableId": "MT-QUAL-ANDROID-016-001",
+      "evidenceClass": "MANUAL",
+      "state": "PENDING",
+      "note": "physical Android hardware-backed smoke; release readiness only"
+    },
+    {
+      "stableId": "MT-QUAL-UBUNTU-016-001",
+      "evidenceClass": "MANUAL",
+      "state": "PENDING",
+      "note": "qualified Ubuntu GUI smoke; release readiness only"
+    }
   ]
 }
