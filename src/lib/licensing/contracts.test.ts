@@ -15,6 +15,8 @@ import {
   LICENCE_QUERY_SIGNATURE_HEADER,
   LICENCE_QUERY_SIGNED_AT_HEADER,
   LICENCE_QUERY_SIGNATORY_HEADER,
+  LICENCE_TRANSITION_INTENT_BASELINE_FREE,
+  LICENCE_TRANSITION_INTENT_CONFIRMED_UPGRADE,
   licenceQuerySignedJson,
   type LicenceFreshQueryEnvelope,
 } from './contracts';
@@ -109,5 +111,15 @@ describe('FEAT-015 canonical licence transaction corpus (byte-exact)', () => {
 
   it('locks the baseline transaction id used by the vectors', () => {
     expect(LICENCE_FIXED_BASELINE_TRANSACTION_ID).toBe('5f2d9e11-3c44-4a80-b8e7-6b2f1a0c9d3e');
+  });
+});
+
+describe('FEAT-017 frozen upgrade vocabulary', () => {
+  it('pins the confirmed_upgrade transition intent next to the baseline intent', () => {
+    expect(LICENCE_TRANSITION_INTENT_BASELINE_FREE).toBe('baseline_free');
+    expect(LICENCE_TRANSITION_INTENT_CONFIRMED_UPGRADE).toBe('confirmed_upgrade');
+    expect(LICENCE_TRANSITION_INTENT_CONFIRMED_UPGRADE).not.toBe(
+      LICENCE_TRANSITION_INTENT_BASELINE_FREE,
+    );
   });
 });

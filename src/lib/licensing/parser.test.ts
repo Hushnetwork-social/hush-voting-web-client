@@ -61,6 +61,53 @@ describe('parseEntitlementQueryResult', () => {
     }
   });
 
+  it('carries the validated higher-option/Enterprise boundary into the ready projection', () => {
+    const outcome = parse(
+      activeResult({
+        PlanId: 'hushvoting.direct.free',
+        PlanFamily: 'direct',
+        HigherOptions: [
+          {
+            PlanId: 'hushvoting.veritas.500',
+            DisplayName: 'HushVoting! Veritas 500',
+            SafeDescription: 'Up to 500 voters',
+            EligibleVoterCap: 500,
+            UnlimitedElections: true,
+            TermKind: 'annual',
+            TermYears: 1,
+          },
+          {
+            PlanId: 'hushvoting.veritas.2000',
+            DisplayName: 'HushVoting! Veritas 2k',
+            SafeDescription: 'Up to 2,000 voters',
+            EligibleVoterCap: 2000,
+            UnlimitedElections: true,
+            TermKind: 'annual',
+            TermYears: 1,
+          },
+        ],
+        Enterprise: {
+          PlanId: 'hushvoting.enterprise',
+          DisplayName: 'HushVoting! Enterprise',
+          SafeDescription: 'Contact provider — not yet available',
+        },
+      }),
+    );
+    expect(outcome.outcome).toBe('ready');
+    if (outcome.outcome !== 'ready') return;
+    // Server order is authoritative and preserved; no client reordering.
+    expect(outcome.projection.higherOptions.map((o) => o.planId)).toEqual([
+      'hushvoting.veritas.500',
+      'hushvoting.veritas.2000',
+    ]);
+    expect(outcome.projection.enterprise?.planId).toBe('hushvoting.enterprise');
+    expect(outcome.projection.higherOptions[1].termYears).toBe(1);
+    // Exact FEAT-015 template members never reach the projection.
+    const serialized = JSON.stringify(outcome.projection);
+    expect(serialized).not.toContain('TransitionIntent');
+    expect(serialized).not.toContain('UserSignature');
+  });
+
   it('maps no-active to noActive with the exact server template', () => {
     const outcome = parse({
       ok: true,

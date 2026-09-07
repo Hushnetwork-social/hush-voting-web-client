@@ -48,6 +48,13 @@ export const LICENCE_CATALOGUE_VERSION_V1 = 'hushvoting-licence-catalogue/v1.0.0
 export const LICENCE_TRANSITION_INTENT_BASELINE_FREE = 'baseline_free' as const;
 
 /**
+ * Confirmed-upgrade transition intent (FEAT-015 frozen payload member).
+ * Used by the FEAT-017 closed authority to construct the exact upgrade
+ * assignment; UI code never sees this member inside a payload.
+ */
+export const LICENCE_TRANSITION_INTENT_CONFIRMED_UPGRADE = 'confirmed_upgrade' as const;
+
+/**
  * Client-recognized plan families published by the v1.0.0 catalogue. A server
  * active view whose family is outside this allowlist is a compatible-client
  * gate (unsupported), never Direct Free coercion.
