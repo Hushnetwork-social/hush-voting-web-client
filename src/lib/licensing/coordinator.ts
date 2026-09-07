@@ -207,6 +207,13 @@ export class LicenceEntitlementCoordinator {
     this.attemptCount = 0;
     this.consecutiveUnauthenticated = 0;
     this.projection = null;
+    // FEAT-017: a fresh query-first start opens a new session scope — ephemeral
+    // upgrade artifacts (notification eligibility, retained terminal outcome,
+    // delayed marker, pending rejection requery) never survive it.
+    this.upgradeDelayed = false;
+    this.upgradeTerminal = null;
+    this.upgradeNotificationEligible = false;
+    this.upgradeRejectedRequery = false;
     this.phase = 'resolving';
     await this.runFreshQuery('start');
     return this.snapshot();

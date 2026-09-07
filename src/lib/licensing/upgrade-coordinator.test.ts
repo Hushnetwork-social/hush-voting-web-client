@@ -684,6 +684,20 @@ describe('delayed window, paused chain, and invalidation (Task 3.3)', () => {
     expect(snap.upgradeNotificationEligible).toBe(false);
     expect(h.submitCalls).toHaveLength(2); // first upgrade submission + this one
   });
+  it('a fresh query-first start never carries ephemeral upgrade artifacts across session scope', async () => {
+    const h = makeHarness();
+    await resolveToExactSuccess(h);
+    expect(h.coordinator.snapshot().upgradeOperation?.status).toBe('local-success');
+    expect(h.coordinator.snapshot().upgradeNotificationEligible).toBe(true);
+    // Lock (invalidation) then a fresh authenticated start: ephemeral artifacts
+    // must not leak into the new session scope.
+    await h.coordinator.lock();
+    h.queryQueue.push(activeResult({ reference: CURRENT_REF, planId: CURRENT_PLAN, displayName: CURRENT_NAME }));
+    const restarted = await h.coordinator.start();
+    expect(restarted.upgradeOperation).toBeNull();
+    expect(restarted.upgradeNotificationEligible).toBe(false);
+    expect(restarted.phase).toBe('entitlementReady');
+  });
 });
 
 describe('privacy and snapshot shape', () => {
