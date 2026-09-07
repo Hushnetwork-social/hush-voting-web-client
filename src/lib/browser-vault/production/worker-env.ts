@@ -657,6 +657,23 @@ export function createProductionWorkerEnvironment(params: {
           });
           return toLicenceStepResult(result);
         }
+        case 'licenceUpgradeConfirm': {
+          const session = licenceSession;
+          if (session === null) {
+            return toAuthorityResult({ outcome: 'INVALID_INPUT', payload: { reason: 'not-authenticated' } });
+          }
+          const targetPlanId = typeof payload.targetPlanId === 'string' ? payload.targetPlanId : '';
+          const result = await session.confirmUpgrade(targetPlanId);
+          return toLicenceStepResult(result);
+        }
+        case 'licenceUpgradeAcknowledge': {
+          const session = licenceSession;
+          if (session === null) {
+            return toAuthorityResult({ outcome: 'INVALID_INPUT', payload: { reason: 'not-authenticated' } });
+          }
+          const result = await session.acknowledgeUpgradeOutcome();
+          return toLicenceStepResult(result);
+        }
         default:
           return { outcome: 'INVALID_INPUT', retryable: false, allowedActions: [], supportCode: undefined };
       }

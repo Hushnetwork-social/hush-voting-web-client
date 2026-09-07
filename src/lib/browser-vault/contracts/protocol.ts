@@ -130,7 +130,13 @@ export type BrowserOperationKind =
   // snapshots/progress.
   | 'licenceBootstrapStart'
   | 'licenceBootstrapControl'
-  | 'licenceBootstrapEligibility';
+  | 'licenceBootstrapEligibility'
+  // FEAT-017 additive: one closed confirmed-upgrade operation per authority.
+  // Signing, journal custody, submission, and reconciliation stay inside the
+  // authority; these page requests only drive safe steps and receive safe
+  // snapshots/progress (same rule as the FEAT-016 bootstrap ops).
+  | 'licenceUpgradeConfirm'
+  | 'licenceUpgradeAcknowledge';
 
 /**
  * Operation request. Carries NO secret payload: password/mnemonic/file bytes are
@@ -337,6 +343,10 @@ const OPERATION_PAYLOAD_SCHEMAS: Readonly<Record<string, readonly string[]>> = {
   licenceBootstrapStart: ['networkBinding'],
   licenceBootstrapControl: ['control', 'trigger'],
   licenceBootstrapEligibility: ['foreground', 'connectivity'],
+  // FEAT-017 additive: confirmed-upgrade activation carries only the bounded
+  // server plan handle; acknowledge carries no payload.
+  licenceUpgradeConfirm: ['targetPlanId'],
+  licenceUpgradeAcknowledge: [],
 };
 
 /** Secret-shaped field names that may never appear in operation payloads. */
@@ -491,6 +501,9 @@ const OPERATION_KINDS: ReadonlySet<string> = new Set<BrowserOperationKind>([
   'licenceBootstrapStart',
   'licenceBootstrapControl',
   'licenceBootstrapEligibility',
+  // FEAT-017 additive: closed confirmed-upgrade op kinds.
+  'licenceUpgradeConfirm',
+  'licenceUpgradeAcknowledge',
 ]);
 
 function validateSecretTransfer(record: Record<string, unknown>): SecretTransferMessage | null {

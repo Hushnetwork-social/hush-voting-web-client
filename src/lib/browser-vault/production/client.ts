@@ -67,7 +67,10 @@ export type ClientOperationKind =
   // FEAT-016 additive: closed entitlement-bootstrap steps.
   | 'licenceBootstrapStart'
   | 'licenceBootstrapControl'
-  | 'licenceBootstrapEligibility';
+  | 'licenceBootstrapEligibility'
+  // FEAT-017 additive: one closed confirmed-upgrade operation per authority.
+  | 'licenceUpgradeConfirm'
+  | 'licenceUpgradeAcknowledge';
 
 /** Secret purposes accepted by the sink. */
 export type SecretPurpose = 'devicePassword' | 'mnemonic' | 'filePassword' | 'fileBytes';
@@ -183,7 +186,8 @@ export class BrowserVaultClient {
   private readonly pending = new Map<string, (result: ClientOperationResult) => void>();
   private pendingCapabilityResolvers: Array<(issued: CapabilityIssued) => void> = [];
   private invalidationHandler: ((reason: string) => void) | null = null;
-  private licenceProgressHandler: ((progress: LicenceProgress) => void) | null = null;
+  /** FEAT-016/017: safe licence-progress listeners (page side, multiple owners). */
+  private readonly licenceProgressListeners = new Set<(progress: LicenceProgress) => void>();
   private inFlightConnect: Promise<HandshakeResult> | null = null;
   /** Secret transfers queued per operation id (posted BEFORE the operation). */
   private readonly pendingSecretPosts = new Map<string, Promise<void>>();
@@ -279,9 +283,10 @@ export class BrowserVaultClient {
     this.invalidationHandler = handler;
   }
 
-  /** Register the safe entitlement-progress handler (FEAT-016). */
-  onLicenceProgress(handler: (progress: LicenceProgress) => void): void {
-    this.licenceProgressHandler = handler;
+  /** Register the safe entitlement-progress handler (FEAT-016/017). */
+  onLicenceProgress(handler: (progress: LicenceProgress) => void): () => void {
+    this.licenceProgressListeners.add(handler);
+    return () => this.licenceProgressListeners.delete(handler);
   }
 
   /** Dispatch one operation; resolves on the matching typed outcome.
@@ -452,7 +457,7 @@ export class BrowserVaultClient {
       }
       case 'licence-progress': {
         const progress = message as LicenceProgressEvent;
-        this.licenceProgressHandler?.({
+        const safe: LicenceProgress = {
           phase: progress.phase,
           projection: progress.projection ?? null,
           lastOutcomeCode: progress.lastOutcomeCode,
@@ -460,7 +465,14 @@ export class BrowserVaultClient {
           upgradeOperation: progress.upgradeOperation ?? null,
           upgradeNotificationEligible: progress.upgradeNotificationEligible === true,
           emittedAtMs: progress.emittedAtMs,
-        });
+        };
+        for (const listener of this.licenceProgressListeners) {
+          try {
+            listener(safe);
+          } catch {
+            // A failing listener never breaks the authority delivery loop.
+          }
+        }
         break;
       }
       case 'handshake-rejected':

@@ -182,10 +182,10 @@ export class EntitlementBridge {
   /** Subscribe to authority progress + lifecycle visibility. */
   start(): void {
     if (this.unsubProgress === null) {
-      this.deps.client.onLicenceProgress((progress) => {
+      const unsub = this.deps.client.onLicenceProgress((progress) => {
         this.handleProgress(progress);
       });
-      this.unsubProgress = () => this.deps.client.onLicenceProgress(() => undefined);
+      this.unsubProgress = unsub;
     }
     if (this.unsubVisibility === null && this.deps.subscribeVisibility !== undefined) {
       this.unsubVisibility = this.deps.subscribeVisibility(() => {

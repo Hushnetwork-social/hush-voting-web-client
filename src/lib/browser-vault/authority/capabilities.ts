@@ -105,6 +105,10 @@ export const FRESH_CAPABILITY_REQUIRED_BY_OPERATION: Readonly<Record<BrowserOper
   licenceBootstrapStart: null,
   licenceBootstrapControl: null,
   licenceBootstrapEligibility: null,
+  // FEAT-017 additive: confirmed-upgrade ops require no fresh password
+  // capability (authenticated session only; same rule as bootstrap ops).
+  licenceUpgradeConfirm: null,
+  licenceUpgradeAcknowledge: null,
 } as const;
 
 /** Safe session projection vocabulary for clients (never secrets). */
