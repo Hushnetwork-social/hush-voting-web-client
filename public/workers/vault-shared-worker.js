@@ -28733,6 +28733,9 @@ var LicenceBootstrapSession = class {
     if (record === null) {
       return { ok: false };
     }
+    if (record.identityBinding !== this.actorSigningAddress || record.networkBinding !== this.networkBinding) {
+      return { ok: true };
+    }
     this.mirror.set(record.transactionId, record);
     this.durableHealthy = true;
     return { ok: true };
