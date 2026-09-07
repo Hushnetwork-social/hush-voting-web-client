@@ -33,6 +33,41 @@ import type { AuthIntent } from '../types';
 import type { LicenceRevalidationTrigger } from '../../licensing/session-contract';
 import { isLicenceRevalidationTrigger } from '../../licensing/session-contract';
 
+/**
+ * FEAT-017 page-safe licence workspace intents the root composition may
+ * dispatch. Every intent is routed to the SAME authority op vocabulary the
+ * entitlement bootstrap uses; the page never signs, journals, or constructs.
+ */
+export type LicenceWorkspaceIntent =
+  /** Account/options entry → fresh signed query (never stale display). */
+  | { readonly type: 'LICENCE.REFRESH_ACCOUNT_ENTRY' }
+  /** Authoritative FEAT-018 rejection → refresh + gate (no client auth). */
+  | { readonly type: 'LICENCE.AUTHORITATIVE_REJECTION_REFRESH' }
+  /** D0 exact retry of the sealed operation. */
+  | { readonly type: 'LICENCE.RETRY_EXACT' }
+  /** C0 activation of one validated server plan handle. */
+  | { readonly type: 'LICENCE.ACTIVATE'; readonly targetPlanId: string }
+  /** R0/N1 acknowledgement (clears the one-shot terminal outcome/notice). */
+  | { readonly type: 'LICENCE.ACKNOWLEDGE_OUTCOME' };
+
+/** Map a licence workspace intent to the closed client dispatch payload. */
+export function licenceIntentToDispatch(
+  intent: LicenceWorkspaceIntent,
+): { readonly operation: string; readonly payload?: Record<string, unknown> } | null {
+  switch (intent.type) {
+    case 'LICENCE.REFRESH_ACCOUNT_ENTRY':
+      return { operation: 'licenceBootstrapControl', payload: { control: 'revalidate', trigger: 'account-entry' } };
+    case 'LICENCE.AUTHORITATIVE_REJECTION_REFRESH':
+      return { operation: 'licenceBootstrapControl', payload: { control: 'revalidate', trigger: 'authoritative-rejection' } };
+    case 'LICENCE.RETRY_EXACT':
+      return { operation: 'licenceBootstrapControl', payload: { control: 'retry' } };
+    case 'LICENCE.ACTIVATE':
+      return { operation: 'licenceUpgradeConfirm', payload: { targetPlanId: intent.targetPlanId } };
+    case 'LICENCE.ACKNOWLEDGE_OUTCOME':
+      return { operation: 'licenceUpgradeAcknowledge' };
+  }
+}
+
 /** Connectivity inputs forwarded to the authority loop (closed vocabulary). */
 export type BridgeConnectivityInput = 'online' | 'offline' | 'paused' | 'reconnecting';
 
@@ -172,11 +207,61 @@ export class EntitlementBridge {
   private foregrounded = true;
   private unsubProgress: (() => void) | null = null;
   private unsubVisibility: (() => void) | null = null;
+  /** FEAT-017 page-side mirror of the last safe licence progress. */
+  private lastLicenceProgress: LicenceProgress | null = null;
+  private readonly licenceWorkspaceListeners = new Set<(progress: LicenceProgress) => void>();
 
   constructor(private readonly deps: EntitlementBridgeDependencies) {}
 
   get isRunning(): boolean {
     return this.running;
+  }
+
+  /**
+   * FEAT-017 page-side safe licence facts (projection + upgrade operation +
+   * one-shot notification eligibility). NULL until the first authority
+   * progress broadcast arrives; never carries exact bytes/journal state.
+   */
+  licenceFacts(): LicenceProgress | null {
+    return this.lastLicenceProgress;
+  }
+
+  /** Subscribe to safe licence progress (root workspace composition). */
+  subscribeLicenceWorkspace(handler: (progress: LicenceProgress) => void): () => void {
+    this.licenceWorkspaceListeners.add(handler);
+    if (this.lastLicenceProgress !== null) {
+      handler(this.lastLicenceProgress);
+    }
+    return () => this.licenceWorkspaceListeners.delete(handler);
+  }
+
+  /**
+   * FEAT-017 workspace intent routing. Confirmed-upgrade activation and the
+   * authoritative-rejection refresh are only routed while the authority
+   * session is running (authenticated + ready). Returned boolean tells the
+   * root whether the intent was accepted by the licence authority.
+   */
+  handleLicenceWorkspaceIntent(intent: LicenceWorkspaceIntent): boolean {
+    if (!this.running) {
+      return false;
+    }
+    const mapped = licenceIntentToDispatch(intent);
+    if (mapped === null) {
+      return false;
+    }
+    const stage = this.deps.adapter.snapshot().entitlementStage;
+    if (
+      intent.type === 'LICENCE.REFRESH_ACCOUNT_ENTRY' ||
+      intent.type === 'LICENCE.AUTHORITATIVE_REJECTION_REFRESH'
+    ) {
+      if (stage !== 'entitlementReady') {
+        return false;
+      }
+      // Synchronous gate before the fresh query (never stale presentation).
+      this.deps.adapter.sendEvent({ type: 'ENTITLEMENT.RESET' } as never);
+    }
+    void this.dispatchLicenceOp(mapped.operation, mapped.payload);
+    return true;
   }
 
   /** Subscribe to authority progress + lifecycle visibility. */
@@ -211,6 +296,8 @@ export class EntitlementBridge {
     this.unsubVisibility = null;
     this.running = false;
     this.starting = null;
+    this.lastLicenceProgress = null;
+    this.licenceWorkspaceListeners.clear();
   }
 
   /** Page intent routing (INTENT.ENTITLEMENT_RETRY and friends). */
@@ -280,6 +367,15 @@ export class EntitlementBridge {
     const projection = this.deps.adapter.snapshot();
     if (projection.authState !== 'authenticated') {
       return; // stale progress after Lock can never restore access
+    }
+    // FEAT-017 page mirror: safe facts only, epoch-guarded by the caller.
+    this.lastLicenceProgress = progress;
+    for (const listener of this.licenceWorkspaceListeners) {
+      try {
+        listener(progress);
+      } catch {
+        // A failing listener never breaks authority delivery.
+      }
     }
     const stage = stageForPhase(progress.phase);
     if (stage === null) {
@@ -388,6 +484,30 @@ export class EntitlementBridge {
       }
     } catch {
       // A failed control never fabricates a state; next trigger retries.
+    }
+  }
+
+  /** Dispatch one FEAT-017 licence op to the closed authority vocabulary. */
+  private async dispatchLicenceOp(operation: string, payload: Record<string, unknown> | undefined): Promise<void> {
+    if (!this.running) {
+      return;
+    }
+    try {
+      const result = await this.deps.client.dispatch(operation as never, payload);
+      const outcome = parseStepOutcome(result);
+      if (outcome.ok && outcome.phase !== undefined) {
+        const stage = stageForPhase(outcome.phase);
+        const projection = this.deps.adapter.snapshot();
+        if (stage !== null && stage !== 'lockedOut' && projection.authState === 'authenticated') {
+          this.deps.adapter.sendEvent({
+            type: 'ENTITLEMENT.STAGE',
+            stage,
+            epoch: projection.sessionEpoch,
+          } as never);
+        }
+      }
+    } catch {
+      // A failed op never fabricates a state; the loop reconciles next tick.
     }
   }
 }

@@ -24,6 +24,7 @@ import {
   stageForPhase,
   controlKindForStage,
   resolveEntitlementAuthorityForTarget,
+  licenceIntentToDispatch,
   type EntitlementAuthorityPlan,
 } from './entitlement-bridge';
 import { EntitlementBridge } from './entitlement-bridge';
@@ -167,6 +168,28 @@ describe('closed mappings', () => {
     expect(controlKindForStage(null)).toBeNull();
   });
 
+  it('maps FEAT-017 licence workspace intents to the closed op vocabulary', () => {
+    expect(licenceIntentToDispatch({ type: 'LICENCE.REFRESH_ACCOUNT_ENTRY' })).toEqual({
+      operation: 'licenceBootstrapControl',
+      payload: { control: 'revalidate', trigger: 'account-entry' },
+    });
+    expect(licenceIntentToDispatch({ type: 'LICENCE.AUTHORITATIVE_REJECTION_REFRESH' })).toEqual({
+      operation: 'licenceBootstrapControl',
+      payload: { control: 'revalidate', trigger: 'authoritative-rejection' },
+    });
+    expect(licenceIntentToDispatch({ type: 'LICENCE.RETRY_EXACT' })).toEqual({
+      operation: 'licenceBootstrapControl',
+      payload: { control: 'retry' },
+    });
+    expect(licenceIntentToDispatch({ type: 'LICENCE.ACTIVATE', targetPlanId: 'hushvoting.veritas.2000' })).toEqual({
+      operation: 'licenceUpgradeConfirm',
+      payload: { targetPlanId: 'hushvoting.veritas.2000' },
+    });
+    expect(licenceIntentToDispatch({ type: 'LICENCE.ACKNOWLEDGE_OUTCOME' })).toEqual({
+      operation: 'licenceUpgradeAcknowledge',
+    });
+  });
+
   it('resolves the entitlement authority plan per target (fail closed on native gaps)', () => {
     const plan: EntitlementAuthorityPlan | null = resolveEntitlementAuthorityForTarget({
       targetClass: 'web',
@@ -303,5 +326,54 @@ describe('EntitlementBridge', () => {
     const control = client.dispatched.find((d) => d.operation === 'licenceBootstrapControl');
     expect(control?.payload).toEqual({ control: 'revalidate', trigger: 'foreground' });
     bridge.stop();
+  });
+
+  it('mirrors safe licence facts for the workspace and dispatches upgrade intents', async () => {
+    const { adapter, client, bridge } = harness({ stage: 'entitlementResolving', connectivity: 'online' });
+    bridge.start();
+    client.queue = [okResult('entitlementReady')];
+    bridge.observe(adapter.current);
+    await Promise.resolve();
+    await Promise.resolve();
+    adapter.current = projection({ entitlementStage: 'entitlementReady', entitlementReady: true, connectivity: 'online' });
+    const seen: unknown[] = [];
+    bridge.subscribeLicenceWorkspace((progress) => seen.push(progress));
+    client.progressHandler?.({
+      phase: 'entitlementReady',
+      projection: { planId: 'hushvoting.direct.free' } as unknown,
+      lastOutcomeCode: 'ready',
+      pendingTransactionId: null,
+      upgradeOperation: null,
+      upgradeNotificationEligible: false,
+      emittedAtMs: 4,
+    });
+    expect(bridge.licenceFacts()?.projection).toEqual({ planId: 'hushvoting.direct.free' });
+    expect(seen.length).toBeGreaterThanOrEqual(1);
+    // Activation routes to the closed authority op (never a page signer).
+    const accepted = bridge.handleLicenceWorkspaceIntent({
+      type: 'LICENCE.ACTIVATE',
+      targetPlanId: 'hushvoting.veritas.2000',
+    });
+    await Promise.resolve();
+    expect(accepted).toBe(true);
+    expect(
+      client.dispatched.some((d) => d.operation === 'licenceUpgradeConfirm' && d.payload?.targetPlanId === 'hushvoting.veritas.2000'),
+    ).toBe(true);
+    // Acknowledgement routes to the closed one-shot outcome clear.
+    const acked = bridge.handleLicenceWorkspaceIntent({ type: 'LICENCE.ACKNOWLEDGE_OUTCOME' });
+    await Promise.resolve();
+    expect(acked).toBe(true);
+    expect(client.dispatched.some((d) => d.operation === 'licenceUpgradeAcknowledge')).toBe(true);
+    // Account entry refresh keeps the fresh-query contract and clears stale UI.
+    const refresh = bridge.handleLicenceWorkspaceIntent({ type: 'LICENCE.REFRESH_ACCOUNT_ENTRY' });
+    await Promise.resolve();
+    expect(refresh).toBe(true);
+    expect(adapter.sent.some((m) => (m as { type?: string }).type === 'ENTITLEMENT.RESET')).toBe(true);
+    expect(
+      client.dispatched.some((d) => d.operation === 'licenceBootstrapControl' && d.payload?.trigger === 'account-entry'),
+    ).toBe(true);
+    // After stop no intent is accepted (authority session is gone).
+    bridge.stop();
+    expect(bridge.handleLicenceWorkspaceIntent({ type: 'LICENCE.RETRY_EXACT' })).toBe(false);
   });
 });
