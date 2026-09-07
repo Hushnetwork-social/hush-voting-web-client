@@ -416,27 +416,28 @@ mod tests {
         // member: the FEAT-016 shared fixture round-trips unchanged.
         let baseline = parse_record_json(SHARED_FIXTURE_EXPECTED_JSON).expect("parse baseline");
         assert!(baseline.upgrade_binding.is_none());
-        assert_eq!(serde_json::to_string(&baseline).expect("serialize"), SHARED_FIXTURE_EXPECTED_JSON);
+        assert_eq!(
+            serde_json::to_string(&baseline).expect("serialize"),
+            SHARED_FIXTURE_EXPECTED_JSON
+        );
     }
 
     #[test]
     fn tampered_or_cross_purpose_upgrade_records_are_rejected() {
         let mut wrong_kind = upgrade_fixture();
-        wrong_kind
-            .upgrade_binding
-            .as_mut()
-            .expect("binding")
-            .kind = "baseline_free".to_string();
+        wrong_kind.upgrade_binding.as_mut().expect("binding").kind = "baseline_free".to_string();
         assert!(wrong_kind.validate().is_err());
 
         let mut self_target = upgrade_fixture();
-        self_target.upgrade_binding.as_mut().expect("binding").requested_plan_id =
-            LICENCE_PLAN_DIRECT_FREE.to_string();
+        self_target
+            .upgrade_binding
+            .as_mut()
+            .expect("binding")
+            .requested_plan_id = LICENCE_PLAN_DIRECT_FREE.to_string();
         assert!(self_target.validate().is_err());
 
         let mut alias_tx = upgrade_fixture();
-        alias_tx.transaction_id =
-            "5f2d9e11-3c44-4a80-b8e7-6b2f1a0c9d3e".to_string(); // aliases expected current
+        alias_tx.transaction_id = "5f2d9e11-3c44-4a80-b8e7-6b2f1a0c9d3e".to_string(); // aliases expected current
         assert!(alias_tx.validate().is_err());
 
         let mut wrong_catalogue = upgrade_fixture();
