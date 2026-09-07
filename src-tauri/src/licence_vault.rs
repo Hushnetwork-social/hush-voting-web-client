@@ -255,6 +255,35 @@ pub fn validate_no_active_template(
     Ok(())
 }
 
+/// Closed validation of one confirmed-upgrade REQUEST (FEAT-017 Task 6.3).
+/// Mirrors the TS `buildConfirmedUpgradeUnsignedTransaction` rejection rules
+/// so a native authority can never construct a confirmed_upgrade envelope for
+/// a self-target, a Direct Free target, an unknown catalogue release, or an
+/// unbounded plan handle — registration fails closed exactly like the TS path.
+pub fn validate_confirmed_upgrade_request(
+    expected_current_plan_id: &str,
+    requested_plan_id: &str,
+    observed_catalogue_version: &str,
+) -> Result<(), &'static str> {
+    if expected_current_plan_id.is_empty()
+        || expected_current_plan_id.len() > 128
+        || requested_plan_id.is_empty()
+        || requested_plan_id.len() > 128
+    {
+        return Err("unbounded-plan-id");
+    }
+    if requested_plan_id == expected_current_plan_id {
+        return Err("self-target");
+    }
+    if requested_plan_id == LICENCE_PLAN_DIRECT_FREE {
+        return Err("direct-free-target");
+    }
+    if observed_catalogue_version != LICENCE_CATALOGUE_VERSION_V1 {
+        return Err("stale-or-unbounded-catalogue");
+    }
+    Ok(())
+}
+
 /// Exact sealing result of one canonical unsigned licence envelope.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LicenceSeal {
@@ -659,6 +688,51 @@ mod tests {
     }
 
     #[test]
+    fn confirmed_upgrade_request_validation_fails_closed() {
+        // Valid strictly-higher Veritas request.
+        assert!(validate_confirmed_upgrade_request(
+            LICENCE_PLAN_DIRECT_FREE,
+            "hushvoting.veritas.2000",
+            LICENCE_CATALOGUE_VERSION_V1
+        )
+        .is_ok());
+        // Self-target and Direct Free targets can never be requested.
+        assert_eq!(
+            validate_confirmed_upgrade_request(
+                "hushvoting.veritas.500",
+                "hushvoting.veritas.500",
+                LICENCE_CATALOGUE_VERSION_V1
+            ),
+            Err("self-target")
+        );
+        assert_eq!(
+            validate_confirmed_upgrade_request(
+                "hushvoting.veritas.500",
+                LICENCE_PLAN_DIRECT_FREE,
+                LICENCE_CATALOGUE_VERSION_V1
+            ),
+            Err("direct-free-target")
+        );
+        // Unknown catalogue and unbounded plan handles are rejected.
+        assert_eq!(
+            validate_confirmed_upgrade_request(
+                LICENCE_PLAN_DIRECT_FREE,
+                "hushvoting.veritas.2000",
+                "hushvoting-licence-catalogue/v9.0.0"
+            ),
+            Err("stale-or-unbounded-catalogue")
+        );
+        assert_eq!(
+            validate_confirmed_upgrade_request(
+                LICENCE_PLAN_DIRECT_FREE,
+                "x".repeat(200).as_str(),
+                LICENCE_CATALOGUE_VERSION_V1
+            ),
+            Err("unbounded-plan-id")
+        );
+    }
+
+    #[test]
     fn query_signature_is_base64_over_the_canonical_bytes_and_verifies() {
         let secret = test_secret();
         let headers = sign_licence_query(&secret, FIXED_SIGNED_AT).expect("sign");
@@ -736,6 +810,74 @@ mod tests {
         );
         journal.clear().expect("clear");
         assert_eq!(journal.read().expect("read"), None);
+    }
+
+    #[test]
+    fn journal_stores_one_confirmed_upgrade_record_byte_exact_for_retry() {
+        // FEAT-017 Task 6.3: the purpose-bound native journal stores one
+        // baseline OR confirmed-upgrade operation. The sealed record survives
+        // restart byte-exact so Retry reuses the exact transaction (never a
+        // replacement envelope).
+        use crate::licensing_record::{
+            parse_record_json, LicenceExactSignedTransaction, LicencePendingTransactionRecord,
+            LicenceUpgradeOperationBinding, LICENCE_PENDING_PURPOSE,
+            LICENCE_PENDING_SCHEMA_VERSION, LICENCE_TRANSITION_INTENT_CONFIRMED_UPGRADE,
+        };
+        let record = LicencePendingTransactionRecord {
+            schema_version: LICENCE_PENDING_SCHEMA_VERSION,
+            purpose: LICENCE_PENDING_PURPOSE.to_string(),
+            transaction: LicenceExactSignedTransaction {
+                exact_json: canonical_unsigned_upgrade_transaction_json(
+                    "8c6a1b77-4d2e-4f91-a4c0-9e7b2d8f1a55",
+                    "2026-09-06T00:00:00.000Z",
+                    "5f2d9e11-3c44-4a80-b8e7-6b2f1a0c9d3e",
+                    LICENCE_PLAN_DIRECT_FREE,
+                    "hushvoting.veritas.2000",
+                    LICENCE_CATALOGUE_VERSION_V1,
+                ),
+                digest: sha256_hex_lower(
+                    canonical_unsigned_upgrade_transaction_json(
+                        "8c6a1b77-4d2e-4f91-a4c0-9e7b2d8f1a55",
+                        "2026-09-06T00:00:00.000Z",
+                        "5f2d9e11-3c44-4a80-b8e7-6b2f1a0c9d3e",
+                        LICENCE_PLAN_DIRECT_FREE,
+                        "hushvoting.veritas.2000",
+                        LICENCE_CATALOGUE_VERSION_V1,
+                    )
+                    .as_bytes(),
+                ),
+            },
+            transaction_id: "8c6a1b77-4d2e-4f91-a4c0-9e7b2d8f1a55".to_string(),
+            identity_binding: "0237fdd4364c0b898908be2f1a98a6b4a7890c623ae92a283640e44d87e048daa5"
+                .to_string(),
+            network_binding: "hush-network-local-devnet-5195086".to_string(),
+            target_binding: "ubuntu-native".to_string(),
+            created_utc: "2026-09-07T00:00:00.000Z".to_string(),
+            attempt_evidence: vec![],
+            recovery_state: "sealed".to_string(),
+            submitted_utc: None,
+            index_observed_utc: None,
+            upgrade_binding: Some(LicenceUpgradeOperationBinding {
+                kind: LICENCE_TRANSITION_INTENT_CONFIRMED_UPGRADE.to_string(),
+                expected_current_licence_transaction_id: "5f2d9e11-3c44-4a80-b8e7-6b2f1a0c9d3e"
+                    .to_string(),
+                expected_current_plan_id: LICENCE_PLAN_DIRECT_FREE.to_string(),
+                requested_plan_id: "hushvoting.veritas.2000".to_string(),
+                observed_catalogue_version: LICENCE_CATALOGUE_VERSION_V1.to_string(),
+            }),
+        };
+        let json = serde_json::to_string(&record).expect("serialize");
+        // Strict codec admission + digest verification before journaling.
+        let admitted = parse_record_json(&json).expect("codec admission");
+        assert!(admitted.digest_verifies());
+        let memory = MemoryJournalStorage::new();
+        let journal = TwoSlotLicenceJournal::new(&memory);
+        journal.write(&json).expect("journal upgrade");
+        let read_back = journal.read().expect("read back").expect("present");
+        // Byte-exact reuse: a restart/retry reads the SAME sealed envelope.
+        assert_eq!(read_back, json);
+        let parsed = parse_record_json(&read_back).expect("reparse");
+        assert!(parsed.upgrade_binding.is_some());
     }
 
     #[test]
