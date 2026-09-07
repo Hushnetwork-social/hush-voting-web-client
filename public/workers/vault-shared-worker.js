@@ -26260,7 +26260,9 @@ var LICENCE_QUERY_SIGNED_AT_HEADER = "x-hush-licence-query-signed-at";
 var LICENCE_QUERY_SIGNATURE_HEADER = "x-hush-licence-query-signature";
 var LICENCE_QUERY_METHOD = "GetMyEntitlement";
 var LICENCE_PLAN_DIRECT_FREE = "hushvoting.direct.free";
+var LICENCE_CATALOGUE_VERSION_V1 = "hushvoting-licence-catalogue/v1.0.0";
 var LICENCE_TRANSITION_INTENT_BASELINE_FREE = "baseline_free";
+var LICENCE_TRANSITION_INTENT_CONFIRMED_UPGRADE = "confirmed_upgrade";
 function licenceQuerySignedJson(envelope) {
   return `{"actorAddress":"${envelope.actorAddress}","method":"${envelope.method}","request":{},"signedAt":"${envelope.signedAt}"}`;
 }
@@ -26386,6 +26388,41 @@ var LICENCE_PENDING_SCHEMA_VERSION = 1;
 var LICENCE_PENDING_MAX_JSON_BYTES = 65536;
 var LICENCE_PENDING_MAX_ATTEMPT_EVIDENCE = 64;
 var LICENCE_PENDING_ID_MAX_LENGTH = 128;
+function parseUpgradeBinding(value) {
+  if (!isRecordValue(value)) {
+    return null;
+  }
+  const kind = value.kind;
+  if (kind !== LICENCE_TRANSITION_INTENT_CONFIRMED_UPGRADE) {
+    return null;
+  }
+  const expectedCurrent = value.expectedCurrentLicenceTransactionId;
+  if (!isBoundedString2(expectedCurrent, LICENCE_PENDING_ID_MAX_LENGTH) || !UUID_RE.test(expectedCurrent)) {
+    return null;
+  }
+  const expectedPlan = value.expectedCurrentPlanId;
+  const requestedPlan = value.requestedPlanId;
+  if (!isBoundedString2(expectedPlan, LICENCE_PENDING_ID_MAX_LENGTH) || !isBoundedString2(requestedPlan, LICENCE_PENDING_ID_MAX_LENGTH)) {
+    return null;
+  }
+  if (requestedPlan === expectedPlan) {
+    return null;
+  }
+  if (requestedPlan === LICENCE_PLAN_DIRECT_FREE) {
+    return null;
+  }
+  const catalogue = value.observedCatalogueVersion;
+  if (!isBoundedString2(catalogue, 256) || catalogue !== LICENCE_CATALOGUE_VERSION_V1) {
+    return null;
+  }
+  return {
+    kind: LICENCE_TRANSITION_INTENT_CONFIRMED_UPGRADE,
+    expectedCurrentLicenceTransactionId: expectedCurrent,
+    expectedCurrentPlanId: expectedPlan,
+    requestedPlanId: requestedPlan,
+    observedCatalogueVersion: catalogue
+  };
+}
 var SHA256_HEX_RE = /^[0-9a-f]{64}$/;
 var ISO_UTC_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/;
 var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -26456,6 +26493,17 @@ function parsePendingLicenceRecord(value) {
   if (typeof recoveryState !== "string" || !RECOVERY_STATES.includes(recoveryState)) {
     return null;
   }
+  let upgradeBinding;
+  if (value.upgradeBinding !== void 0 && value.upgradeBinding !== null) {
+    const parsedBinding = parseUpgradeBinding(value.upgradeBinding);
+    if (parsedBinding === null) {
+      return null;
+    }
+    if (parsedBinding.expectedCurrentLicenceTransactionId === value.transactionId) {
+      return null;
+    }
+    upgradeBinding = parsedBinding;
+  }
   const attempts = value.attemptEvidence;
   if (!Array.isArray(attempts) || attempts.length > LICENCE_PENDING_MAX_ATTEMPT_EVIDENCE) {
     return null;
@@ -26480,7 +26528,8 @@ function parsePendingLicenceRecord(value) {
       at: attempt.at,
       outcome: attempt.outcome
     })),
-    recoveryState
+    recoveryState,
+    ...upgradeBinding !== void 0 ? { upgradeBinding } : {}
   };
 }
 function parsePendingLicenceRecordJson(json) {
@@ -26511,6 +26560,15 @@ function serializePendingLicenceRecord(record) {
   }
   if (record.indexObservedUtc !== void 0) {
     json.indexObservedUtc = record.indexObservedUtc;
+  }
+  if (record.upgradeBinding !== void 0) {
+    json.upgradeBinding = {
+      kind: record.upgradeBinding.kind,
+      expectedCurrentLicenceTransactionId: record.upgradeBinding.expectedCurrentLicenceTransactionId,
+      expectedCurrentPlanId: record.upgradeBinding.expectedCurrentPlanId,
+      requestedPlanId: record.upgradeBinding.requestedPlanId,
+      observedCatalogueVersion: record.upgradeBinding.observedCatalogueVersion
+    };
   }
   return JSON.stringify(json);
 }
@@ -27829,6 +27887,58 @@ function isIsoUtc2(value) {
 function isKnownFamily(value) {
   return value === "direct" || value === "veritas" || value === "enterprise";
 }
+function isOptionalSafeInteger(value) {
+  return value === void 0 || Number.isInteger(value) && value >= 0 && value <= Number.MAX_SAFE_INTEGER;
+}
+function isOptionalBoolean(value) {
+  return value === void 0 || typeof value === "boolean";
+}
+function isStructurallyValidOption(option) {
+  return isBoundedText(option.PlanId, MAX_OPTION_TEXT_LENGTH) && isBoundedText(option.DisplayName, MAX_OPTION_TEXT_LENGTH) && isBoundedText(option.SafeDescription, MAX_SAFE_TEXT_LENGTH) && isOptionalSafeInteger(option.EligibleVoterCap) && isOptionalBoolean(option.UnlimitedElections) && (option.TermKind === void 0 || isBoundedText(option.TermKind, MAX_OPTION_TEXT_LENGTH)) && isOptionalSafeInteger(option.TermYears);
+}
+function projectSafeHigherOptions(active) {
+  const enterprisePlanId = active.Enterprise !== void 0 && isRecordValue2(active.Enterprise) ? active.Enterprise.PlanId : void 0;
+  const seen = /* @__PURE__ */ new Set();
+  const options = [];
+  for (const raw of active.HigherOptions) {
+    if (!isRecordValue2(raw)) {
+      continue;
+    }
+    const option = raw;
+    if (option.PlanId === active.PlanId) {
+      continue;
+    }
+    if (typeof enterprisePlanId === "string" && option.PlanId === enterprisePlanId) {
+      continue;
+    }
+    if (seen.has(option.PlanId)) {
+      continue;
+    }
+    seen.add(option.PlanId);
+    const safe = {
+      planId: option.PlanId,
+      displayName: option.DisplayName,
+      safeDescription: option.SafeDescription,
+      ...option.EligibleVoterCap !== void 0 ? { eligibleVoterCap: option.EligibleVoterCap } : {},
+      ...option.UnlimitedElections !== void 0 ? { unlimitedElections: option.UnlimitedElections } : {},
+      ...option.TermKind !== void 0 ? { termKind: option.TermKind } : {},
+      ...option.TermYears !== void 0 ? { termYears: option.TermYears } : {}
+    };
+    options.push(safe);
+  }
+  return options;
+}
+function projectSafeEnterprise(active) {
+  if (active.Enterprise === void 0 || !isRecordValue2(active.Enterprise)) {
+    return null;
+  }
+  const enterprise = active.Enterprise;
+  return {
+    planId: enterprise.PlanId,
+    displayName: enterprise.DisplayName,
+    safeDescription: enterprise.SafeDescription
+  };
+}
 function buildLicenceSafeProjection(actorBinding, networkBinding, active) {
   if (!active || typeof active !== "object") {
     return { ok: false, reason: "missing-active-view" };
@@ -27848,6 +27958,9 @@ function buildLicenceSafeProjection(actorBinding, networkBinding, active) {
   if (!isBoundedText(active.DisplayName)) {
     return { ok: false, reason: "malformed-required-field" };
   }
+  if (!isBoundedText(active.SafeDescription)) {
+    return { ok: false, reason: "malformed-required-field" };
+  }
   if (!isIsoUtc2(active.EffectiveFromUtc)) {
     return { ok: false, reason: "malformed-required-field" };
   }
@@ -27857,10 +27970,10 @@ function buildLicenceSafeProjection(actorBinding, networkBinding, active) {
   if (active.TermKind !== void 0 && !isBoundedText(active.TermKind)) {
     return { ok: false, reason: "malformed-required-field" };
   }
-  if (active.TermYears !== void 0 && (!Number.isInteger(active.TermYears) || active.TermYears < 0)) {
+  if (active.TermYears !== void 0 && (!Number.isInteger(active.TermYears) || active.TermYears < 0 || active.TermYears > Number.MAX_SAFE_INTEGER)) {
     return { ok: false, reason: "malformed-required-field" };
   }
-  if (active.EligibleVoterCap !== void 0 && (!Number.isInteger(active.EligibleVoterCap) || active.EligibleVoterCap < 0)) {
+  if (active.EligibleVoterCap !== void 0 && (!Number.isInteger(active.EligibleVoterCap) || active.EligibleVoterCap < 0 || active.EligibleVoterCap > Number.MAX_SAFE_INTEGER)) {
     return { ok: false, reason: "malformed-required-field" };
   }
   if (!Array.isArray(active.HigherOptions) || !Array.isArray(active.AllowedGovernanceOptionIds)) {
@@ -27880,12 +27993,10 @@ function buildLicenceSafeProjection(actorBinding, networkBinding, active) {
   if (active.HigherOptions.length > 0 && typeof active.HigherOptions[0] === "string") {
     return { ok: false, reason: "malformed-required-field" };
   }
-  if (active.HigherOptions.some(
-    (option) => !isRecordValue2(option) || !isBoundedText(option.PlanId) || !isBoundedText(option.DisplayName) || !isBoundedText(option.SafeDescription)
-  )) {
+  if (active.HigherOptions.some((option) => !isRecordValue2(option) || !isStructurallyValidOption(option))) {
     return { ok: false, reason: "malformed-required-field" };
   }
-  if (active.Enterprise !== void 0 && (!isBoundedText(active.Enterprise.PlanId) || !isBoundedText(active.Enterprise.DisplayName) || !isBoundedText(active.Enterprise.SafeDescription))) {
+  if (active.Enterprise !== void 0 && (!isRecordValue2(active.Enterprise) || !isBoundedText(active.Enterprise.PlanId) || !isBoundedText(active.Enterprise.DisplayName) || !isBoundedText(active.Enterprise.SafeDescription))) {
     return { ok: false, reason: "malformed-required-field" };
   }
   const projection = {
@@ -27897,6 +28008,7 @@ function buildLicenceSafeProjection(actorBinding, networkBinding, active) {
     planId: active.PlanId,
     planFamily: active.PlanFamily,
     displayName: active.DisplayName,
+    safeDescription: active.SafeDescription,
     effectiveFromUtc: active.EffectiveFromUtc,
     expiresAtUtc: active.ExpiresAtUtc,
     termKind: active.TermKind,
@@ -27904,6 +28016,9 @@ function buildLicenceSafeProjection(actorBinding, networkBinding, active) {
     eligibleVoterCap: active.EligibleVoterCap,
     unlimitedElections: active.UnlimitedElections,
     allowedGovernanceOptionIds: [...active.AllowedGovernanceOptionIds],
+    catalogueVersion: active.AssignedCatalogueVersion,
+    higherOptions: projectSafeHigherOptions(active),
+    enterprise: projectSafeEnterprise(active),
     provenance: "indexed-query"
   };
   return { ok: true, projection };
