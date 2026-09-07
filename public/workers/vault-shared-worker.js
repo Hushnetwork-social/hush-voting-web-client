@@ -28373,6 +28373,10 @@ var LicenceEntitlementCoordinator = class {
     this.attemptCount = 0;
     this.consecutiveUnauthenticated = 0;
     this.projection = null;
+    this.upgradeDelayed = false;
+    this.upgradeTerminal = null;
+    this.upgradeNotificationEligible = false;
+    this.upgradeRejectedRequery = false;
     this.phase = "resolving";
     await this.runFreshQuery("start");
     return this.snapshot();
