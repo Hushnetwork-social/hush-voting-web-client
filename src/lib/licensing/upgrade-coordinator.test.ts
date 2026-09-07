@@ -36,6 +36,7 @@ import {
 } from './coordinator';
 import type { LicencePendingTransactionRecord } from './pending-transaction';
 import type { LicenceHigherOptionView } from './contracts';
+import { buildConfirmedUpgradeUnsignedTransaction } from './upgrade';
 
 const ACTOR = '0237fdd4364c0b898908be2f1a98a6b4a7890c623ae92a283640e44d87e048daa5';
 const NETWORK = 'hush-network-local-devnet-5195086';
@@ -356,6 +357,332 @@ describe('pending operation under the old indexed licence (D017-01)', () => {
     expect(h.submitCalls[1]).toEqual(first);
     expect(h.coordinator.snapshot().upgradeOperation?.status).toBe('pending');
     expect(h.identityCounter).toBe(1); // no replacement identity was minted
+  });
+});
+
+function noActiveResult(): LicenceQueryTransportResult {
+  return {
+    ok: true,
+    state: 'noActive',
+    template: {
+      TransitionIntent: 'baseline_free',
+      RequestedPlanId: 'hushvoting.direct.free',
+      ObservedCatalogueVersion: CATALOGUE_V1,
+    },
+  };
+}
+
+function queuedSealedUpgradeId(h: Harness): string {
+  const id = h.coordinator.snapshot().upgradeOperation?.operation?.pendingTransactionId;
+  if (id === undefined) {
+    throw new Error('fixture: expected a sealed upgrade operation');
+  }
+  return id;
+}
+
+async function resolveToExactSuccess(h: Harness): Promise<string> {
+  await sealUpgrade(h, 'pending');
+  const opId = queuedSealedUpgradeId(h);
+  h.queryQueue.push(activeResult({ reference: opId, planId: TARGET_PLAN, displayName: TARGET_NAME }));
+  h.advance(ENTITLEMENT_QUERY_POLL_INTERVAL_MS);
+  await h.coordinator.tick(eligible);
+  return opId;
+}
+
+describe('reconciliation: exact match, competing, restart (Task 3.3/3.4)', () => {
+  it('only the exact indexed transaction UUID confirms local success once', async () => {
+    const h = makeHarness();
+    const opId = await resolveToExactSuccess(h);
+    const snap = h.coordinator.snapshot();
+    expect(snap.upgradeOperation?.status).toBe('local-success');
+    expect(snap.upgradeOperation?.currentPlanId).toBe(TARGET_PLAN);
+    expect(snap.upgradeOperation?.currentPlanDisplayName).toBe(TARGET_NAME);
+    expect(snap.upgradeOperation?.targetPlanDisplayName).toBe(TARGET_NAME);
+    expect(snap.upgradeNotificationEligible).toBe(true);
+    expect(snap.pendingTransactionId).toBeNull();
+    expect(snap.phase).toBe('entitlementReady');
+    expect(h.journal.size).toBe(0);
+    expect(h.deleteCalls).toContain(opId);
+  });
+
+  it('local-success eligibility is one-shot: revalidation never re-arms and acknowledgement clears it', async () => {
+    const h = makeHarness();
+    const opId = await resolveToExactSuccess(h);
+    expect(h.coordinator.snapshot().upgradeNotificationEligible).toBe(true);
+    // Foreground revalidation refreshes truth: the result artifact and the
+    // eligibility persist (no repeat arm, no loss) until acknowledged.
+    h.queryQueue.push(activeResult({ reference: opId, planId: TARGET_PLAN, displayName: TARGET_NAME }));
+    await h.coordinator.revalidate('foreground');
+    const after = h.coordinator.snapshot();
+    expect(after.upgradeOperation?.status).toBe('local-success');
+    expect(after.upgradeNotificationEligible).toBe(true);
+    await h.coordinator.acknowledgeUpgradeOutcome();
+    const acknowledged = h.coordinator.snapshot();
+    expect(acknowledged.upgradeNotificationEligible).toBe(false);
+    expect(acknowledged.upgradeOperation).toBeNull();
+    expect(acknowledged.lastOutcomeCode).toBe('upgrade-outcome-acknowledged');
+  });
+
+  it('a competing activation retires the obsolete pending without any local-success claim or eligibility', async () => {
+    const h = makeHarness();
+    await sealUpgrade(h, 'pending');
+    h.queryQueue.push(
+      activeResult({
+        reference: COMPETING_REF,
+        planId: 'hushvoting.veritas.10000',
+        displayName: 'HushVoting! Veritas 10k',
+      }),
+    );
+    h.advance(ENTITLEMENT_QUERY_POLL_INTERVAL_MS);
+    await h.coordinator.tick(eligible);
+    const snap = h.coordinator.snapshot();
+    expect(snap.upgradeOperation?.status).toBe('competing-activation');
+    expect(snap.upgradeOperation?.currentPlanId).toBe('hushvoting.veritas.10000');
+    expect(snap.upgradeNotificationEligible).toBe(false);
+    expect(snap.pendingTransactionId).toBeNull();
+    expect(h.journal.size).toBe(0);
+    await h.coordinator.acknowledgeUpgradeOutcome();
+    expect(h.coordinator.snapshot().upgradeOperation).toBeNull();
+  });
+
+  it('query-first restart with the old licence still current preserves the pending operation', async () => {
+    const h = makeHarness();
+    await sealUpgrade(h, 'pending');
+    expect(h.journal.size).toBe(1);
+    // Process restart: a fresh coordinator reconciles against the SAME journal.
+    const restarted = new LicenceEntitlementCoordinator(ACTOR, NETWORK, h.ports);
+    h.queryQueue.push(activeResult()); // old current still indexed
+    const snap = await restarted.start();
+    expect(snap.phase).toBe('entitlementReady');
+    expect(snap.upgradeOperation?.status).toBe('pending');
+    expect(snap.upgradeOperation?.operation?.targetPlanId).toBe(TARGET_PLAN);
+    expect(snap.upgradeOperation?.operation?.pendingTransactionId).toBeTruthy();
+    expect(h.submitCalls).toHaveLength(1); // ready truth: no resubmission
+    expect(h.journal.size).toBe(1);
+    // Polling continues under the old licence.
+    h.queryQueue.push(activeResult());
+    h.advance(ENTITLEMENT_QUERY_POLL_INTERVAL_MS);
+    await restarted.tick(eligible);
+    expect(restarted.snapshot().upgradeOperation?.status).toBe('pending');
+    expect(restarted.snapshot().lastOutcomeCode).toBe('upgrade-pending-old-current');
+  });
+
+  it('query-first restart resolves an upgrade indexed while offline to local success once', async () => {
+    const h = makeHarness();
+    await sealUpgrade(h, 'pending');
+    const opId = queuedSealedUpgradeId(h);
+    const restarted = new LicenceEntitlementCoordinator(ACTOR, NETWORK, h.ports);
+    h.queryQueue.push(activeResult({ reference: opId, planId: TARGET_PLAN, displayName: TARGET_NAME }));
+    const snap = await restarted.start();
+    expect(snap.upgradeOperation?.status).toBe('local-success');
+    expect(snap.upgradeNotificationEligible).toBe(true);
+    expect(h.journal.size).toBe(0);
+  });
+});
+
+describe('stale activation and authoritative rejection (D017-06)', () => {
+  it('changed current at Activate retains a stale(current-changed) notice and never seals', async () => {
+    const h = makeHarness();
+    await bootReady(h);
+    h.queryQueue.push(
+      activeResult({
+        reference: COMPETING_REF,
+        planId: 'hushvoting.veritas.10000',
+        displayName: 'HushVoting! Veritas 10k',
+      }),
+    );
+    await h.coordinator.confirmUpgrade(TARGET_PLAN);
+    const snap = h.coordinator.snapshot();
+    expect(snap.lastOutcomeCode).toBe('upgrade-stale-current-changed');
+    expect(snap.upgradeOperation?.status).toBe('stale');
+    if (snap.upgradeOperation?.status === 'stale') {
+      expect(snap.upgradeOperation.reason).toBe('current-changed');
+    }
+    expect(h.submitCalls).toHaveLength(0);
+    await h.coordinator.acknowledgeUpgradeOutcome();
+    expect(h.coordinator.snapshot().upgradeOperation).toBeNull();
+  });
+
+  it('a target the fresh truth no longer offers retains stale(catalogue-changed)', async () => {
+    const h = makeHarness();
+    await bootReady(h);
+    h.queryQueue.push(
+      activeResult({ higherOptions: [higherOption('hushvoting.veritas.10000', 'HushVoting! Veritas 10k')] }),
+    );
+    await h.coordinator.confirmUpgrade(TARGET_PLAN);
+    const snap = h.coordinator.snapshot();
+    expect(snap.upgradeOperation?.status).toBe('stale');
+    if (snap.upgradeOperation?.status === 'stale') {
+      expect(snap.upgradeOperation.reason).toBe('catalogue-changed');
+    }
+    expect(h.submitCalls).toHaveLength(0);
+  });
+
+  it('an authoritative terminal rejection re-queries truth and yields stale-rejection when truth is unchanged', async () => {
+    const h = makeHarness();
+    // boot + confirm fresh query + the rejection re-query (old current unchanged).
+    h.queryQueue.push(activeResult(), activeResult(), activeResult());
+    await h.coordinator.start();
+    h.admissionQueue.push('terminalRejected');
+    await h.coordinator.confirmUpgrade(TARGET_PLAN);
+    const snap = h.coordinator.snapshot();
+    expect(snap.lastOutcomeCode).toBe('upgrade-stale-rejection');
+    expect(snap.upgradeOperation?.status).toBe('stale');
+    if (snap.upgradeOperation?.status === 'stale') {
+      expect(snap.upgradeOperation.reason).toBe('stale-rejection');
+    }
+    expect(snap.pendingTransactionId).toBeNull();
+    expect(snap.phase).toBe('entitlementReady');
+    expect(h.journal.size).toBe(0);
+    expect(h.submitCalls).toHaveLength(1); // the rejected submission itself
+  });
+
+  it('no-active truth while an upgrade is pending never auto-resubmits (query-only)', async () => {
+    const h = makeHarness();
+    await sealUpgrade(h, 'pending');
+    h.queryQueue.push(noActiveResult());
+    h.advance(ENTITLEMENT_QUERY_POLL_INTERVAL_MS);
+    await h.coordinator.tick(eligible);
+    const snap = h.coordinator.snapshot();
+    expect(snap.phase).toBe('awaitingIndex');
+    expect(snap.upgradeOperation?.status).toBe('pending');
+    expect(snap.lastOutcomeCode).toBe('upgrade-no-active-query-only');
+    expect(h.submitCalls).toHaveLength(1);
+    expect(h.journal.size).toBe(1); // exact sealed record preserved
+  });
+
+  it('an upgrade-intent record without its binding fails closed instead of submitting as a baseline', async () => {
+    const h = makeHarness();
+    // Plant an incoherent record: confirmed_upgrade payload, NO binding member.
+    const brokenId = '22222222-3333-4444-8555-666666666666';
+    const built = buildConfirmedUpgradeUnsignedTransaction({
+      expectedCurrentLicenceTransactionId: CURRENT_REF,
+      expectedCurrentPlanId: CURRENT_PLAN,
+      requestedPlanId: TARGET_PLAN,
+      observedCatalogueVersion: CATALOGUE_V1,
+      transactionId: brokenId,
+      transactionTimestampUtc: '2026-09-07T00:00:00.000Z',
+    });
+    expect(built.ok).toBe(true);
+    if (!built.ok) return;
+    h.journal.set(brokenId, {
+      schemaVersion: 1,
+      purpose: 'pending_licence_transaction',
+      transaction: { exactJson: built.canonicalUnsignedJson, digest: built.digest },
+      transactionId: brokenId,
+      identityBinding: ACTOR,
+      networkBinding: NETWORK,
+      targetBinding: 'web-sharedworker',
+      createdUtc: '2026-09-07T00:00:00.000Z',
+      attemptEvidence: [],
+      recoveryState: 'sealed',
+    });
+    h.queryQueue.push(noActiveResult());
+    const restarted = new LicenceEntitlementCoordinator(ACTOR, NETWORK, h.ports);
+    const snap = await restarted.start();
+    expect(snap.phase).toBe('entitlementRepair');
+    expect(snap.lastOutcomeCode).toBe('upgrade-record-missing-binding');
+    expect(h.submitCalls).toHaveLength(0);
+    expect(h.journal.size).toBe(1); // preserved for controlled repair, never submitted
+  });
+});
+
+describe('delayed window, paused chain, and invalidation (Task 3.3)', () => {
+  it('30 s of advancing reachable time marks the live operation delayed while the workspace stays ready', async () => {
+    const h = makeHarness();
+    await sealUpgrade(h, 'pending');
+    expect(h.coordinator.snapshot().phase).toBe('entitlementReady');
+    // Five 10 s ticks accumulate 30 s+ of reachable foreground time (the first
+    // tick anchors the clock); each poll returns the old current licence.
+    for (let i = 0; i < 5; i += 1) {
+      h.queryQueue.push(activeResult());
+      h.advance(10_000);
+      await h.coordinator.tick(eligible);
+    }
+    const snap = h.coordinator.snapshot();
+    expect(snap.upgradeOperation?.status).toBe('delayed');
+    expect(snap.phase).toBe('entitlementReady'); // old licence still usable
+    expect(snap.projection?.licenceReference).toBe(CURRENT_REF);
+    expect(h.submitCalls).toHaveLength(1); // never auto-resubmitted
+  });
+
+  it('a paused-chain signal shows delayed immediately, and exact Retry resets the window', async () => {
+    const h = makeHarness();
+    await sealUpgrade(h, 'pending');
+    await h.coordinator.onConnectivity('paused');
+    const delayed = h.coordinator.snapshot();
+    expect(delayed.upgradeOperation?.status).toBe('delayed');
+    expect(delayed.lastOutcomeCode).toBe('upgrade-chain-paused');
+    expect(delayed.phase).toBe('entitlementReady');
+    // Exact Retry resubmits the identical transaction and restarts the window.
+    h.admissionQueue.push('pending');
+    await h.coordinator.retryExact();
+    const retried = h.coordinator.snapshot();
+    expect(retried.upgradeOperation?.status).toBe('pending');
+    expect(h.submitCalls).toHaveLength(2);
+    expect(h.submitCalls[1]).toEqual(h.submitCalls[0]);
+  });
+
+  it('offline clears the delayed marker; reconnect queries fresh first and returns to pending', async () => {
+    const h = makeHarness();
+    await sealUpgrade(h, 'pending');
+    await h.coordinator.onConnectivity('paused');
+    expect(h.coordinator.snapshot().upgradeOperation?.status).toBe('delayed');
+    await h.coordinator.onConnectivity('offline');
+    const offline = h.coordinator.snapshot();
+    expect(offline.phase).toBe('resolving');
+    expect(offline.projection).toBeNull();
+    expect(offline.upgradeOperation?.status).toBe('pending');
+    const queriesBefore = h.queryCalls;
+    h.queryQueue.push(activeResult());
+    await h.coordinator.onConnectivity('online');
+    const online = h.coordinator.snapshot();
+    expect(h.queryCalls).toBe(queriesBefore + 1);
+    expect(online.phase).toBe('entitlementReady');
+    expect(online.upgradeOperation?.status).toBe('pending');
+  });
+
+  it('Lock/invalidation clears terminal contexts, notification eligibility, and delayed state', async () => {
+    const h = makeHarness();
+    await resolveToExactSuccess(h);
+    expect(h.coordinator.snapshot().upgradeOperation?.status).toBe('local-success');
+    expect(h.coordinator.snapshot().upgradeNotificationEligible).toBe(true);
+    await h.coordinator.lock();
+    const locked = h.coordinator.snapshot();
+    expect(locked.phase).toBe('lockedOut');
+    expect(locked.upgradeOperation).toBeNull();
+    expect(locked.upgradeNotificationEligible).toBe(false);
+    expect(locked.projection).toBeNull();
+  });
+
+  it('a new activation intent clears the retained success artifact before sealing again', async () => {
+    const h = makeHarness();
+    await sealUpgrade(h, 'pending');
+    const opId = queuedSealedUpgradeId(h);
+    // Exact indexing confirms the first upgrade.
+    h.queryQueue.push(activeResult({ reference: opId, planId: TARGET_PLAN, displayName: TARGET_NAME }));
+    h.advance(ENTITLEMENT_QUERY_POLL_INTERVAL_MS);
+    await h.coordinator.tick(eligible);
+    expect(h.coordinator.snapshot().upgradeOperation?.status).toBe('local-success');
+    // The user reviews fresh options above the new current and activates again.
+    const nextTarget = 'hushvoting.veritas.5000';
+    const nextName = 'HushVoting! Veritas 5k';
+    h.queryQueue.push(
+      activeResult({
+        reference: opId,
+        planId: TARGET_PLAN,
+        displayName: TARGET_NAME,
+        higherOptions: [higherOption(nextTarget, nextName)],
+      }),
+    );
+    h.admissionQueue.push('pending');
+    await h.coordinator.confirmUpgrade(nextTarget);
+    const snap = h.coordinator.snapshot();
+    expect(snap.upgradeOperation?.status).toBe('pending');
+    expect(snap.upgradeOperation?.operation?.targetPlanId).toBe(nextTarget);
+    expect(snap.upgradeOperation?.operation?.expectedCurrentPlanId).toBe(TARGET_PLAN);
+    expect(snap.upgradeNotificationEligible).toBe(false);
+    expect(h.submitCalls).toHaveLength(2); // first upgrade submission + this one
   });
 });
 

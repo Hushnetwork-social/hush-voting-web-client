@@ -28237,6 +28237,25 @@ function buildConfirmedUpgradeUnsignedTransaction(input) {
 function isBoundedPlanId(value) {
   return isBoundedText2(value, MAX_PLAN_ID_LENGTH);
 }
+function licenceTransitionIntentOfPendingRecord(record) {
+  try {
+    const envelope = JSON.parse(record.transaction.exactJson);
+    const intent = envelope.Payload?.TransitionIntent;
+    return intent === "confirmed_upgrade" || intent === "baseline_free" ? intent : null;
+  } catch {
+    return null;
+  }
+}
+function isPendingRecordPurposeCoherent(record) {
+  const intent = licenceTransitionIntentOfPendingRecord(record);
+  if (intent === "confirmed_upgrade") {
+    return record.upgradeBinding !== void 0;
+  }
+  if (intent === "baseline_free") {
+    return record.upgradeBinding === void 0;
+  }
+  return false;
+}
 function resolveUpgradeTargetDisplayName(projection, targetPlanId) {
   if (projection === null) {
     return null;
@@ -28325,6 +28344,16 @@ var LicenceEntitlementCoordinator = class {
     this.lastOutcomeCode = null;
     /** FEAT-017: one-shot local-success notification eligibility (Task 3.3). */
     this.upgradeNotificationEligible = false;
+    /**
+     * FEAT-017: delayed (D0) marker for a live upgrade operation while the old
+     * indexed licence keeps the machine phase ready (30 s advancing-chain or
+     * paused-chain; reset by a new submission/retry or by offline).
+     */
+    this.upgradeDelayed = false;
+    /** FEAT-017: retained terminal upgrade outcome until acknowledged. */
+    this.upgradeTerminal = null;
+    /** FEAT-017: consume-after-submit flag for the authoritative-rejection requery. */
+    this.upgradeRejectedRequery = false;
   }
   snapshot() {
     return {
@@ -28380,10 +28409,16 @@ var LicenceEntitlementCoordinator = class {
       this.projection = null;
       this.reachableElapsedMs = 0;
       this.lastReachableAtMs = null;
+      this.upgradeDelayed = false;
       this.lastOutcomeCode = "offline";
       return this.snapshot();
     }
     if (event === "paused") {
+      if (this.hasLiveUpgradeOperation() && this.projection !== null) {
+        this.upgradeDelayed = true;
+        this.lastOutcomeCode = "upgrade-chain-paused";
+        return this.snapshot();
+      }
       if (this.phase === "awaitingIndex") {
         this.phase = "confirmationDelayed";
         this.lastOutcomeCode = "chain-paused";
@@ -28481,15 +28516,29 @@ var LicenceEntitlementCoordinator = class {
     }
     const fresh = this.projection;
     if (fresh.licenceReference !== displayed.licenceReference || fresh.planId !== displayed.planId || fresh.planId === requestedPlanId) {
+      this.upgradeTerminal = { status: "stale", reason: "current-changed" };
       this.lastOutcomeCode = "upgrade-stale-current-changed";
       return this.snapshot();
     }
     const offered = fresh.higherOptions.some((option) => option.planId === requestedPlanId);
     if (!offered) {
+      this.upgradeTerminal = { status: "stale", reason: "catalogue-changed" };
       this.lastOutcomeCode = "upgrade-stale-catalogue-changed";
       return this.snapshot();
     }
     await this.sealAndSubmitConfirmedUpgrade(requestedPlanId, fresh);
+    return this.snapshot();
+  }
+  /**
+   * FEAT-017 Task 3.3 — authority-side acknowledgement that the page surfaced
+   * the terminal upgrade outcome (result view, one-time notification, stale
+   * review, or competing notice). Clears the retained terminal context and the
+   * one-shot notification eligibility. A live pending operation is untouched.
+   */
+  acknowledgeUpgradeOutcome() {
+    this.upgradeTerminal = null;
+    this.upgradeNotificationEligible = false;
+    this.lastOutcomeCode = "upgrade-outcome-acknowledged";
     return this.snapshot();
   }
   /** Lock/invalidation: stop work, clear ephemeral projection, ignore late results. */
@@ -28499,6 +28548,10 @@ var LicenceEntitlementCoordinator = class {
     this.projection = null;
     this.pendingRecord = null;
     this.pendingTransactionId = null;
+    this.upgradeDelayed = false;
+    this.upgradeTerminal = null;
+    this.upgradeNotificationEligible = false;
+    this.upgradeRejectedRequery = false;
     this.phase = "lockedOut";
     this.lastOutcomeCode = "locked";
     return this.snapshot();
@@ -28512,9 +28565,14 @@ var LicenceEntitlementCoordinator = class {
         this.reachableElapsedMs += Math.max(0, now - this.lastReachableAtMs);
         this.lastReachableAtMs = now;
       }
-      if (this.confirmationStartedReachableMs !== null && this.reachableElapsedMs - this.confirmationStartedReachableMs >= ENTITLEMENT_CONFIRMATION_DELAYED_MS && (this.phase === "awaitingIndex" || this.phase === "baselineSubmitting")) {
-        this.phase = "confirmationDelayed";
-        this.lastOutcomeCode = "confirmation-delayed-30s";
+      if (this.confirmationStartedReachableMs !== null && this.reachableElapsedMs - this.confirmationStartedReachableMs >= ENTITLEMENT_CONFIRMATION_DELAYED_MS && (this.phase === "awaitingIndex" || this.phase === "baselineSubmitting" || this.phase === "entitlementReady" && this.hasLiveUpgradeOperation())) {
+        if (this.hasLiveUpgradeOperation() && this.projection !== null) {
+          this.upgradeDelayed = true;
+          this.lastOutcomeCode = "upgrade-confirmation-delayed-30s";
+        } else {
+          this.phase = "confirmationDelayed";
+          this.lastOutcomeCode = "confirmation-delayed-30s";
+        }
       }
     } else {
       this.lastReachableAtMs = null;
@@ -28569,12 +28627,11 @@ var LicenceEntitlementCoordinator = class {
     switch (cls) {
       case "ready": {
         if (outcome.outcome !== "ready") return;
-        const outcomeCodeBeforeReconcile = this.lastOutcomeCode;
         await this.attachBoundPendingRecordForReconciliation();
-        this.reconcilePendingAgainstActive(outcome.projection.licenceReference);
+        const reconciledUpgrade = this.reconcilePendingAgainstActive(outcome.projection.licenceReference);
         this.projection = outcome.projection;
         this.phase = "entitlementReady";
-        if (this.lastOutcomeCode === outcomeCodeBeforeReconcile) {
+        if (!reconciledUpgrade) {
           this.lastOutcomeCode = "ready";
         }
         return;
@@ -28682,48 +28739,84 @@ var LicenceEntitlementCoordinator = class {
     }
     return null;
   }
+  /**
+   * @returns true when a confirmed-upgrade operation was processed against the
+   * fresh active reference (its purpose-specific outcome code was set); false
+   * for baseline/no-pending results (the caller reports plain 'ready').
+   */
   reconcilePendingAgainstActive(activeLicenceReference) {
     if (this.pendingTransactionId === null) {
-      return;
+      return false;
     }
     if (this.pendingRecord !== null && isConfirmedUpgradePendingRecord(this.pendingRecord)) {
-      this.reconcilePendingUpgrade(activeLicenceReference);
-      return;
+      return this.reconcilePendingUpgrade(activeLicenceReference);
     }
     const pendingIsActive = activeLicenceReference === this.pendingTransactionId;
     this.retirePending(pendingIsActive ? "confirmed-indexed" : "superseded");
     this.pendingRecord = null;
     this.pendingTransactionId = null;
+    return false;
   }
   /**
    * FEAT-017 reconciliation of one confirmed-upgrade operation against fresh
-   * indexed truth. Returning the expected OLD licence reference is neither
-   * success nor supersession: the operation stays pending under the old
-   * limits. Exact-match / competing truth resolution completes in Task 3.3;
-   * until then a changed reference conservatively preserves the sealed
-   * operation (never retired, never claimed successful).
+   * indexed truth (Task 3.3 table):
+   *  - expected OLD licence reference  -> preserve pending under old limits;
+   *  - exact sealed transaction UUID   -> local success emitted ONCE;
+   *  - any other changed compatible ref -> competing activation: accept
+   *    authoritative truth, retire obsolete pending, NO local-success claim.
+   *
+   * @returns true when this record was processed (outcome code set).
    */
   reconcilePendingUpgrade(activeLicenceReference) {
     if (this.pendingRecord === null) {
-      return;
+      return false;
     }
     const binding = this.pendingRecord.upgradeBinding;
     if (binding === void 0) {
-      return;
+      return false;
     }
     if (activeLicenceReference === binding.expectedCurrentLicenceTransactionId) {
       this.lastOutcomeCode = "upgrade-pending-old-current";
-      return;
+      return true;
     }
-    this.lastOutcomeCode = "upgrade-awaiting-changed-truth";
+    if (activeLicenceReference === this.pendingRecord.transactionId) {
+      const operation = {
+        pendingTransactionId: this.pendingRecord.transactionId,
+        expectedCurrentPlanId: binding.expectedCurrentPlanId,
+        targetPlanId: binding.requestedPlanId,
+        observedCatalogueVersion: binding.observedCatalogueVersion,
+        sealedAtUtc: this.pendingRecord.createdUtc
+      };
+      this.retirePending("confirmed-indexed");
+      this.pendingRecord = null;
+      this.pendingTransactionId = null;
+      this.upgradeTerminal = { status: "local-success", operation };
+      this.upgradeNotificationEligible = true;
+      this.upgradeDelayed = false;
+      this.lastOutcomeCode = "upgrade-local-success";
+      return true;
+    }
+    this.retirePending("superseded");
+    this.pendingRecord = null;
+    this.pendingTransactionId = null;
+    this.upgradeTerminal = { status: "competing-activation" };
+    this.upgradeDelayed = false;
+    this.lastOutcomeCode = "upgrade-competing-activation";
+    return true;
   }
   async submitPending(record) {
     if (this.cancelled) {
       return;
     }
+    if (!isPendingRecordPurposeCoherent(record)) {
+      this.phase = "entitlementRepair";
+      this.lastOutcomeCode = "upgrade-record-missing-binding";
+      return;
+    }
     this.inFlight = true;
     this.phase = "baselineSubmitting";
     this.confirmationStartedReachableMs = this.reachableElapsedMs;
+    this.upgradeDelayed = false;
     try {
       const admission = await this.ports.submitBaseline(record);
       if (this.cancelled) {
@@ -28747,8 +28840,13 @@ var LicenceEntitlementCoordinator = class {
           this.needsImmediateQuery = true;
           break;
         case "failClosed":
-          this.phase = "entitlementRepair";
-          this.lastOutcomeCode = "terminal-rejected";
+          if (upgrade) {
+            this.upgradeRejectedRequery = true;
+            this.lastOutcomeCode = "upgrade-terminal-rejected-requery";
+          } else {
+            this.phase = "entitlementRepair";
+            this.lastOutcomeCode = "terminal-rejected";
+          }
           break;
         case "preserveAndReconcile":
           if (upgrade && this.projection !== null) {
@@ -28765,6 +28863,37 @@ var LicenceEntitlementCoordinator = class {
     if (this.needsImmediateQuery && !this.cancelled) {
       this.needsImmediateQuery = false;
       await this.runFreshQuery("already-exists");
+    }
+    if (this.upgradeRejectedRequery && !this.cancelled) {
+      this.upgradeRejectedRequery = false;
+      await this.reconcileRejectedUpgrade();
+    }
+  }
+  /**
+   * FEAT-017 (D017-06): authoritative rejection of a sealed confirmed upgrade.
+   * Re-query indexed truth first: if another activation indexed meanwhile, the
+   * normal reconciliation outcomes apply (exact local success / competing). If
+   * truth is unchanged (the old licence still current), the attempted
+   * activation is terminal-obsolete: retire the sealed operation and require a
+   * fresh review (stale-rejection). No-active/unavailable truth keeps the
+   * operation in query-only recovery under the existing gates.
+   */
+  async reconcileRejectedUpgrade() {
+    const wasPendingId = this.pendingTransactionId;
+    await this.runFreshQuery("upgrade-rejected");
+    if (this.cancelled || wasPendingId === null) {
+      return;
+    }
+    if (this.pendingTransactionId === null || this.pendingRecord === null) {
+      return;
+    }
+    if (isConfirmedUpgradePendingRecord(this.pendingRecord) && this.phase === "entitlementReady" && this.projection !== null) {
+      this.retirePending("retired");
+      this.pendingRecord = null;
+      this.pendingTransactionId = null;
+      this.upgradeTerminal = { status: "stale", reason: "stale-rejection" };
+      this.upgradeDelayed = false;
+      this.lastOutcomeCode = "upgrade-stale-rejection";
     }
   }
   recordAttempt(record, admission) {
@@ -28786,7 +28915,7 @@ var LicenceEntitlementCoordinator = class {
       if (loaded.ok && loaded.record !== void 0) {
         const updated = {
           ...loaded.record,
-          recoveryState: state === "confirmed-indexed" ? "confirmedIndexed" : "superseded"
+          recoveryState: state === "confirmed-indexed" ? "confirmedIndexed" : state === "superseded" ? "superseded" : "retired"
         };
         this.ports.savePending(updated);
       }
@@ -28805,31 +28934,86 @@ var LicenceEntitlementCoordinator = class {
    * absent; display names come only from validated fresh projection data at
    * snapshot time (Phase 2 review recommendation #4).
    */
+  /**
+   * FEAT-017: page-safe confirmed-upgrade operation view. A live sealed
+   * operation renders as pending/delayed; a retained terminal outcome renders
+   * as local-success / competing-activation / stale. Built through the closed
+   * session-contract builder, so exact bytes, signatures, bindings, and journal
+   * state are structurally absent; display names come only from validated
+   * fresh projection data at snapshot time (Phase 2 review recommendation #4).
+   */
   buildUpgradeOperationSnapshot() {
-    if (!this.hasLiveUpgradeOperation() || this.pendingRecord === null) {
+    if (this.hasLiveUpgradeOperation() && this.pendingRecord !== null) {
+      const binding = this.pendingRecord.upgradeBinding;
+      if (binding !== void 0) {
+        const identity = {
+          pendingTransactionId: this.pendingRecord.transactionId,
+          expectedCurrentPlanId: binding.expectedCurrentPlanId,
+          targetPlanId: binding.requestedPlanId,
+          observedCatalogueVersion: binding.observedCatalogueVersion,
+          sealedAtUtc: this.pendingRecord.createdUtc
+        };
+        const delayed = this.upgradeDelayed || this.phase === "confirmationDelayed";
+        const built = buildLicenceUpgradeSafeOperation({
+          status: delayed ? "delayed" : "pending",
+          operation: identity,
+          currentPlanId: this.projection === null ? null : this.projection.planId,
+          currentPlanDisplayName: this.projection === null ? null : this.projection.displayName,
+          targetPlanDisplayName: resolveUpgradeTargetDisplayName(
+            this.projection,
+            binding.requestedPlanId
+          )
+        });
+        if (built.ok) {
+          return built.snapshot;
+        }
+      }
+    }
+    return this.buildUpgradeTerminalSnapshot();
+  }
+  /**
+   * FEAT-017: page-safe snapshot of the retained terminal upgrade outcome
+   * (local-success / competing-activation / stale with its closed reason).
+   * Display names resolve only from validated fresh projection data at
+   * snapshot time (never stale or invented copy).
+   */
+  buildUpgradeTerminalSnapshot() {
+    if (this.upgradeTerminal === null) {
       return null;
     }
-    const binding = this.pendingRecord.upgradeBinding;
-    if (binding === void 0) {
-      return null;
+    const terminal = this.upgradeTerminal;
+    const currentPlanId = this.projection === null ? null : this.projection.planId;
+    const currentPlanDisplayName = this.projection === null ? null : this.projection.displayName;
+    if (terminal.status === "local-success") {
+      const built2 = buildLicenceUpgradeSafeOperation({
+        status: "local-success",
+        operation: terminal.operation,
+        currentPlanId,
+        currentPlanDisplayName,
+        targetPlanDisplayName: resolveUpgradeTargetDisplayName(
+          this.projection,
+          terminal.operation.targetPlanId
+        )
+      });
+      return built2.ok ? built2.snapshot : null;
     }
-    const identity = {
-      pendingTransactionId: this.pendingRecord.transactionId,
-      expectedCurrentPlanId: binding.expectedCurrentPlanId,
-      targetPlanId: binding.requestedPlanId,
-      observedCatalogueVersion: binding.observedCatalogueVersion,
-      sealedAtUtc: this.pendingRecord.createdUtc
-    };
-    const delayed = this.phase === "confirmationDelayed";
+    if (terminal.status === "stale") {
+      const built2 = buildLicenceUpgradeSafeOperation({
+        status: "stale",
+        reason: terminal.reason,
+        operation: null,
+        currentPlanId,
+        currentPlanDisplayName,
+        targetPlanDisplayName: null
+      });
+      return built2.ok ? built2.snapshot : null;
+    }
     const built = buildLicenceUpgradeSafeOperation({
-      status: delayed ? "delayed" : "pending",
-      operation: identity,
-      currentPlanId: this.projection === null ? null : this.projection.planId,
-      currentPlanDisplayName: this.projection === null ? null : this.projection.displayName,
-      targetPlanDisplayName: resolveUpgradeTargetDisplayName(
-        this.projection,
-        binding.requestedPlanId
-      )
+      status: "competing-activation",
+      operation: null,
+      currentPlanId,
+      currentPlanDisplayName,
+      targetPlanDisplayName: null
     });
     return built.ok ? built.snapshot : null;
   }
@@ -28857,6 +29041,7 @@ var LicenceEntitlementCoordinator = class {
    * clears retained terminal result/stale/competing notices here).
    */
   clearUpgradePresentationArtifacts() {
+    this.upgradeTerminal = null;
     this.upgradeNotificationEligible = false;
   }
   /**
