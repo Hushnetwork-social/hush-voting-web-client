@@ -135,6 +135,40 @@ try {
       FEAT017_PAIRING_LEDGER: seededLedgerPath,
     }),
   );
+
+  // 8. obligations red-effectiveness: a seeded obligations doc with the wrong
+  // task link must fail the obligations validator.
+  const seededObligationsPath = join(root, 'obligations-seeded.json');
+  writeFileSync(
+    seededObligationsPath,
+    JSON.stringify(
+      {
+        schemaVersion: 'hepha-manual-test-obligations/v1',
+        featureId: 'FEAT-017',
+        obligations: [
+          {
+            id: 'MT-QUAL-ANDROID-017-001',
+            title: 'broken',
+            reason: 'This test cannot be automated and the user needs to test it manually.',
+            phaseNumber: 7,
+            taskId: 'phase-7-task-7-9', // wrong durable link
+            preconditions: ['a'],
+            steps: ['b'],
+            expectedResult: 'c',
+            evidenceRequirements: ['d'],
+            status: 'PENDING',
+          },
+        ],
+      },
+      null,
+      2,
+    ),
+  );
+  results.push(
+    expectRed('obligations', process.execPath, [join(SCRIPT_DIR, 'obligations.mjs')], {
+      OBLIGATIONS_PATH: seededObligationsPath,
+    }),
+  );
 } finally {
   rmSync(root, { recursive: true, force: true });
 }

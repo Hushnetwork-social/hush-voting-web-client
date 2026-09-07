@@ -41,6 +41,7 @@ run('journey-wiring-discovery', 'node', [join(SCRIPT_DIR, 'journey-wiring.mjs')]
 run('wiring', 'node', [join(SCRIPT_DIR, 'wiring.mjs')]);
 run('coverage', 'node', [join(SCRIPT_DIR, 'coverage.mjs')]);
 run('evidence-pairing-obligations', 'node', [join(SCRIPT_DIR, 'evidence.mjs')]);
+run('manual-obligations', 'node', [join(SCRIPT_DIR, 'obligations.mjs')]);
 run('secret-scan', 'node', [join(SCRIPT_DIR, 'secret-scan.mjs')]);
 run('source-property-scan', 'node', [join(SCRIPT_DIR, 'property-scan.mjs')]);
 run('artifact-privacy-scan', 'node', [join(SCRIPT_DIR, 'artifact-scan.mjs')]);

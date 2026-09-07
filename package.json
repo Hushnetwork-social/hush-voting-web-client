@@ -113,10 +113,11 @@
     "licence-upgrade:artifact-scan": "node scripts/licence-upgrade/artifact-scan.mjs",
     "licence-upgrade:quality": "node scripts/licence-upgrade/quality.mjs",
     "licence-upgrade:selftest": "node scripts/licence-upgrade/selftest.mjs",
-    "licence-upgrade:gates": "npm run licence-upgrade:selftest && npm run licence-upgrade:journey-wiring && npm run licence-upgrade:wiring && npm run licence-upgrade:coverage && npm run licence-upgrade:evidence && npm run licence-upgrade:secret-scan && npm run licence-upgrade:property-scan && npm run licence-upgrade:artifact-scan && npm run licence-upgrade:quality",
+    "licence-upgrade:gates": "npm run licence-upgrade:selftest && npm run licence-upgrade:journey-wiring && npm run licence-upgrade:wiring && npm run licence-upgrade:coverage && npm run licence-upgrade:evidence && npm run licence-upgrade:obligations && npm run licence-upgrade:secret-scan && npm run licence-upgrade:property-scan && npm run licence-upgrade:artifact-scan && npm run licence-upgrade:quality",
     "test:licence-upgrade:bdd": "playwright test --config playwright.licence-upgrade.config.ts",
     "licence-upgrade:journey-wiring": "node scripts/licence-upgrade/journey-wiring.mjs",
-    "licence-upgrade:evidence": "node scripts/licence-upgrade/evidence.mjs"
+    "licence-upgrade:evidence": "node scripts/licence-upgrade/evidence.mjs",
+    "licence-upgrade:obligations": "node scripts/licence-upgrade/obligations.mjs"
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.14.4",
