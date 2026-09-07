@@ -31,6 +31,7 @@ pub const LICENCE_PAYLOAD_KIND: &str = "71370664-5eb4-4ce9-b96a-d7e7ffe53db5";
 pub const LICENCE_PLAN_DIRECT_FREE: &str = "hushvoting.direct.free";
 pub const LICENCE_CATALOGUE_VERSION_V1: &str = "hushvoting-licence-catalogue/v1.0.0";
 pub const LICENCE_TRANSITION_INTENT_BASELINE_FREE: &str = "baseline_free";
+pub const LICENCE_TRANSITION_INTENT_CONFIRMED_UPGRADE: &str = "confirmed_upgrade";
 pub const LICENCE_QUERY_METHOD: &str = "GetMyEntitlement";
 pub const LICENCE_USER_SIGNATURE_MEMBER: &str = "UserSignature";
 
@@ -52,6 +53,27 @@ pub fn baseline_payload_json(observed_catalogue_version: &str) -> String {
     )
 }
 
+/// Canonical payload JSON of a confirmed-upgrade licence payload (FEAT-017
+/// frozen FEAT-015 declaration order: TransitionIntent, RequestedPlanId,
+/// ObservedCatalogueVersion, ExpectedCurrentLicenceTransactionId,
+/// ExpectedCurrentPlanId). Byte-identical to the TS `LicenceUpgradePayload`
+/// serializer (LIC-FIX-002 corpus).
+pub fn confirmed_upgrade_payload_json(
+    expected_current_licence_transaction_id: &str,
+    expected_current_plan_id: &str,
+    requested_plan_id: &str,
+    observed_catalogue_version: &str,
+) -> String {
+    format!(
+        "{{\"TransitionIntent\":\"{intent}\",\"RequestedPlanId\":\"{requested}\",\"ObservedCatalogueVersion\":\"{catalogue}\",\"ExpectedCurrentLicenceTransactionId\":\"{expected_tx}\",\"ExpectedCurrentPlanId\":\"{expected_plan}\"}}",
+        intent = LICENCE_TRANSITION_INTENT_CONFIRMED_UPGRADE,
+        requested = escape_json(requested_plan_id),
+        catalogue = escape_json(observed_catalogue_version),
+        expected_tx = escape_json(expected_current_licence_transaction_id),
+        expected_plan = escape_json(expected_current_plan_id),
+    )
+}
+
 /// Exact UTF-8 byte length of the canonical payload JSON.
 pub fn payload_json_utf8_length(observed_catalogue_version: &str) -> usize {
     baseline_payload_json(observed_catalogue_version).len()
@@ -64,6 +86,32 @@ pub fn canonical_unsigned_transaction_json(
     observed_catalogue_version: &str,
 ) -> String {
     let payload_json = baseline_payload_json(observed_catalogue_version);
+    format!(
+        "{{\"TransactionId\":\"{tx}\",\"PayloadKind\":\"{kind}\",\"TransactionTimeStamp\":\"{ts}\",\"Payload\":{payload},\"PayloadSize\":{size}}}",
+        tx = escape_json(transaction_id),
+        kind = LICENCE_PAYLOAD_KIND,
+        ts = escape_json(transaction_timestamp_utc),
+        payload = payload_json,
+        size = payload_json.len(),
+    )
+}
+
+/// Canonical unsigned confirmed-upgrade transaction JSON (FEAT-017 frozen
+/// envelope, byte-identical to the TS serializer for LIC-FIX-002).
+pub fn canonical_unsigned_upgrade_transaction_json(
+    transaction_id: &str,
+    transaction_timestamp_utc: &str,
+    expected_current_licence_transaction_id: &str,
+    expected_current_plan_id: &str,
+    requested_plan_id: &str,
+    observed_catalogue_version: &str,
+) -> String {
+    let payload_json = confirmed_upgrade_payload_json(
+        expected_current_licence_transaction_id,
+        expected_current_plan_id,
+        requested_plan_id,
+        observed_catalogue_version,
+    );
     format!(
         "{{\"TransactionId\":\"{tx}\",\"PayloadKind\":\"{kind}\",\"TransactionTimeStamp\":\"{ts}\",\"Payload\":{payload},\"PayloadSize\":{size}}}",
         tx = escape_json(transaction_id),
@@ -530,6 +578,59 @@ mod tests {
         assert!(json.contains("\"PayloadSize\":144"));
         // Frozen member order: payload members appear before PayloadSize.
         assert!(json.find("\"Payload\"").unwrap() < json.find("\"PayloadSize\"").unwrap());
+    }
+
+    #[test]
+    fn confirmed_upgrade_unsigned_transaction_matches_lic_fix_002_bytes_and_digest() {
+        // FEAT-017 fixed canonical vector (LIC-FIX-002): mirrors the TS corpus
+        // asserted in upgrade.test.ts and the shared Rust record fixture in
+        // licensing_record.rs.
+        const UPGRADE_TX_ID: &str = "8c6a1b77-4d2e-4f91-a4c0-9e7b2d8f1a55";
+        const UPGRADE_TIMESTAMP: &str = "2026-09-06T00:00:00.000Z";
+        const EXPECTED_CURRENT_TX: &str = "5f2d9e11-3c44-4a80-b8e7-6b2f1a0c9d3e";
+        const EXPECTED_CURRENT_PLAN: &str = "hushvoting.direct.free";
+        const TARGET_PLAN: &str = "hushvoting.veritas.2000";
+        /// sha-256 of the canonical unsigned upgrade envelope (TS LIC-FIX-002).
+        const LIC_FIX_002_SHA256: &str =
+            "27a380b4242bb06d3c6068953fff31f0a6179c0b80e73631e3b47b9ddcbe2cd0";
+
+        let json = canonical_unsigned_upgrade_transaction_json(
+            UPGRADE_TX_ID,
+            UPGRADE_TIMESTAMP,
+            EXPECTED_CURRENT_TX,
+            EXPECTED_CURRENT_PLAN,
+            TARGET_PLAN,
+            LICENCE_CATALOGUE_VERSION_V1,
+        );
+        assert_eq!(json.len(), 463);
+        assert_eq!(sha256_hex_lower(json.as_bytes()), LIC_FIX_002_SHA256);
+        assert!(json.contains("\"PayloadSize\":275"));
+        assert!(json.contains("\"TransitionIntent\":\"confirmed_upgrade\""));
+        assert!(json.contains("\"ExpectedCurrentLicenceTransactionId\""));
+        assert!(json.contains("\"ExpectedCurrentPlanId\""));
+        // Frozen member order mirrors the TS serializer.
+        let payload_start = json.find("\"Payload\":{").expect("payload");
+        let intent = json[payload_start..]
+            .find("\"TransitionIntent\"")
+            .expect("intent");
+        let requested = json[payload_start..]
+            .find("\"RequestedPlanId\"")
+            .expect("requested");
+        let catalogue = json[payload_start..]
+            .find("\"ObservedCatalogueVersion\"")
+            .expect("catalogue");
+        let expected_tx = json[payload_start..]
+            .find("\"ExpectedCurrentLicenceTransactionId\"")
+            .expect("expected tx");
+        let expected_plan = json[payload_start..]
+            .find("\"ExpectedCurrentPlanId\"")
+            .expect("expected plan");
+        assert!(
+            intent < requested
+                && requested < catalogue
+                && catalogue < expected_tx
+                && expected_tx < expected_plan
+        );
     }
 
     #[test]
