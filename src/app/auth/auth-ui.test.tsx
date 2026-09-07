@@ -26,6 +26,8 @@ function projection(overrides: Partial<AuthRenderProjection>): AuthRenderProject
     protectedAccess: false,
     entitlementStage: null,
     entitlementReady: false,
+    sessionEpoch: 1,
+    entitlementRequired: true,
     safeIdentity: { alias: 'Ada', abbreviatedSigningAddress: 'NVh…1a2b' },
     authenticatedIdentity: null,
     outcomeCode: null,

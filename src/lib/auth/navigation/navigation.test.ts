@@ -151,6 +151,8 @@ describe('thin adapter protected projection', () => {
       protectedAccess: false,
       entitlementStage: null,
       entitlementReady: false,
+      sessionEpoch: 1,
+      entitlementRequired: true,
       safeIdentity: null,
       authenticatedIdentity: null,
       outcomeCode: null,
@@ -165,6 +167,8 @@ describe('thin adapter protected projection', () => {
       protectedAccess: false,
       entitlementStage: 'entitlementResolving',
       entitlementReady: false,
+      sessionEpoch: 1,
+      entitlementRequired: true,
       safeIdentity: { alias: 'Ada', abbreviatedSigningAddress: 'NVh…1a2b' },
       authenticatedIdentity: {
         alias: 'Ada',
@@ -181,6 +185,8 @@ describe('thin adapter protected projection', () => {
       protectedAccess: true,
       entitlementStage: 'entitlementReady',
       entitlementReady: true,
+      sessionEpoch: 1,
+      entitlementRequired: true,
       safeIdentity: { alias: 'Ada', abbreviatedSigningAddress: 'NVh…1a2b' },
       authenticatedIdentity: {
         alias: 'Ada',
