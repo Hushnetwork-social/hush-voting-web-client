@@ -42,6 +42,8 @@ export const LICENCE_UPGRADE_COPY = {
   actionReturnToWorkspace: 'Return to workspace',
   actionViewCurrentLicence: 'View current licence',
   actionCopy: 'Copy',
+  actionBack: 'Back',
+  accountRefLabel: 'Ref',
 
   // Status / pending / notification copy.
   statusActive: 'Active',
@@ -68,6 +70,7 @@ export const LICENCE_UPGRADE_COPY = {
   labelCurrent: 'Current',
   labelTarget: 'Target',
   labelPendingTarget: 'Pending target',
+  labelSelected: 'Selected',
 
   // No-higher, stale, and Enterprise copy.
   noHigherMessage: 'No higher self-service plan is available.',

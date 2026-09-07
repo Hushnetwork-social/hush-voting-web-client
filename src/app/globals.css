@@ -1011,3 +1011,758 @@ h1 {
     transition: none !important;
   }
 }
+
+/* ===================================================================== */
+/* FEAT-017 licence UI (Account summary, workspace surfaces, indicators) */
+/* Complementary surfaces + spacing + radius; borders only for focus/    */
+/* selected/warning/error; no heavy nested cards; no white-outline grid. */
+/* ===================================================================== */
+
+/* ---- shared chips / meta ---- */
+.licence-status-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.75rem;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.licence-status-active {
+  color: var(--success);
+  background: rgba(134, 239, 172, 0.14);
+}
+
+.licence-status-pending {
+  color: var(--warning);
+  background: var(--warning-surface);
+}
+
+.licence-meta-label {
+  display: block;
+  color: var(--muted);
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* ---- Account flyout licence summary (A0/A0P) ---- */
+.licence-account-summary {
+  display: grid;
+  gap: 0.8rem;
+  padding: 1rem 1.1rem;
+  background: var(--surface-low);
+  border-radius: 0.85rem;
+}
+
+.licence-account-plan-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.licence-account-plan {
+  font-size: 1.02rem;
+  font-weight: 750;
+  color: var(--text);
+}
+
+.licence-account-pending {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.licence-account-pending-target {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.licence-account-pending-status,
+.licence-account-limits-note {
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.licence-account-facts {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0;
+}
+
+.licence-account-fact-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.licence-account-fact-row dt {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.licence-account-fact-row dd {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.86rem;
+  font-weight: 650;
+  text-align: right;
+}
+
+.licence-account-action {
+  display: inline-flex;
+  min-height: 2.85rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0.7rem 1.1rem;
+  color: var(--on-primary);
+  background: var(--primary);
+  border: 0;
+  border-radius: 0.85rem;
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.licence-account-action:hover:not(:disabled) {
+  background: var(--accent-strong);
+}
+
+.licence-account-action:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* ---- full-width workspace shell ---- */
+.licence-workspace {
+  width: min(100%, 96rem);
+  margin-inline: auto;
+  display: grid;
+  gap: clamp(1.25rem, 3vw, 2.25rem);
+  padding-block: clamp(1rem, 3vw, 2.5rem) 4rem;
+}
+
+.licence-workspace-header {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.licence-workspace-title {
+  margin: 0;
+  max-width: none;
+  font-size: clamp(1.9rem, 4vw, 3rem);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.licence-workspace-title:focus-visible,
+.licence-change-notice-title:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 4px;
+  border-radius: 0.35rem;
+}
+
+.licence-workspace-subtitle {
+  max-width: 60rem;
+  margin: 0;
+  color: var(--muted);
+  font-size: 1.05rem;
+  line-height: 1.6;
+}
+
+/* ---- section bands (natural-case copy; uppercase is a token here) ---- */
+.licence-section {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.licence-section-band {
+  margin: 0;
+  color: var(--primary);
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* ---- current detail + metric wells ---- */
+.licence-current-detail,
+.licence-enterprise,
+.licence-option,
+.licence-change-notice {
+  border-radius: 1.1rem;
+  padding: clamp(1rem, 2vw, 1.4rem);
+}
+
+.licence-current-detail {
+  display: grid;
+  gap: 0.85rem;
+  background: var(--surface-low);
+}
+
+.licence-current-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+}
+
+.licence-current-name,
+.licence-option-name,
+.licence-enterprise-name {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 750;
+  color: var(--text);
+}
+
+.licence-current-desc,
+.licence-option-desc,
+.licence-enterprise-desc {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.licence-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.8rem;
+  margin: 0;
+}
+
+.licence-metric-well {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.9rem 1rem;
+  background: var(--surface-elevated);
+  border-radius: 0.9rem;
+}
+
+.licence-metric-label {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.licence-metric-value {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.licence-current-effective,
+.licence-current-boundary-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.licence-current-reference {
+  display: grid;
+  gap: 0.5rem;
+}
+
+/* ---- reference row / copy ---- */
+.licence-reference-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+}
+
+.licence-reference-full,
+.licence-catalogue-version,
+.licence-short-reference {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  color: var(--primary);
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.licence-copy-button {
+  display: inline-flex;
+  min-height: 2.85rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0.6rem 1rem;
+  color: var(--text);
+  background: var(--surface-elevated);
+  border: 1px solid transparent;
+  border-radius: 0.85rem;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.licence-copy-button:hover {
+  background: var(--surface-highest);
+}
+
+.licence-copy-button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.licence-copy-feedback {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+/* ---- higher options / enterprise ---- */
+.licence-option-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 1rem;
+}
+
+.licence-option {
+  display: grid;
+  gap: 0.7rem;
+  align-content: start;
+  background: var(--surface-elevated);
+  border: 1px solid transparent;
+}
+
+.licence-option-selected {
+  border-color: var(--primary-container);
+}
+
+.licence-option-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.licence-option-selected-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--primary);
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.licence-option-facts {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0;
+}
+
+.licence-option-fact-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.9rem;
+}
+
+.licence-option-fact-row dt {
+  color: var(--muted);
+}
+
+.licence-option-fact-row dd {
+  margin: 0;
+  color: var(--text);
+  font-weight: 650;
+  text-align: right;
+}
+
+.licence-review-button {
+  display: inline-flex;
+  min-height: 2.85rem;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  padding: 0.65rem 1.1rem;
+  color: var(--on-primary);
+  background: var(--primary);
+  border: 0;
+  border-radius: 0.85rem;
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.licence-review-button:hover {
+  background: var(--accent-strong);
+}
+
+.licence-review-button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.licence-no-higher {
+  padding: 1.2rem 1.3rem;
+  background: var(--surface-low);
+  border-radius: 1rem;
+}
+
+.licence-no-higher-message {
+  margin: 0;
+  color: var(--text);
+  font-weight: 650;
+}
+
+.licence-selection-lock {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  padding: 1rem 1.2rem;
+  background: var(--surface-low);
+  border-radius: 1rem;
+}
+
+.licence-lock-target {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.licence-enterprise {
+  display: grid;
+  gap: 0.6rem;
+  align-content: start;
+  background: var(--surface-low);
+}
+
+.licence-enterprise-tag {
+  width: fit-content;
+  color: var(--warning);
+  background: var(--warning-surface);
+  border-radius: 999px;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.78rem;
+  font-weight: 750;
+  letter-spacing: 0.02em;
+}
+
+/* ---- actions ---- */
+.licence-action-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.9rem;
+  margin-top: 0.4rem;
+}
+
+.licence-primary-action,
+.licence-secondary-action {
+  display: inline-flex;
+  min-height: 2.85rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0.7rem 1.4rem;
+  border-radius: 0.85rem;
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.licence-primary-action {
+  color: var(--on-primary);
+  background: var(--primary);
+  border: 0;
+}
+
+.licence-primary-action:hover:not(:disabled) {
+  background: var(--accent-strong);
+}
+
+.licence-secondary-action {
+  color: var(--text);
+  background: var(--surface-elevated);
+  border: 1px solid transparent;
+}
+
+.licence-secondary-action:hover:not(:disabled) {
+  background: var(--surface-highest);
+}
+
+.licence-primary-action:focus-visible,
+.licence-secondary-action:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* ---- confirmation ---- */
+.licence-compare-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.licence-compare-side {
+  display: grid;
+  gap: 0.6rem;
+  padding: clamp(1rem, 2vw, 1.4rem);
+  background: var(--surface-low);
+  border-radius: 1.1rem;
+  align-content: start;
+}
+
+.licence-compare-side-title,
+.licence-consequences-title {
+  margin: 0;
+  color: var(--primary);
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.licence-compare-plan {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 750;
+  color: var(--text);
+}
+
+.licence-compare-desc {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.licence-fact-list {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+}
+
+.licence-fact-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.9rem;
+}
+
+.licence-fact-row dt {
+  color: var(--muted);
+}
+
+.licence-fact-row dd {
+  margin: 0;
+  color: var(--text);
+  font-weight: 650;
+  text-align: right;
+}
+
+.licence-confirm-metadata {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.licence-consequences {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.licence-consequences-list {
+  margin: 0;
+  padding-left: 1.2rem;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+/* ---- progress / delayed / result ---- */
+.licence-progress,
+.licence-delayed,
+.licence-result {
+  display: grid;
+  gap: 1rem;
+  align-content: start;
+}
+
+.licence-progress-waiting {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.licence-progress-status {
+  margin: 0;
+  color: var(--muted);
+}
+
+.licence-progress-current,
+.licence-progress-target {
+  display: grid;
+  gap: 0.4rem;
+  padding: 1rem 1.2rem;
+  background: var(--surface-low);
+  border-radius: 1rem;
+}
+
+.licence-progress-current-message,
+.licence-progress-limits,
+.licence-progress-reassurance,
+.licence-delayed-message,
+.licence-delayed-current,
+.licence-delayed-explainer,
+.licence-result-message {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.licence-progress-target-name {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.licence-result-message {
+  color: var(--text);
+  font-size: 1.08rem;
+  font-weight: 650;
+}
+
+/* ---- stale / change notice ---- */
+.licence-change-notice {
+  display: grid;
+  gap: 0.4rem;
+  background: var(--warning-surface);
+  border: 1px solid transparent;
+}
+
+.licence-change-notice-title {
+  margin: 0;
+  color: var(--warning);
+  font-size: 1.05rem;
+  line-height: 1.5;
+}
+
+/* ---- N0 pending indicator / N1 notification ---- */
+.licence-pending-indicator {
+  display: inline-flex;
+  min-height: 2.85rem;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem;
+  color: var(--warning);
+  background: var(--warning-surface);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.licence-pending-indicator:hover {
+  background: rgba(161, 98, 7, 0.32);
+}
+
+.licence-pending-indicator:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.licence-activation-notification {
+  display: grid;
+  gap: 0.6rem;
+  padding: 1rem 1.2rem;
+  background: var(--surface-elevated);
+  border-radius: 1rem;
+  box-shadow: 0 0.75rem 2rem rgba(0, 0, 0, 0.25);
+}
+
+.licence-notification-message {
+  margin: 0;
+  color: var(--success);
+  font-weight: 750;
+}
+
+.licence-notification-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+}
+
+.licence-notification-link,
+.licence-notification-dismiss {
+  display: inline-flex;
+  min-height: 2.85rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0.55rem 1rem;
+  border-radius: 0.8rem;
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.licence-notification-link {
+  color: var(--on-primary);
+  background: var(--primary);
+  border: 0;
+}
+
+.licence-notification-dismiss {
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid transparent;
+}
+
+.licence-notification-link:focus-visible,
+.licence-notification-dismiss:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* ---- responsive / reflow ---- */
+@media (max-width: 800px) {
+  .licence-compare-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .licence-option-grid,
+  .licence-metric-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .licence-action-row,
+  .licence-notification-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .licence-primary-action,
+  .licence-secondary-action,
+  .licence-review-button {
+    width: 100%;
+  }
+}
+
+/* Reduced motion: licence surfaces carry no essential animation; kill any
+   non-essential transition under the user's motion preference. */
+@media (prefers-reduced-motion: reduce) {
+  .licence-workspace *,
+  .licence-account-summary * {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

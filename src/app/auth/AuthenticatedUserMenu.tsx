@@ -2,10 +2,21 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { AuthenticatedIdentityMetadata } from '../../lib/auth/types';
+import type { LicenceAccountSummaryFacts } from '../../lib/licensing/upgrade-presentation';
+import { AccountLicenceSummary, type LicenceAccountActionKind } from './licence/account-licence-summary';
 
 interface AuthenticatedUserMenuProps {
   readonly identity: AuthenticatedIdentityMetadata;
   readonly onLock: () => void;
+  /**
+   * Optional FEAT-017 licence facts for the Account licence summary (A0/A0P).
+   * When absent (Phase 6 pre-wiring), the popup keeps its current content;
+   * when present, the licence block renders above Lock.
+   */
+  readonly licence?: {
+    readonly facts: LicenceAccountSummaryFacts;
+    readonly onLicenceAction: (action: LicenceAccountActionKind) => void;
+  } | null;
 }
 
 type CopiedKey = 'signing' | 'encryption' | null;
@@ -15,7 +26,7 @@ export function abbreviatePublicKey(value: string): string {
 }
 
 /** Authenticated-only public identity popup with keyboard/outside dismissal. */
-export function AuthenticatedUserMenu({ identity, onLock }: AuthenticatedUserMenuProps) {
+export function AuthenticatedUserMenu({ identity, onLock, licence }: AuthenticatedUserMenuProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -117,6 +128,10 @@ export function AuthenticatedUserMenu({ identity, onLock }: AuthenticatedUserMen
               </dd>
             </div>
           </dl>
+
+          {licence !== undefined && licence !== null ? (
+            <AccountLicenceSummary facts={licence.facts} onAction={licence.onLicenceAction} />
+          ) : null}
 
           <button
             type="button"
