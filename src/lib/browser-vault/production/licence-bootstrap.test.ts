@@ -474,4 +474,52 @@ describe('LicenceBootstrapSession (worker host)', () => {
       vi.useRealTimers();
     }
   });
+
+  it('FEAT-017 upgrade snapshot fields flow into safe progress only after real operations', async () => {
+    const { host, server } = await createHostHarness();
+    server.queryResponses = [() => activeResponse('5f2d9e11-3c44-4a80-b8e7-6b2f1a0c9d3e')];
+    const start = await host.start(NETWORK_BINDING);
+    expect(start.ok).toBe(true);
+    if (!start.ok) return;
+    // No upgrade operation has ever been sealed in this baseline-only harness:
+    // the additive safe vocabulary is always present and page-safe.
+    const before = host.snapshot();
+    expect(before).not.toBeNull();
+    if (before !== null) {
+      expect(before.phase).toBe('entitlementReady');
+      expect(before.upgradeOperation).toBeNull();
+      expect(before.upgradeNotificationEligible).toBe(false);
+    }
+    // A malformed activation is refused without touching the authority.
+    const bad = await host.confirmUpgrade(42);
+    expect(bad).toEqual({ ok: false, reason: 'invalid-input' });
+    const empty = await host.confirmUpgrade('');
+    expect(empty).toEqual({ ok: false, reason: 'invalid-input' });
+    // Acknowledging an outcome that was never surfaced is still a safe step.
+    const ack = await host.acknowledgeUpgradeOutcome();
+    expect(ack.ok).toBe(true);
+    host.teardown();
+  });
+
+  it('rejects upgrade control before authentication with the closed refusal', async () => {
+    const { storage, server, signingAddress } = await createHostHarness();
+    const engine2 = await unlockAndVerify(storage, signingAddress, server.encryptionAddress);
+    engine2.lock();
+    const lockedHost = new LicenceBootstrapSession({
+      engine: engine2,
+      nowMs: () => Date.now(),
+      expectedNetworkBinding: NETWORK_BINDING,
+      querySubmit: async () => ({ ok: false, status: 'UNAVAILABLE' }),
+      transactionSubmit: async () => 'uncertain',
+      onProgress: () => undefined,
+    });
+    expect(await lockedHost.confirmUpgrade('hushvoting.veritas.2000')).toEqual({
+      ok: false,
+      reason: 'not-authenticated',
+    });
+    expect(await lockedHost.acknowledgeUpgradeOutcome()).toEqual({
+      ok: false,
+      reason: 'not-authenticated',
+    });
+  });
 });
