@@ -22,17 +22,15 @@ import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 const SCRIPT_DIR = import.meta.dirname;
-const DEFAULT_PATH = join(
-  SCRIPT_DIR,
-  '..',
-  '..',
-  '..',
-  'hush-voting-memory-bank',
-  'Features',
-  '03_IN_PROGRESS',
-  'FEAT-017-account-licence-and-upgrade-experience',
-  'ManualTestObligations.json',
-);
+// The feature folder moves from 03_IN_PROGRESS to 04_COMPLETED during
+// complete-feature, so resolve the current lifecycle state instead of pinning a
+// single state directory. The explicit OBLIGATIONS_PATH override still wins.
+const FEATURE_FOLDER = 'FEAT-017-account-licence-and-upgrade-experience';
+const MEMORY_BANK_FEATURES = join(SCRIPT_DIR, '..', '..', '..', 'hush-voting-memory-bank', 'Features');
+const DEFAULT_PATH = ['04_COMPLETED', '03_IN_PROGRESS']
+  .map((state) => join(MEMORY_BANK_FEATURES, state, FEATURE_FOLDER, 'ManualTestObligations.json'))
+  .find((candidate) => existsSync(candidate)) ??
+  join(MEMORY_BANK_FEATURES, '04_COMPLETED', FEATURE_FOLDER, 'ManualTestObligations.json');
 const OBLIGATIONS_PATH = process.env.OBLIGATIONS_PATH ?? DEFAULT_PATH;
 const EXACT_REASON = 'This test cannot be automated and the user needs to test it manually.';
 
