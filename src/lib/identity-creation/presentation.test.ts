@@ -13,6 +13,7 @@ describe('mapStageToScreen — deterministic screen model', () => {
       ['profile', 'profile'],
       ['generating', 'generate'],
       ['recovery', 'recovery'],
+      ['confirmRecovery', 'confirmRecovery'],
       ['protect', 'protect'],
       ['review', 'review'],
       ['provisionalResume', 'finishCreating'],

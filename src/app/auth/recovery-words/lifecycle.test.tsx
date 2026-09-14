@@ -38,6 +38,28 @@ function stagedPreview(overrides: Partial<StagedPreviewProjection> = {}): Staged
 }
 
 describe('ProtectionScreen (Task 5.6)', () => {
+  it('requires non-retention consent and matching passwords before transferring and clearing the dedicated buffers', async () => {
+    const user = userEvent.setup();
+    const onProtect = vi.fn();
+    render(<ProtectionScreen protection={protection({ allowedModes: ['devicePasswordWeb'] })}
+      onChooseMode={vi.fn()} onAcknowledge={vi.fn()} onProtect={onProtect} onBack={vi.fn()} />);
+    const password = screen.getByLabelText('Device password', { exact: true });
+    const confirm = screen.getByLabelText('Confirm device password', { exact: true });
+    await user.type(password, 'test-device-password');
+    await user.type(confirm, 'different-password');
+    const proceed = screen.getByRole('button', { name: 'Continue' });
+    expect(proceed).toBeDisabled();
+    await user.click(screen.getByTestId('recovery-no-retention-ack'));
+    await user.click(proceed);
+    expect(onProtect).not.toHaveBeenCalled();
+    expect(screen.getByText('The device passwords do not match.')).toBeVisible();
+    await user.clear(confirm);
+    await user.type(confirm, 'test-device-password');
+    await user.click(proceed);
+    expect(onProtect).toHaveBeenCalledOnce();
+    expect(password).toHaveValue('');
+    expect(confirm).toHaveValue('');
+  });
   it('defaults Create a HushVoting vault password to checked', () => {
     render(<ProtectionScreen protection={protection()} onChooseMode={vi.fn()} onAcknowledge={vi.fn()} onBack={vi.fn()} />);
     const password = screen.getByTestId('mode-password') as HTMLInputElement;
@@ -52,6 +74,8 @@ describe('ProtectionScreen (Task 5.6)', () => {
     const continueButton = screen.getByRole('button', { name: 'Continue' });
     expect(continueButton).toBeDisabled();
     await user.click(screen.getByTestId('session-ack'));
+    expect(continueButton).toBeDisabled();
+    await user.click(screen.getByTestId('recovery-no-retention-ack'));
     expect(continueButton).not.toBeDisabled();
     await user.click(continueButton);
     expect(onAcknowledge).toHaveBeenCalled();

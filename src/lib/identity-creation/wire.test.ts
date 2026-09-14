@@ -79,8 +79,8 @@ describe('normalizeSubmitReply — closed status/code mapping', () => {
   });
 
   it('rejects without a validation code are unknown/terminal, never editable', () => {
-    expect(normalizeSubmitReply({ successfull: true, message: 'no', status: 'REJECTED' }, EMPTY_ALLOWLIST)).toEqual({ kind: 'unknownRejection' });
-    expect(normalizeSubmitReply({ successfull: true, message: 'no', status: 'REJECTED', validationCode: null }, EMPTY_ALLOWLIST)).toEqual({ kind: 'unknownRejection' });
+    expect(normalizeSubmitReply({ successfull: false, message: 'no', status: 'REJECTED' }, EMPTY_ALLOWLIST)).toEqual({ kind: 'unknownRejection' });
+    expect(normalizeSubmitReply({ successfull: false, message: 'no', status: 'REJECTED', validationCode: null }, EMPTY_ALLOWLIST)).toEqual({ kind: 'unknownRejection' });
   });
 
   it('UNSPECIFIED / unknown enum / contradictory replies fail closed', () => {
@@ -92,24 +92,34 @@ describe('normalizeSubmitReply — closed status/code mapping', () => {
 
   it('editable codes come only from the pinned allowlist; unknown codes are terminal', () => {
     const allowlist = new Set(['ALIAS_INVALID']);
-    expect(normalizeSubmitReply({ successfull: true, message: 'alias invalid', status: 'REJECTED', validationCode: 'ALIAS_INVALID' }, allowlist)).toEqual({ kind: 'editableRejection', validationCode: 'ALIAS_INVALID' });
-    expect(normalizeSubmitReply({ successfull: true, message: 'bad sig', status: 'REJECTED', validationCode: 'SIGNATURE_INVALID' }, allowlist)).toEqual({ kind: 'terminalRejection', validationCode: 'SIGNATURE_INVALID' });
+    expect(normalizeSubmitReply({ successfull: false, message: 'alias invalid', status: 'REJECTED', validationCode: 'ALIAS_INVALID' }, allowlist)).toEqual({ kind: 'editableRejection', validationCode: 'ALIAS_INVALID' });
+    expect(normalizeSubmitReply({ successfull: false, message: 'bad sig', status: 'REJECTED', validationCode: 'SIGNATURE_INVALID' }, allowlist)).toEqual({ kind: 'terminalRejection', validationCode: 'SIGNATURE_INVALID' });
   });
 
   it('empty allowlist fails closed: no editable correction is ever authorized', () => {
-    const outcome = normalizeSubmitReply({ successfull: true, message: 'alias invalid', status: 'REJECTED', validationCode: 'ALIAS_INVALID' }, EMPTY_ALLOWLIST);
+    const outcome = normalizeSubmitReply({ successfull: false, message: 'alias invalid', status: 'REJECTED', validationCode: 'ALIAS_INVALID' }, EMPTY_ALLOWLIST);
     expect(outcome.kind).toBe('terminalRejection');
   });
 });
 
 describe('message-mutation invariance', () => {
+  it.each(['ACCEPTED', 'PENDING', 'ALREADY_EXISTS'] as const)('rejects a rejection code attached to %s', status => {
+    expect(normalizeSubmitReply({ status, successfull: true, message: 'accepted', validationCode: 'UNTRUSTED_CODE' }, new Set()))
+      .toEqual({ kind: 'compatibilityError' });
+  });
+
+  it('rejects successful REJECTED even when an editable code is allowlisted', () => {
+    expect(normalizeSubmitReply({ status: 'REJECTED', successfull: true, message: 'accepted', validationCode: 'E1' }, new Set(['E1'])))
+      .toEqual({ kind: 'compatibilityError' });
+  });
+
   it('free-form Message never changes any outcome', () => {
     const editable = new Set(['E1']);
     const base: Array<() => SubmissionOutcome> = [
       () => normalizeSubmitReply({ successfull: true, message: 'anything', status: 'ACCEPTED' }, editable),
       () => normalizeSubmitReply({ successfull: true, message: 'ANOTHER THING', status: 'ACCEPTED' }, editable),
-      () => normalizeSubmitReply({ successfull: true, message: '', status: 'REJECTED', validationCode: 'E1' }, editable),
-      () => normalizeSubmitReply({ successfull: true, message: '!!!', status: 'REJECTED', validationCode: 'E1' }, editable),
+      () => normalizeSubmitReply({ successfull: false, message: '', status: 'REJECTED', validationCode: 'E1' }, editable),
+      () => normalizeSubmitReply({ successfull: false, message: '!!!', status: 'REJECTED', validationCode: 'E1' }, editable),
     ];
     expect(base[0]()).toEqual(base[1]());
     expect(base[2]()).toEqual(base[3]());

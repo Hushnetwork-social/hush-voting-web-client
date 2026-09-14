@@ -1,3 +1,4 @@
+import { hasBoundedHistoricalName, IDENTITY_RESPONSE_MAX_BYTES } from '../../../lib/identity-compatibility/historical-profile';
 /**
  * FEAT-007 same-origin BFF — GetIdentity lookup proxy.
  *
@@ -16,7 +17,9 @@ import { createServerTransport } from '../server-transport';
 
 export const runtime = 'nodejs';
 
-const ADDRESS_RE = /^[A-Za-z0-9]{1,128}$/;
+// Approved uncompressed secp256k1 addresses contain 130 hex characters.
+// Match the bounded public-address contract used by the authentication adapters.
+const ADDRESS_RE = /^[A-Za-z0-9]{1,256}$/;
 
 /**
  * FEAT-008 no-client-caching policy: lookup responses must never be cached by
@@ -54,11 +57,17 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (typeof address !== 'string' || !ADDRESS_RE.test(address)) {
     return jsonResponse({ error: { code: 'MALFORMED_REQUEST' } }, 400);
   }
+  let timeout: ReturnType<typeof setTimeout> | undefined;
   const result = await Promise.race([
     port.lookupIdentity({ publicSigningAddress: address }),
-    new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), RPC_TIMEOUT_MS)),
-  ]).catch((e: unknown) => ({ ok: false as const, failure: { kind: 'timeout' as const }, error: e }));
+    new Promise<never>((_, reject) => { timeout = setTimeout(() => reject(new Error('timeout')), RPC_TIMEOUT_MS); }),
+  ]).catch((e: unknown) => ({ ok: false as const, failure: { kind: 'timeout' as const }, error: e }))
+    .finally(() => clearTimeout(timeout));
   if (!result.ok) {
+    return jsonResponse({ error: { code: 'SERVER_UNAVAILABLE' } }, 502);
+  }
+  if ((result.reply.successfull && !hasBoundedHistoricalName(result.reply.profileName))
+      || new TextEncoder().encode(JSON.stringify({ reply: result.reply })).byteLength > IDENTITY_RESPONSE_MAX_BYTES) {
     return jsonResponse({ error: { code: 'SERVER_UNAVAILABLE' } }, 502);
   }
   return jsonResponse({ reply: result.reply }, 200);

@@ -28,6 +28,7 @@ function view(overrides: Partial<RecoveryViewState> = {}): RecoveryViewState {
 }
 
 const noopProps = {
+  network: { canonicalNetworkId: 'hushnetwork-devnet', classification: 'isolated-non-production' as const },
   onSelectCount: vi.fn(),
   onPastePhrase: vi.fn(),
   onConfirmPasteReplacement: vi.fn(),
@@ -53,6 +54,15 @@ const noopProps = {
   onRetry: vi.fn(),
   removalPending: false,
 };
+
+it('shows checking and Back without recovery inputs or removal actions during custody inspection', () => {
+  render(<RecoveryFlow {...noopProps} view={view()} wordGrid={null} candidateReview={null}
+    protection={null} stagedPreview={null} lookupProgress={null} />);
+  expect(screen.getByRole('status').textContent).toBe('Checking local credentials before recovery…');
+  expect(screen.getByRole('button', { name: /Back$/ })).toBeDefined();
+  expect(screen.queryByTestId('word-grid')).toBeNull();
+  expect(screen.queryByRole('button', { name: /remove/i })).toBeNull();
+});
 
 describe('LocalUserGuard (Task 5.8)', () => {
   it('keeps Lock and destructive removal distinct; Restore is unavailable while a user exists', () => {

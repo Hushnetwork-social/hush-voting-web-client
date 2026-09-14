@@ -54,6 +54,56 @@ function flowProps(overrides: Partial<Parameters<typeof CredentialFileFlow>[0]> 
   return { view: view(), sessionOnlyOnly: false, ...handlers, ...overrides };
 }
 
+// EPIC-001 -> FEAT-009 AC-009-084 -> Phase 5 Tasks 5.1/5.2, 5.3/5.4.
+describe('FEAT-009 projected error focus', () => {
+  it.each(['INVALID_MAGIC', 'SIGNING_KEY_MISMATCH'])('focuses the safe error summary after %s without stealing correction focus', (failureCode) => {
+    const props = flowProps({ view: view({ stage: 'reading' }) });
+    const rendered = render(<CredentialFileFlow {...props} />);
+    rendered.rerender(<CredentialFileFlow {...props} view={view({ failureCode })} />);
+    expect(screen.getByTestId('restore-error')).toHaveFocus();
+    const choose = screen.getByTestId('choose-file');
+    choose.focus();
+    rendered.rerender(<CredentialFileFlow {...props} view={view({ failureCode })} />);
+    expect(choose).toHaveFocus();
+    rendered.rerender(<CredentialFileFlow {...props} view={view({ stage: 'reading' })} />);
+    rendered.rerender(<CredentialFileFlow {...props} view={view({ failureCode })} />);
+    expect(screen.getByTestId('restore-error')).toHaveFocus();
+  });
+
+  it('focuses password failure feedback when no countdown exists', async () => {
+    const user = userEvent.setup();
+    const props = flowProps({ view: view({ stage: 'password' }) });
+    const rendered = render(<CredentialFileFlow {...props} />);
+    await user.click(screen.getByTestId('choose-different-file'));
+    rendered.rerender(<CredentialFileFlow {...props} view={view({ stage: 'password', failureCode: 'AUTHENTICATION_FAILED' })} />);
+    expect(screen.getByTestId('restore-error')).toHaveFocus();
+    expect(screen.getByTestId('backup-password-input')).toHaveValue('');
+  });
+
+  it('focuses a new backoff once and preserves keyboard focus across countdown updates', () => {
+    const props = flowProps({ view: view({ stage: 'password' }) });
+    const rendered = render(<CredentialFileFlow {...props} />);
+    const failed = (seconds: number) => view({ stage: 'password', failureCode: 'AUTHENTICATION_FAILED', backoffRemainingSeconds: seconds });
+    rendered.rerender(<CredentialFileFlow {...props} view={failed(2)} />);
+    expect(screen.getByTestId('backoff-countdown')).toHaveFocus();
+    const choose = screen.getByTestId('choose-different-file');
+    choose.focus();
+    rendered.rerender(<CredentialFileFlow {...props} view={failed(1)} />);
+    expect(choose).toHaveFocus();
+  });
+
+  it('returns focus to the real chooser after a failed or cancelled read', () => {
+    const props = flowProps({ view: view({ stage: 'reading' }) });
+    const rendered = render(<CredentialFileFlow {...props} />);
+    rendered.rerender(<CredentialFileFlow {...props} view={view({ failureCode: 'READ_PARTIAL' })} />);
+    expect(screen.getByTestId('choose-file')).toHaveFocus();
+    rendered.rerender(<CredentialFileFlow {...props} view={view({ stage: 'reading' })} />);
+    rendered.rerender(<CredentialFileFlow {...props} view={view()} />);
+    expect(screen.getByTestId('choose-file')).toHaveFocus();
+    expect(screen.queryByTestId('restore-error')).toBeNull();
+  });
+});
+
 describe('FEAT-009 picker/read surfaces (Task 5.1)', () => {
   it('shows selection guidance and never a filename before selection', () => {
     const props = flowProps({ view: view({ stage: 'picker' }) });
@@ -98,11 +148,11 @@ describe('FEAT-009 picker/read surfaces (Task 5.1)', () => {
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
-  it('reading surface shows progress copy and Cancel', () => {
+  it('reading surface shows Cancel immediately and progress copy after the delay', async () => {
     const props = flowProps({ view: view({ stage: 'reading' }) });
     render(<CredentialFileFlow {...props} />);
-    expect(screen.getAllByText(COPY.reading.title).length).toBeGreaterThan(0);
     expect(screen.getByTestId('cancel-read')).toBeDefined();
+    expect((await screen.findAllByText(COPY.reading.title)).length).toBeGreaterThan(0);
   });
 
   it('structural errors render the safe invalid-file copy', () => {
@@ -111,6 +161,14 @@ describe('FEAT-009 picker/read surfaces (Task 5.1)', () => {
     expect(screen.getByText(COPY.errors.invalidFile)).toBeDefined();
     expect(screen.getByTestId('choose-file')).toBeDefined(); // becomes Choose a different file
   });
+});
+
+it('does not mount a file picker while fresh custody preflight is unresolved', () => {
+  render(<CredentialFileFlow {...flowProps({ view: view({ stage: 'capabilityPreflight' }) })} />);
+  expect(screen.queryByTestId('choose-file')).toBeNull();
+  expect(screen.queryByTestId('credential-file-input')).toBeNull();
+  expect(screen.queryByTestId('backup-password-input')).toBeNull();
+  expect(screen.getByRole('status')).toBeDefined();
 });
 
 describe('FEAT-009 password surface (Task 5.3)', () => {
@@ -223,6 +281,22 @@ describe('FEAT-009 profile/protection/success surfaces (Task 5.5)', () => {
     expect(screen.queryByTestId('password-explainer')).toBeNull();
   });
 
+  // EPIC-001 -> FEAT-009 AC-009-051 -> Phase 5 Tasks 5.5/5.6.
+  it.each(['', 'different-confirmation'])('does not submit device protection with an absent or mismatched confirmation (%s)', async confirmation => {
+    const user = userEvent.setup();
+    const onChooseProtection = vi.fn();
+    render(<CredentialFileFlow {...flowProps({
+      view: view({ stage: 'protection', protectionChoices: ['devicePassword'] }),
+      onChooseProtection,
+    })} />);
+    await user.type(screen.getByTestId('restore-device-password'), 'local-device-password');
+    if (confirmation) await user.type(screen.getByTestId('restore-device-password-confirmation'), confirmation);
+    await user.click(screen.getByTestId('submit-protection'));
+    expect((screen.getByTestId('submit-protection') as HTMLButtonElement).disabled).toBe(true);
+    expect(onChooseProtection).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('backup-password-input')).toBeNull();
+  });
+
   it('submits a separately entered and confirmed Device password', async () => {
     const user = userEvent.setup();
     const onChooseProtection = vi.fn();
@@ -277,6 +351,14 @@ describe('FEAT-009 navigation/ownership/cleanup surfaces (Task 5.7)', () => {
     const props = flowProps({ view: view({ stage: 'terminal' }) });
     render(<CredentialFileFlow {...props} />);
     expect(screen.getAllByText(COPY.errors.generic).length).toBeGreaterThan(0);
+  });
+
+  it('keeps server proof rejection distinct from a failed unsigned lookup', () => {
+    const props = flowProps({ view: view({ stage: 'terminal', failureCode: 'SERVER_PROOF_REJECTED' }) });
+    render(<CredentialFileFlow {...props} />);
+    expect(screen.getByRole('alert').textContent).toBe(COPY.errors.serverProof);
+    expect(screen.queryByTestId('create-identity')).toBeNull();
+    expect(screen.queryByTestId('backup-password-input')).toBeNull();
   });
 });
 

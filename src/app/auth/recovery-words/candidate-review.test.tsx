@@ -37,9 +37,9 @@ function review(overrides: Partial<CandidateReviewProjection> = {}): CandidateRe
 }
 
 describe('LookupProgress', () => {
-  it('reports safe counted progress without addresses', () => {
+  it('reports safe counted progress without addresses after the progress delay', async () => {
     render(<LookupProgress done={2} total={4} />);
-    expect(screen.getByText('Checking identity formats 2 of 4')).toBeDefined();
+    expect(await screen.findByText('Checking identity formats 2 of 4')).toBeDefined();
   });
 });
 

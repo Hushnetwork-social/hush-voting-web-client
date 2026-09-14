@@ -107,6 +107,7 @@ export function ReviewScreen({ review, onCreate, onBack, submitting }: ReviewPro
     { label: REVIEW.alias, value: review.normalizedAlias },
     { label: REVIEW.visibility, value: review.visibility === 'public' ? 'Public' : 'Private' },
     { label: REVIEW.signingAddress, value: review.abbreviatedSigningAddress },
+    { label: REVIEW.encryptionAddress, value: review.abbreviatedEncryptionAddress },
   ];
   return (
     <SurfacePanel title={REVIEW.title}>
@@ -120,16 +121,16 @@ export function ReviewScreen({ review, onCreate, onBack, submitting }: ReviewPro
         ))}
         <div className="flex justify-between gap-4 py-2 text-sm">
           <dt className="text-[var(--text-muted)]">{REVIEW.recovery}</dt>
-          <dd className="font-medium text-[var(--text)]">{REVIEW.recoveryConfirmed}</dd>
+          <dd className="font-medium text-[var(--text)]">{review.recoveryConfirmed ? REVIEW.recoveryConfirmed : REVIEW.recoveryUnconfirmed}</dd>
         </div>
         <div className="flex justify-between gap-4 py-2 text-sm">
           <dt className="text-[var(--text-muted)]">{REVIEW.deviceProtection}</dt>
-          <dd className="font-medium text-[var(--text)]">{REVIEW.deviceProtectionReady}</dd>
+          <dd className="font-medium text-[var(--text)]">{review.deviceProtectionReady ? REVIEW.deviceProtectionReady : REVIEW.deviceProtectionRequired}</dd>
         </div>
       </dl>
       <div className="mt-4 flex items-center gap-3">
         <BackButton onClick={onBack} />
-        <ActionButton onClick={onCreate} busy={submitting} disabled={submitting}>
+        <ActionButton onClick={onCreate} busy={submitting} disabled={submitting || !review.recoveryConfirmed || !review.deviceProtectionReady}>
           {submitting ? REVIEW.submitting : REVIEW.action}
         </ActionButton>
       </div>

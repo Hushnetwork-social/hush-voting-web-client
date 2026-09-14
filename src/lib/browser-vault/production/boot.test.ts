@@ -6,8 +6,8 @@
  * absent; a v2 handshake is accepted and delivered; malformed/stale messages
  * fail closed; and a provisioned vault surfaces as locked.
  */
-import { describe, expect, it } from 'vitest';
-import { bootVaultWorker, type WorkerAppIdentity } from './worker-entry';
+import { describe, expect, it, vi } from 'vitest';
+import { bootVaultWorker, rejectUnbootedPort, type WorkerAppIdentity } from './worker-entry';
 import type { VaultStorageSession } from '../storage/wrapper';
 import type { VaultResult } from '../../vault-core/contracts/results';
 import { success, failure } from '../../vault-core/contracts/results';
@@ -69,6 +69,7 @@ class MemoryVaultStorage implements VaultStorageSession {
 }
 
 class FakePort {
+  closed = false;
   readonly sent: unknown[] = [];
   onmessage: ((event: { readonly data: unknown }) => void) | null = null;
   postMessage(message: unknown): void {
@@ -78,16 +79,33 @@ class FakePort {
     this.onmessage?.({ data });
   }
   start(): void {}
+  close(): void { this.closed = true; }
 }
 
 const APP_IDENTITY: WorkerAppIdentity = { appVersion: '0.1.0', buildDigest: '0123456789ab' };
 
 describe('worker boot + handshake', () => {
+  it('answers a handshake with a closed refusal after boot failure and closes the port', () => {
+    const port = new FakePort();
+    rejectUnbootedPort(port as unknown as MessagePort);
+    port.push({ kind: 'handshake', clientChannel: 'denied-channel' });
+    expect(port.sent).toEqual([{ kind: 'handshake-rejected', protocolVersion: 2, reason: 'unsupported-config' }]);
+    expect(port.closed).toBe(true);
+    expect(port.onmessage).toBeNull();
+  });
+  it('rejects a failed primitive probe before opening storage or creating authority', async () => {
+    const openStorage = vi.fn(async () => success({ session: new MemoryVaultStorage() }));
+    const result = await bootVaultWorker({ appIdentity: APP_IDENTITY, openStorage,
+      probePrimitives: async () => ({ ok: false, reason: 'crypto-unavailable' }) });
+    expect(result).toEqual({ ok: false, reason: 'crypto-unavailable' });
+    expect(openStorage).not.toHaveBeenCalled();
+  });
   it('boots, resolves verified-absent startup, and accepts a v2 handshake', async () => {
     const storage = new MemoryVaultStorage();
     const result = await bootVaultWorker({
       appIdentity: APP_IDENTITY,
       runtimeConfigId: 'development-localhost',
+      probePrimitives: async () => ({ ok: true, persisted: null, estimateAvailable: false }),
       openStorage: async () => success({ session: storage }),
     });
     console.log('BOOTRESULT', JSON.stringify(result));
@@ -110,6 +128,7 @@ describe('worker boot + handshake', () => {
     const result = await bootVaultWorker({
       appIdentity: APP_IDENTITY,
       runtimeConfigId: 'development-localhost',
+      probePrimitives: async () => ({ ok: true, persisted: null, estimateAvailable: false }),
       openStorage: async () => success({ session: storage }),
     });
     expect(result.ok).toBe(true);

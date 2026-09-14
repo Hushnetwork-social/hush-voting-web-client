@@ -75,6 +75,23 @@ export type AuthStateCode =
   | 'blockedError'
   | 'removingLocalUser';
 
+/**
+ * FEAT-016 entitlement substage codes inside the compound `authenticated`
+ * state. Identity stays authenticated throughout; protected rendering is
+ * true ONLY for `entitlementReady`. Names may follow repository conventions;
+ * observable outcomes are closed by tests.
+ */
+export type EntitlementStageCode =
+  | 'entitlementResolving'
+  | 'baselineSigning'
+  | 'baselineSubmitting'
+  | 'awaitingIndex'
+  | 'confirmationDelayed'
+  | 'entitlementUnavailable'
+  | 'entitlementUnsupported'
+  | 'entitlementRepair'
+  | 'entitlementReady';
+
 /** Connectivity region state codes (parallel region; never erases auth context). */
 export type ConnectivityStateCode = 'unknown' | 'online' | 'paused' | 'offline' | 'reconnecting';
 
@@ -97,6 +114,8 @@ export interface AuthenticatedIdentityMetadata {
 
 /** Bounded safe public identity metadata shown while locked. */
 export interface SafeIdentityMetadata {
+  /** Display-only pending lifecycle hint; never authorizes resume or a write. */
+  readonly pendingSetup?: true;
   readonly alias: string;
   /** Abbreviated signing address (bounded; no full-address copy while locked). */
   readonly abbreviatedSigningAddress: string;
@@ -149,6 +168,7 @@ export type AuthIntent =
   | { readonly type: 'INTENT.CONFIRM_MISSING_PROFILE' }
   | { readonly type: 'INTENT.ENTER_TEMPORARY_MODE' }
   | { readonly type: 'INTENT.RETRY' }
+  | { readonly type: 'INTENT.ENTITLEMENT_RETRY' }
   | { readonly type: 'INTENT.TAKE_OVER_SESSION' }
   | { readonly type: 'INTENT.NAVIGATE'; readonly destination: TypedDestinationKind }
   | { readonly type: 'INTENT.GO_BACK' }
@@ -211,4 +231,13 @@ export interface AuthMachineContext {
   readonly supportCode: SupportCode | null;
   readonly outcomeCode: AuthOutcomeCode | null;
   readonly coarseStageStartedAtMs: number | null;
+  /** FEAT-016 entitlement substage mirror (derived state is authoritative). */
+  readonly entitlementStage: EntitlementStageCode | null;
+  /**
+   * FEAT-016 strictness switch: TRUE in every real product/host composition
+   * (protected rendering requires entitlementReady). FALSE only in the
+   * build-isolated auth-only test/dev harness that has no entitlement
+   * authority and is statically excluded from product bundles.
+   */
+  readonly entitlementRequired: boolean;
 }

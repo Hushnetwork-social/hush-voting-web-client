@@ -19,12 +19,17 @@ export interface ProtectionProps {
   readonly protection: ProtectionProjection;
   readonly onChooseMode: (mode: ProtectionMode) => void;
   readonly onAcknowledge: () => void;
+  readonly onProtect?: (password: string) => void;
   readonly onBack: () => void;
 }
 
-export function ProtectionScreen({ protection, onChooseMode, onAcknowledge, onBack }: ProtectionProps) {
+export function ProtectionScreen({ protection, onChooseMode, onAcknowledge, onProtect, onBack }: ProtectionProps) {
   const [mode, setMode] = useState<ProtectionMode | null>(protection.defaultPasswordChecked ? 'devicePasswordWeb' : null);
   const [sessionAcknowledged, setSessionAcknowledged] = useState(false);
+  const [noRetentionAcknowledged, setNoRetentionAcknowledged] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
+  const confirmRef = useRef<HTMLInputElement>(null);
 
   const choose = (next: ProtectionMode) => {
     setMode(next);
@@ -37,16 +42,16 @@ export function ProtectionScreen({ protection, onChooseMode, onAcknowledge, onBa
         {PROTECTION.acknowledgement}
       </p>
 
-      <fieldset className="flex flex-col gap-3">
+      <fieldset className="flex flex-col gap-3" disabled={protection.busy}>
         <legend className="mb-1 text-sm font-medium text-[var(--text)]">Choose how this device is protected</legend>
 
-        <label className="flex min-h-11 items-start gap-2 rounded-xl bg-[var(--surface-strong)] p-3 text-sm text-[var(--text)]">
+        {protection.allowedModes.includes('devicePasswordWeb') && <label className="flex min-h-11 items-start gap-2 rounded-xl bg-[var(--surface-strong)] p-3 text-sm text-[var(--text)]">
           <input type="radio" name="protection" checked={mode === 'devicePasswordWeb'} onChange={() => choose('devicePasswordWeb')} data-testid="mode-password" />
           <span>
             <span className="font-medium">{PROTECTION.defaultPasswordLabel}</span>
             <span className="block text-xs font-normal text-[var(--text-muted)]">{PROTECTION.defaultPasswordDetail}</span>
           </span>
-        </label>
+        </label>}
 
         {protection.allowedModes.includes('passwordlessWeb') && (
           <label className="flex min-h-11 items-start gap-2 rounded-xl bg-[var(--surface-strong)] p-3 text-sm text-[var(--text)]">
@@ -79,6 +84,23 @@ export function ProtectionScreen({ protection, onChooseMode, onAcknowledge, onBa
         )}
       </fieldset>
 
+      <label className="mt-3 flex min-h-11 items-center gap-2 text-sm text-[var(--text)]">
+        <input type="checkbox" checked={noRetentionAcknowledged} onChange={event => setNoRetentionAcknowledged(event.target.checked)} data-testid="recovery-no-retention-ack" />
+        I understand that HushVoting will not save my recovery words.
+      </label>
+
+      {mode === 'devicePasswordWeb' && onProtect && <div className="mt-3 flex flex-col gap-3">
+        <label className="flex flex-col gap-1 text-sm">
+          Device password
+          <input ref={passwordRef} type="password" autoComplete="new-password" className="min-h-11 rounded-xl bg-[var(--surface-strong)] p-3" />
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          Confirm device password
+          <input ref={confirmRef} type="password" autoComplete="new-password" className="min-h-11 rounded-xl bg-[var(--surface-strong)] p-3" />
+        </label>
+        {passwordError && <RecoveryFieldError id="rw-password-error">{passwordError}</RecoveryFieldError>}
+      </div>}
+
       {mode === 'sessionOnly' && (
         <label className="mt-3 flex items-center gap-2 text-sm text-[var(--text)]">
           <input type="checkbox" checked={sessionAcknowledged} onChange={(event) => setSessionAcknowledged(event.target.checked)} data-testid="session-ack" />
@@ -94,10 +116,21 @@ export function ProtectionScreen({ protection, onChooseMode, onAcknowledge, onBa
         <RecoveryBackButton onClick={onBack} />
         <RecoveryActionButton
           variant="primary"
-          disabled={mode === null || (mode === 'sessionOnly' && !sessionAcknowledged)}
+          disabled={protection.busy || mode === null || !protection.allowedModes.includes(mode) || !noRetentionAcknowledged || (mode === 'sessionOnly' && !sessionAcknowledged)}
           onClick={() => {
             if (mode !== null) {
+              if (mode === 'devicePasswordWeb' && onProtect) {
+                const password = passwordRef.current?.value ?? '';
+                if (password.length < 8) { setPasswordError('Choose a device password with at least 8 characters.'); return; }
+                if (password !== confirmRef.current?.value) { setPasswordError('The device passwords do not match.'); return; }
+                onAcknowledge();
+                onProtect(password);
+                if (passwordRef.current) passwordRef.current.value = '';
+                if (confirmRef.current) confirmRef.current.value = '';
+                return;
+              }
               onAcknowledge();
+              if (mode === 'sessionOnly' && sessionAcknowledged) onProtect?.('');
             }
           }}
         >

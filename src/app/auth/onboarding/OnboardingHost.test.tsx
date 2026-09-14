@@ -1,3 +1,4 @@
+import { createRecoveryWordDisplay } from '../../../lib/auth/web/recovery-word-display';
 /**
  * FEAT-010 Task 5.2 — OnboardingHost component tests.
  *
@@ -33,7 +34,8 @@ function childFixture(kind: OnboardingChild['kind']): OnboardingChild {
       kind,
       props: {
         view: createView(),
-        recoveryWords: null,
+        recoveryDisplay: createRecoveryWordDisplay().display,
+        recoveryVisible: false,
         recoveryAcknowledged: false,
         recoveryTimeoutMessage: null,
         confirmPositions: [],
@@ -85,6 +87,7 @@ function childFixture(kind: OnboardingChild['kind']): OnboardingChild {
     return {
       kind,
       props: {
+        network: { canonicalNetworkId: 'hushnetwork-devnet', classification: 'isolated-non-production' },
         view: {
           screen: 'locked',
           canGoBack: false,

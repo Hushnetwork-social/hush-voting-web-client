@@ -117,13 +117,28 @@ export type BrowserOperationKind =
   | 'createCandidate'
   | 'revealCandidateWords'
   | 'concealCandidate'
+  | 'discardSecretTransfers'
   | 'destroyCandidate'
   | 'deriveWordsCandidate'
+  | 'deriveRecoveryCandidates'
   | 'importFileCandidate'
   | 'retainTransactionDigest'
   | 'submitIdentityTransaction'
   | 'promoteLifecycle'
-  | 'inspectStartup';
+  | 'inspectStartup'
+  // FEAT-016 additive: closed entitlement-bootstrap operations. Signing,
+  // journal custody, submission, and the reconciliation loop stay inside the
+  // authority; these page requests only drive safe steps and receive safe
+  // snapshots/progress.
+  | 'licenceBootstrapStart'
+  | 'licenceBootstrapControl'
+  | 'licenceBootstrapEligibility'
+  // FEAT-017 additive: one closed confirmed-upgrade operation per authority.
+  // Signing, journal custody, submission, and reconciliation stay inside the
+  // authority; these page requests only drive safe steps and receive safe
+  // snapshots/progress (same rule as the FEAT-016 bootstrap ops).
+  | 'licenceUpgradeConfirm'
+  | 'licenceUpgradeAcknowledge';
 
 /**
  * Operation request. Carries NO secret payload: password/mnemonic/file bytes are
@@ -251,8 +266,27 @@ export interface GlobalInvalidation {
   readonly reason: 'lock' | 'removal' | 'takeover' | 'update-mismatch' | 'authority-loss' | 'cleanup-failed';
 }
 
+/**
+ * FEAT-016/017 additive: safe entitlement progress broadcast (authority →
+ * pages). Carries only the closed snapshot vocabulary — never secrets,
+ * signatures, exact bytes, journal state, or transport details. FEAT-017 adds
+ * the page-safe confirmed-upgrade operation view and its one-shot
+ * notification eligibility so the root composition can render Account,
+ * workspace, and N0/N1 surfaces from real authority state.
+ */
+export interface LicenceProgressEvent {
+  readonly kind: 'licence-progress';
+  readonly phase: string;
+  readonly projection: unknown | null;
+  readonly lastOutcomeCode: string | null;
+  readonly pendingTransactionId: string | null;
+  readonly upgradeOperation: unknown | null;
+  readonly upgradeNotificationEligible: boolean;
+  readonly emittedAtMs: number;
+}
+
 /** Closed union of authority → page events. */
-export type BrowserWorkerEvent = OperationOutcome | GlobalInvalidation | HandshakeAccepted | HandshakeRejected | CapabilityIssued;
+export type BrowserWorkerEvent = OperationOutcome | GlobalInvalidation | HandshakeAccepted | HandshakeRejected | CapabilityIssued | LicenceProgressEvent;
 
 /**
  * Runtime schema validation — the ONLY admission gate for inbound messages.
@@ -289,7 +323,7 @@ export function validateClientMessage(value: unknown): BrowserClientMessage | nu
 
 /** Closed payload allowlist per v2 operation kind (public fields only). */
 const OPERATION_PAYLOAD_SCHEMAS: Readonly<Record<string, readonly string[]>> = {
-  provisionFromValidatedBundle: ['candidateRef', 'alias', 'visibility'],
+  provisionFromValidatedBundle: ['candidateRef', 'alias', 'visibility', 'protectionMode'],
   unlockPassword: [],
   changeDevicePassword: [],
   verifyOnlineIdentity: [],
@@ -300,13 +334,23 @@ const OPERATION_PAYLOAD_SCHEMAS: Readonly<Record<string, readonly string[]>> = {
   createCandidate: [],
   revealCandidateWords: ['candidateRef'],
   concealCandidate: ['candidateRef'],
+  discardSecretTransfers: ['transferOperationId'],
   destroyCandidate: ['candidateRef'],
   deriveWordsCandidate: ['producerId', 'wordCount'],
-  importFileCandidate: [],
+  deriveRecoveryCandidates: ['wordCount'],
+  importFileCandidate: ['emptyV1Confirmed'],
   retainTransactionDigest: ['digest'],
   submitIdentityTransaction: ['alias', 'visibility'],
   promoteLifecycle: ['status'],
   inspectStartup: [],
+  // FEAT-016 additive: closed entitlement-bootstrap control payloads.
+  licenceBootstrapStart: ['networkBinding'],
+  licenceBootstrapControl: ['control', 'trigger'],
+  licenceBootstrapEligibility: ['foreground', 'connectivity'],
+  // FEAT-017 additive: confirmed-upgrade activation carries only the bounded
+  // server plan handle; acknowledge carries no payload.
+  licenceUpgradeConfirm: ['targetPlanId'],
+  licenceUpgradeAcknowledge: [],
 };
 
 /** Secret-shaped field names that may never appear in operation payloads. */
@@ -450,13 +494,22 @@ const OPERATION_KINDS: ReadonlySet<string> = new Set<BrowserOperationKind>([
   'createCandidate',
   'revealCandidateWords',
   'concealCandidate',
+  'discardSecretTransfers',
   'destroyCandidate',
   'deriveWordsCandidate',
+  'deriveRecoveryCandidates',
   'importFileCandidate',
   'retainTransactionDigest',
   'submitIdentityTransaction',
   'promoteLifecycle',
   'inspectStartup',
+  // FEAT-016 additive.
+  'licenceBootstrapStart',
+  'licenceBootstrapControl',
+  'licenceBootstrapEligibility',
+  // FEAT-017 additive: closed confirmed-upgrade op kinds.
+  'licenceUpgradeConfirm',
+  'licenceUpgradeAcknowledge',
 ]);
 
 function validateSecretTransfer(record: Record<string, unknown>): SecretTransferMessage | null {
@@ -469,13 +522,13 @@ function validateSecretTransfer(record: Record<string, unknown>): SecretTransfer
   if (record.purpose !== 'devicePassword' && record.purpose !== 'mnemonic' && record.purpose !== 'filePassword' && record.purpose !== 'fileBytes') {
     return null;
   }
-  if (typeof record.value !== 'string' || record.value.length === 0) {
+  if (typeof record.value !== 'string' || (record.value.length === 0 && record.purpose !== 'filePassword')) {
     return null;
   }
   // Bounded secret payloads (passwords/mnemonics ≤ 4 KiB; file bytes ≤ 1 MiB
   // base64url). Oversized transfers fail closed and never reach the engine.
   const maxBytes = record.purpose === 'fileBytes' ? 1_400_000 : 4096;
-  if (record.value.length > maxBytes) {
+  if ((record.purpose === 'fileBytes' ? record.value.length : new TextEncoder().encode(record.value).byteLength) > maxBytes) {
     return null;
   }
   return {

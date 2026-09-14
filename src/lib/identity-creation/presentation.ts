@@ -66,6 +66,8 @@ export function mapStageToScreen(stage: CreationStage): CreationScreen {
       return 'generate';
     case 'recovery':
       return 'recovery';
+    case 'confirmRecovery':
+      return 'confirmRecovery';
     case 'protect':
       return 'protect';
     case 'review':

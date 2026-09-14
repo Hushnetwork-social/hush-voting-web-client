@@ -68,10 +68,10 @@ if (reasons.length > 0) {
   process.exit(1);
 }
 
-// Cross-check the executable Gherkin catalog: every manifest scenario ID must
+// Cross-check presence/mappings in the .NET Gherkin and external-gate catalogue: every manifest scenario ID must
 // exist in the feature files, every feature scenario must reference a known
 // criterion, and scenario IDs must be unique.
-const FEATURES_DIR = join(REPO_ROOT, 'features', 'credential-file-restore');
+const FEATURES_DIR = join(REPO_ROOT, '..', 'hush-server-node', 'Node', 'HushNode.IntegrationTests', 'HushVoting', 'Features', 'credential-file-restore');
 const catalogReasons = [];
 const catalogScenarioIds = new Set();
 const catalogCriteria = new Set();
@@ -79,7 +79,7 @@ let featureFiles = [];
 try {
   featureFiles = readdirSync(FEATURES_DIR).filter((f) => f.endsWith('.feature'));
 } catch {
-  catalogReasons.push('features/credential-file-restore directory missing');
+  catalogReasons.push('HushVoting .NET credential-file-restore catalogue directory missing');
 }
 for (const file of featureFiles) {
   const content = readFileSync(join(FEATURES_DIR, file), 'utf8');
@@ -109,4 +109,4 @@ if (catalogReasons.length > 0) {
   process.exit(1);
 }
 
-console.log(`OK: 89/89 criteria, ${manifest.criteria.length} mappings, ${catalogScenarioIds.size} catalog scenarios, families unique, classifications valid`);
+console.log(`OK: 89/89 criteria, ${manifest.criteria.length} mappings, ${catalogScenarioIds.size} catalogue entries, families unique, classifications valid (presence/mapping only; runtime and qualification completion are separate)`);

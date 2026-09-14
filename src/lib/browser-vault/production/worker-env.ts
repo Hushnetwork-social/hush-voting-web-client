@@ -1,3 +1,4 @@
+import { hasBoundedHistoricalName, readIdentityResponse } from '../../identity-compatibility/historical-profile';
 /**
  * FEAT-010 production browser worker environment (Task 7.3).
  *
@@ -21,9 +22,40 @@ import type { AuthorityEnvironment } from '../authority/authority';
 import { resolveManifest, ISOLATED_DEVNET_MANIFEST } from '../../runtime/manifests';
 import type { DeploymentManifest } from '../../runtime/deployment';
 import { SealedVaultEngine, type SealedOutcome } from './sealed-vault';
+import { LicenceBootstrapSession, type LicenceBootstrapSessionDeps } from './licence-session';
 import type { VaultStorageSession } from '../storage/wrapper';
 import type { SuiteCryptoOperations } from '../../vault-core/contracts/ports';
-import type { RuntimeConfigId } from '../contracts/protocol';
+import type { RuntimeConfigId, BrowserWorkerEvent } from '../contracts/protocol';
+import { LICENCE_QUERY_SIGNATURE_HEADER, LICENCE_QUERY_SIGNED_AT_HEADER, LICENCE_QUERY_SIGNATORY_HEADER, type LicenceTransportStatus } from '../../licensing/contracts';
+import { parseLicenceBffReply } from '../../licensing/licence-bff-http';
+import type { LicenceProgressPayload, LicenceBootstrapStepResult, LicenceConnectivityInput } from '../../licensing/session-contract';
+
+/** Same-origin BFF licence-entitlement query path (server-only route). */
+const BFF_LICENCE_QUERY_PATH = '/api/licence-entitlement' as const;
+
+/** Authority-owned entitlement reconciliation pump cadence (ms). */
+const LICENCE_BOOTSTRAP_LOOP_INTERVAL_MS = 1_000 as const;
+
+/** Map an HTTP status from the licence BFF to the closed transport status. */
+function httpStatusToLicenceTransport(status: number): LicenceTransportStatus {
+  switch (status) {
+    case 400:
+      return 'INVALID_ARGUMENT';
+    case 401:
+    case 403:
+      return 'UNAUTHENTICATED';
+    case 404:
+    case 501:
+      return 'UNIMPLEMENTED';
+    case 408:
+    case 504:
+      return 'DEADLINE_EXCEEDED';
+    case 503:
+      return 'UNAVAILABLE';
+    default:
+      return 'UNKNOWN';
+  }
+}
 
 /** Same-origin BFF identity lookup path (server-only route; no NEXT_PUBLIC). */
 const BFF_IDENTITY_LOOKUP_PATH = '/api/identity' as const;
@@ -37,7 +69,7 @@ const LOOKUP_TIMEOUT_MS = 10_000 as const;
 /** Closed outcome vocabulary emitted to the authority (typed, secret-free). */
 export type WorkerOperationOutcome =
   | { readonly outcome: 'OK'; readonly payload?: unknown }
-  | { readonly outcome: 'WRONG_PASSWORD_OR_DAMAGED' }
+  | { readonly outcome: 'WRONG_PASSWORD_OR_DAMAGED'; readonly retryDeadlineMs?: number }
   | { readonly outcome: 'THROTTLED'; readonly retryDeadlineMs?: number }
   | { readonly outcome: 'NETWORK_MISMATCH' }
   | { readonly outcome: 'UNSUPPORTED_VAULT' }
@@ -62,7 +94,7 @@ function outcomeFromSealed(result: SealedOutcome): WorkerOperationOutcome {
     case 'OK':
       return { outcome: 'OK', payload: result.detail };
     case 'WRONG_PASSWORD_OR_DAMAGED':
-      return { outcome: 'WRONG_PASSWORD_OR_DAMAGED' };
+      return { outcome: 'WRONG_PASSWORD_OR_DAMAGED', retryDeadlineMs: result.cooldownDeadlineMs };
     case 'THROTTLED':
       return { outcome: 'THROTTLED', retryDeadlineMs: result.cooldownDeadlineMs };
     case 'NETWORK_MISMATCH':
@@ -82,7 +114,7 @@ function outcomeFromSealed(result: SealedOutcome): WorkerOperationOutcome {
     case 'NETWORK_UNAVAILABLE':
       return { outcome: 'NETWORK_UNAVAILABLE' };
     case 'INVALID_INPUT':
-      return { outcome: 'INVALID_INPUT', payload: { reason: result.reason } };
+      return { outcome: 'INVALID_INPUT', payload: { reason: result.reason, ...(result.invalidPositions ? { invalidPositions: result.invalidPositions } : {}) } };
     case 'UNKNOWN_FAILURE':
       return { outcome: 'UNKNOWN_FAILURE', payload: { supportCode: result.supportCode } };
   }
@@ -157,17 +189,16 @@ export function createWorkerBffIdentityLookup(fetchImpl: typeof fetch = fetch): 
       if (!response.ok) {
         return { kind: 'unavailable' };
       }
-      const payload = (await response.json()) as {
+      const payload = (await readIdentityResponse(response, controller.signal)) as {
         reply?: { successfull?: unknown; profileName?: unknown; publicSigningAddress?: unknown; publicEncryptAddress?: unknown; isPublic?: unknown } | null;
       };
       const reply = payload.reply;
-      if (reply === null || reply === undefined || reply.successfull === false) {
-        return { kind: 'missing' };
-      }
+      if (reply?.successfull === false) return { kind: 'missing' };
+      if (reply?.successfull !== true) return { kind: 'unavailable' };
       const signing = reply.publicSigningAddress;
       const encryption = reply.publicEncryptAddress;
-      if (typeof signing !== 'string' || typeof encryption !== 'string') {
-        return { kind: 'missing' };
+      if (!hasBoundedHistoricalName(reply.profileName) || typeof signing !== 'string' || signing.length === 0 || typeof encryption !== 'string' || encryption.length === 0 || typeof reply.isPublic !== 'boolean') {
+        return { kind: 'unavailable' };
       }
       return {
         kind: 'exact',
@@ -196,6 +227,8 @@ export interface SecretTransfer {
 }
 
 export interface SecretTransferBook {
+  readonly clear: () => void;
+  readonly discard: (operationId: string) => void;
   readonly store: (transfer: SecretTransfer) => void;
   readonly take: (operationId: string, kind: SecretTransfer['kind']) => string | Uint8Array | null;
 }
@@ -223,7 +256,19 @@ export function createSecretTransferBook(): SecretTransferBook {
     if (operation.size === 0) operations.delete(operationId);
     return transfer.value;
   };
-  return { store, take };
+  const discard = (operationId: string): void => {
+    const operation = operations.get(operationId);
+    if (!operation) return;
+    for (const transfer of operation.values()) {
+      if (transfer.value instanceof Uint8Array) transfer.value.fill(0);
+      transfer.consumed = true;
+    }
+    operations.delete(operationId);
+  };
+  const clear = (): void => {
+    for (const operationId of operations.keys()) discard(operationId);
+  };
+  return { store, take, clear, discard };
 }
 
 /** Production authority environment over the sealed engine. */
@@ -272,6 +317,7 @@ export function createProductionWorkerEnvironment(params: {
         executeOperation: failClosedOutcome as unknown as AuthorityEnvironment['executeOperation'],
         deliver: params.deliver,
         broadcast: params.broadcast,
+      onInvalidate: secretBook.clear,
         cleanupBoundMs: 1000,
         onForceCleanup: params.onForceCleanup,
       },
@@ -295,6 +341,143 @@ export function createProductionWorkerEnvironment(params: {
     },
     onForceCleanup: params.onForceCleanup,
   });
+
+  // ---------------------------------------------------------------------
+  // FEAT-016 entitlement-bootstrap session (worker-owned reconciliation loop)
+  // ---------------------------------------------------------------------
+  let licenceSession: LicenceBootstrapSession | null = null;
+  let licenceLoopTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Same-origin BFF signed-query submit (three frozen headers only). */
+  const licenceBffQuerySubmit: LicenceBootstrapSessionDeps['querySubmit'] = async (headers) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), LOOKUP_TIMEOUT_MS);
+    try {
+      const response = await (params.fetchImpl ?? fetch)(BFF_LICENCE_QUERY_PATH, {
+        method: 'POST',
+        headers: {
+          [LICENCE_QUERY_SIGNATORY_HEADER]: headers.signatory,
+          [LICENCE_QUERY_SIGNED_AT_HEADER]: headers.signedAt,
+          [LICENCE_QUERY_SIGNATURE_HEADER]: headers.signature,
+          'content-type': 'application/json',
+        },
+        body: '{}',
+        cache: 'no-store',
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        const status = httpStatusToLicenceTransport(response.status);
+        return { ok: false, status };
+      }
+      const body: unknown = await response.json();
+      return parseLicenceBffReply(body);
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        return { ok: false, status: 'DEADLINE_EXCEEDED' };
+      }
+      return { ok: false, status: 'UNAVAILABLE' };
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+
+  /** Canonical transaction ingress submission mapped to admission vocabulary. */
+  const licenceTransactionSubmit: LicenceBootstrapSessionDeps['transactionSubmit'] = async (signedJson) => {
+    const submit = createWorkerBffTransactionSubmit(params.fetchImpl);
+    const result = await submit(signedJson);
+    if (!result.ok) {
+      return 'uncertain';
+    }
+    switch (result.reply.status) {
+      case 'ACCEPTED':
+        return 'accepted';
+      case 'PENDING':
+        return 'pending';
+      case 'ALREADY_EXISTS':
+        return 'alreadyExists';
+      case 'REJECTED':
+        return 'terminalRejected';
+      default:
+        return 'uncertain';
+    }
+  };
+
+  /** Publish one safe progress broadcast to every connected client. */
+  const publishLicenceProgress = (payload: LicenceProgressPayload): void => {
+    try {
+      params.broadcast({
+        kind: 'licence-progress',
+        phase: payload.phase,
+        projection: payload.projection ?? null,
+        lastOutcomeCode: payload.lastOutcomeCode,
+        pendingTransactionId: payload.pendingTransactionId,
+        upgradeOperation: payload.upgradeOperation ?? null,
+        upgradeNotificationEligible: payload.upgradeNotificationEligible === true,
+        emittedAtMs: payload.emittedAtMs,
+      } as BrowserWorkerEvent);
+    } catch {
+      // A dead broadcast channel never compromises the authority.
+    }
+  };
+
+  /** One authority-owned serialized pump loop (~1 s cadence; self-stopping). */
+  const ensureLicenceLoop = (session: LicenceBootstrapSession): void => {
+    licenceSession = session;
+    if (licenceLoopTimer !== null) {
+      return;
+    }
+    const loop = async (): Promise<void> => {
+      const current = licenceSession;
+      if (current === null || !current.isActive()) {
+        stopLicenceLoop();
+        return;
+      }
+      try {
+        await current.pump();
+      } finally {
+        if (licenceSession !== null && licenceSession.isActive()) {
+          licenceLoopTimer = setTimeout(() => void loop(), LICENCE_BOOTSTRAP_LOOP_INTERVAL_MS);
+        } else {
+          stopLicenceLoop();
+        }
+      }
+    };
+    licenceLoopTimer = setTimeout(() => void loop(), LICENCE_BOOTSTRAP_LOOP_INTERVAL_MS);
+  };
+
+  const stopLicenceLoop = (): void => {
+    if (licenceLoopTimer !== null) {
+      clearTimeout(licenceLoopTimer);
+      licenceLoopTimer = null;
+    }
+    licenceSession = null;
+  };
+
+  const stopLicenceSession = (): void => {
+    licenceSession?.teardown();
+    stopLicenceLoop();
+  };
+
+  /** Create (or reuse) the licence session for the current engine/epoch. */
+  const getOrCreateLicenceSession = (): LicenceBootstrapSession | null => {
+    if (licenceSession !== null) {
+      return licenceSession;
+    }
+    if (engine.licenceActor() === null) {
+      return null;
+    }
+    const session = new LicenceBootstrapSession({
+      engine,
+      nowMs: () => Date.now(),
+      expectedNetworkBinding: manifest.canonicalNetworkId,
+      querySubmit: licenceBffQuerySubmit,
+      transactionSubmit: licenceTransactionSubmit,
+      onProgress: publishLicenceProgress,
+    });
+    licenceSession = session;
+    ensureLicenceLoop(session);
+    return session;
+  };
 
   const executeOperation: AuthorityEnvironment['executeOperation'] = async (request) => {
     const operation = request.operation;
@@ -331,10 +514,22 @@ export function createProductionWorkerEnvironment(params: {
           const outcome = engine.concealCandidate(candidateRef);
           return toAuthorityResult(outcomeFromSealed(outcome));
         }
+        case 'discardSecretTransfers': {
+          if (typeof payload.transferOperationId !== 'string' || payload.transferOperationId.length === 0) return toAuthorityResult({ outcome: 'INVALID_INPUT' });
+          secretBook.discard(payload.transferOperationId);
+          return toAuthorityResult({ outcome: 'OK' });
+        }
         case 'destroyCandidate': {
           const candidateRef = typeof payload.candidateRef === 'string' ? payload.candidateRef : '';
           const outcome = engine.destroyCandidate(candidateRef);
           return toAuthorityResult(outcomeFromSealed(outcome));
+        }
+        case 'deriveRecoveryCandidates': {
+          const mnemonic = take(request.operationId, 'mnemonic');
+          if (typeof mnemonic !== 'string' || (payload.wordCount !== 12 && payload.wordCount !== 24)) {
+            return toAuthorityResult({ outcome: 'INVALID_INPUT', payload: { reason: 'UNSUPPORTED_INPUT' } });
+          }
+          return toAuthorityResult(outcomeFromSealed(engine.deriveRecoveryCandidates({ mnemonic, wordCount: payload.wordCount })));
         }
         case 'deriveWordsCandidate': {
           const mnemonic = take(request.operationId, 'mnemonic');
@@ -352,18 +547,34 @@ export function createProductionWorkerEnvironment(params: {
           if (typeof filePassword !== 'string' || typeof fileBytesValue !== 'string') {
             return toAuthorityResult({ outcome: 'INVALID_INPUT', payload: { reason: 'missing-file-material' } });
           }
+          if (filePassword.length === 0 && payload.emptyV1Confirmed !== true) {
+            return toAuthorityResult({ outcome: 'INVALID_INPUT', payload: { reason: 'empty-v1-confirmation-required' } });
+          }
           const fileBytes = decodeBase64Url(fileBytesValue);
           if (fileBytes === null) {
             return toAuthorityResult({ outcome: 'INVALID_INPUT', payload: { reason: 'file-encoding' } });
           }
-          const outcome = await engine.importFileCandidate({ fileBytes, filePassword });
-          return toAuthorityResult(outcomeFromSealed(outcome));
+          try {
+            const outcome = await engine.importFileCandidate({ fileBytes, filePassword });
+            if (outcome.code === 'WRONG_PASSWORD_OR_DAMAGED' || outcome.code === 'THROTTLED') {
+              // Retain only bounded ciphertext for Retry in the same import
+              // epoch. Its password was consumed and is never stored again.
+              store({ operationId: request.operationId, kind: 'fileBytes', value: fileBytesValue, consumed: false });
+            }
+            return toAuthorityResult(outcomeFromSealed(outcome));
+          } finally {
+            fileBytes.fill(0);
+          }
         }
         case 'provisionFromValidatedBundle': {
+          const sessionOnly = payload.protectionMode === 'sessionOnly';
+          if (payload.protectionMode !== undefined && !sessionOnly && payload.protectionMode !== 'devicePassword') {
+            return toAuthorityResult({ outcome: 'INVALID_INPUT', payload: { reason: 'unsupported-protection-mode' } });
+          }
           const devicePassword = take(request.operationId, 'devicePassword');
           const candidateRef = typeof payload.candidateRef === 'string' ? payload.candidateRef : '';
           emitDiagnosticBeacon({ kind: 'provision-inputs', operation: request.operationId, outcome: `pw=${typeof devicePassword === 'string'} ref=${candidateRef.length > 0}` });
-          if (typeof devicePassword !== 'string' || candidateRef.length === 0) {
+          if ((!sessionOnly && typeof devicePassword !== 'string') || candidateRef.length === 0) {
             return toAuthorityResult({ outcome: 'INVALID_INPUT', payload: { reason: 'missing-provision-input' } });
           }
           const alias = typeof payload.alias === 'string' ? payload.alias : '';
@@ -371,15 +582,16 @@ export function createProductionWorkerEnvironment(params: {
           if (alias.length === 0 || visibility === null) {
             return toAuthorityResult({ outcome: 'INVALID_INPUT', payload: { reason: 'profile-input' } });
           }
-          const outcome = await engine.provision({
+          const input = {
             candidateRef,
-            devicePassword,
             alias,
-            visibility,
+            visibility: visibility as 'private' | 'public',
             configurationId: manifest.configurationId,
             networkBinding: { canonicalNetworkId: manifest.canonicalNetworkId, networkMagic: manifest.networkMagic, configurationId: manifest.configurationId },
             producerId: 'P-01',
-          });
+          };
+          const outcome = sessionOnly ? await engine.provisionSessionOnly(input)
+            : await engine.provision({ ...input, devicePassword: devicePassword as string });
           return toAuthorityResult(outcomeFromSealed(outcome));
         }
         case 'unlockPassword': {
@@ -410,10 +622,12 @@ export function createProductionWorkerEnvironment(params: {
           return toAuthorityResult(outcomeFromSealed(outcome));
         }
         case 'lockAll': {
+          stopLicenceSession();
           const outcome = engine.lock();
           return toAuthorityResult(outcomeFromSealed(outcome));
         }
         case 'removeLocalUser': {
+          stopLicenceSession();
           emitDiagnosticBeacon({ kind: 'removal-step', operation: 'before-engine-removal' });
           const outcome = await engine.removeLocalUser();
           emitDiagnosticBeacon({ kind: 'removal-step', operation: 'after-engine-removal', outcome: outcome.code });
@@ -452,9 +666,69 @@ export function createProductionWorkerEnvironment(params: {
           const outcome = await engine.inspectStartup();
           return toAuthorityResult(outcomeFromSealed(outcome));
         }
+        case 'licenceBootstrapStart': {
+          const networkBinding = typeof payload.networkBinding === 'string' ? payload.networkBinding : '';
+          if (networkBinding.length === 0 || networkBinding.length > 256 || networkBinding !== manifest.canonicalNetworkId) {
+            return toAuthorityResult({ outcome: 'INVALID_INPUT', payload: { reason: 'network-binding' } });
+          }
+          const session = getOrCreateLicenceSession();
+          if (session === null) {
+            return toAuthorityResult({ outcome: 'INVALID_INPUT', payload: { reason: 'not-authenticated' } });
+          }
+          const result = await session.start(networkBinding);
+          return toLicenceStepResult(result);
+        }
+        case 'licenceBootstrapControl': {
+          const control = typeof payload.control === 'string' ? payload.control : '';
+          const trigger = payload.trigger;
+          const session = licenceSession;
+          if (session === null) {
+            return toAuthorityResult({ outcome: 'INVALID_INPUT', payload: { reason: 'not-authenticated' } });
+          }
+          const result = await session.control(control, trigger);
+          return toLicenceStepResult(result);
+        }
+        case 'licenceBootstrapEligibility': {
+          const session = licenceSession;
+          if (session === null) {
+            return toAuthorityResult({ outcome: 'INVALID_INPUT', payload: { reason: 'not-authenticated' } });
+          }
+          const foreground = payload.foreground;
+          const connectivity = payload.connectivity;
+          const result = await session.updateEligibility({
+            ...(typeof foreground === 'boolean' ? { foregrounded: foreground } : {}),
+            ...(typeof connectivity === 'string' ? { connectivity: connectivity as LicenceConnectivityInput } : {}),
+          });
+          return toLicenceStepResult(result);
+        }
+        case 'licenceUpgradeConfirm': {
+          const session = licenceSession;
+          if (session === null) {
+            return toAuthorityResult({ outcome: 'INVALID_INPUT', payload: { reason: 'not-authenticated' } });
+          }
+          const targetPlanId = typeof payload.targetPlanId === 'string' ? payload.targetPlanId : '';
+          const result = await session.confirmUpgrade(targetPlanId);
+          return toLicenceStepResult(result);
+        }
+        case 'licenceUpgradeAcknowledge': {
+          const session = licenceSession;
+          if (session === null) {
+            return toAuthorityResult({ outcome: 'INVALID_INPUT', payload: { reason: 'not-authenticated' } });
+          }
+          const result = await session.acknowledgeUpgradeOutcome();
+          return toLicenceStepResult(result);
+        }
         default:
           return { outcome: 'INVALID_INPUT', retryable: false, allowedActions: [], supportCode: undefined };
       }
+  }
+
+  /** Wrap one licence bootstrap step result into the authority vocabulary. */
+  function toLicenceStepResult(result: LicenceBootstrapStepResult): { readonly outcome: string; readonly retryable: boolean; readonly allowedActions: readonly string[]; readonly payload?: unknown } {
+    if (result.ok) {
+      return toAuthorityResult({ outcome: 'OK', payload: { kind: 'licence-bootstrap-step', ok: true, snapshot: result.snapshot } });
+    }
+    return toAuthorityResult({ outcome: 'INVALID_INPUT', payload: { kind: 'licence-bootstrap-step', ok: false, reason: result.reason } });
   }
 
   /** Diagnostic beacon (BroadcastChannel; never affects operations). */
@@ -478,6 +752,12 @@ export function createProductionWorkerEnvironment(params: {
       executeOperation,
       deliver: params.deliver,
       broadcast: params.broadcast,
+      shouldInvalidateOnLifecycle: signal => engine.isSessionOnly() && (signal === 'pagehide' || signal === 'disconnect'),
+      onInvalidate: () => {
+        secretBook.clear();
+        stopLicenceSession();
+        engine.wipeSecrets();
+      },
       cleanupBoundMs: 1000,
       onForceCleanup: params.onForceCleanup,
     },
@@ -491,7 +771,7 @@ function toAuthorityResult(outcome: WorkerOperationOutcome): { readonly outcome:
     case 'OK':
       return { outcome: 'OK', retryable: false, allowedActions: [], supportCode: undefined, payload: outcome.payload };
     case 'WRONG_PASSWORD_OR_DAMAGED':
-      return { outcome: 'WRONG_PASSWORD_OR_DAMAGED', retryable: true, allowedActions: ['retry'], supportCode: undefined };
+      return { outcome: 'WRONG_PASSWORD_OR_DAMAGED', retryable: true, allowedActions: ['retry'], retryDeadlineMs: outcome.retryDeadlineMs, supportCode: undefined };
     case 'THROTTLED':
       return { outcome: 'THROTTLED', retryable: false, allowedActions: ['retry'], retryDeadlineMs: outcome.retryDeadlineMs, supportCode: undefined };
     case 'NETWORK_MISMATCH':

@@ -8,6 +8,8 @@
  * authority sink (never React state).
  */
 import type { ReactNode } from 'react';
+import { useEffect, useRef } from 'react';
+import type { RestoreFocusTarget } from '../../../lib/credential-file-restore/contracts/projection';
 import { useInlineOnboardingBack } from '../onboarding/back-context';
 
 /** Exact required copy (single source; matches presentation EXACT_COPY). */
@@ -86,9 +88,22 @@ export const COPY = {
 } as const;
 
 /** Shared panel: complementary surface, restrained radius, no heavy borders. */
-export function RestorePanel({ title, children, aside }: { readonly title: string; readonly children: ReactNode; readonly aside?: ReactNode }) {
+export function RestorePanel({ title, children, aside, focusTarget, focusKey }: {
+  readonly title: string; readonly children: ReactNode; readonly aside?: ReactNode;
+  readonly focusTarget?: RestoreFocusTarget; readonly focusKey?: string;
+}) {
+  const panelRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!focusTarget) return;
+    // Only a new projected screen/failure moves focus. Countdown ticks and
+    // equivalent projections must not interrupt keyboard correction.
+    const target = focusTarget === 'retryButton' ? 'chooseFileButton' : focusTarget;
+    const element = panelRef.current?.querySelector<HTMLElement>(`[data-restore-focus="${target}"]`)
+      ?? (target === 'countdownStatus' ? panelRef.current?.querySelector<HTMLElement>('[data-restore-focus="errorSummary"]') : null);
+    element?.focus();
+  }, [focusTarget, focusKey]);
   return (
-    <section className="mx-auto w-full max-w-xl px-4 py-8" data-testid="restore-panel">
+    <section ref={panelRef} className="mx-auto w-full max-w-xl px-4 py-8" data-testid="restore-panel">
       <div className="restore-surface bg-[var(--surface-strong)] p-6 shadow-sm">
         <div className="mb-4 flex items-start justify-between gap-3">
           <h2 className="w-full max-w-none text-xl font-semibold leading-snug text-[var(--text)]">{title}</h2>
@@ -119,6 +134,7 @@ export function RestorePrimaryButton({
   fullWidth = false,
   type = 'button',
   testId,
+  focusTarget,
 }: {
   readonly children: ReactNode;
   readonly onClick?: () => void;
@@ -126,6 +142,7 @@ export function RestorePrimaryButton({
   readonly fullWidth?: boolean;
   readonly type?: 'button' | 'submit';
   readonly testId: string;
+  readonly focusTarget?: RestoreFocusTarget;
 }) {
   return (
     <button
@@ -134,6 +151,7 @@ export function RestorePrimaryButton({
       disabled={disabled}
       className={`button-default ${fullWidth ? 'w-full' : ''}`}
       data-testid={testId}
+      data-restore-focus={focusTarget}
     >
       {children}
     </button>
@@ -152,7 +170,7 @@ export function RestoreStatusRegion({ children, role = 'status' }: { readonly ch
 /** Safe error region (never echoes secret/identifier values). */
 export function RestoreErrorRegion({ children }: { readonly children: ReactNode }) {
   return (
-    <div role="alert" className="mt-3 rounded-xl bg-[var(--surface-error)] p-3 text-sm text-[var(--text-error)]" data-testid="restore-error">
+    <div role="alert" tabIndex={-1} data-restore-focus="errorSummary" className="mt-3 rounded-xl bg-[var(--surface-error)] p-3 text-sm text-[var(--text-error)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)]" data-testid="restore-error">
       {children}
     </div>
   );
@@ -164,7 +182,7 @@ export function BackoffCountdown({ remainingSeconds }: { readonly remainingSecon
     return null;
   }
   return (
-    <p aria-live="polite" className="mt-2 text-sm text-[var(--text-muted)]" data-testid="backoff-countdown">
+    <p aria-live="polite" tabIndex={-1} data-restore-focus="countdownStatus" className="mt-2 text-sm text-[var(--text-muted)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)]" data-testid="backoff-countdown">
       Please wait {remainingSeconds} second{remainingSeconds === 1 ? '' : 's'} before trying again.
     </p>
   );

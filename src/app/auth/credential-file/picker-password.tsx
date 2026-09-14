@@ -16,6 +16,7 @@
 import { useRef, useState } from 'react';
 import type { RestoreViewState } from '../../../lib/credential-file-restore/presentation/view';
 import { BackoffCountdown, COPY, RestoreBackButton, RestoreErrorRegion, RestorePanel, RestorePrimaryButton, RestoreStatusRegion } from './surfaces';
+import { useProgressDelay } from '../use-progress-delay';
 
 export interface EntryAndPickerProps {
   readonly view: RestoreViewState;
@@ -24,6 +25,22 @@ export interface EntryAndPickerProps {
   readonly onCancelRead: () => void;
   readonly onBack: () => void;
   readonly onAcknowledgeSessionOnly: () => void;
+}
+
+/** Each read mounts a fresh timer; Cancel remains immediately available. */
+function ReadingScreen({ onCancelRead, onBack }: Pick<EntryAndPickerProps, 'onCancelRead' | 'onBack'>) {
+  const ready = useProgressDelay();
+  return (
+    <RestorePanel title={ready ? COPY.reading.title : COPY.picker.title}>
+      {ready ? <RestoreStatusRegion>{COPY.reading.title}</RestoreStatusRegion> : null}
+      <div className="mt-4 flex items-center gap-3">
+        <RestorePrimaryButton testId="cancel-read" onClick={onCancelRead}>
+          {COPY.reading.cancel}
+        </RestorePrimaryButton>
+        <RestoreBackButton onBack={onBack} />
+      </div>
+    </RestorePanel>
+  );
 }
 
 /** Picker + read surfaces (safe selected status; cancel neutral). */
@@ -44,23 +61,21 @@ export function PickerReadScreen({ view, sessionOnlyOnly, onChooseFile, onCancel
       onChooseFile(file);
     }
   };
-  if (view.screen === 'reading') {
+  if (view.screen === 'capabilityPreflight') {
     return (
-      <RestorePanel title={COPY.reading.title}>
-        <RestoreStatusRegion>{COPY.reading.title}</RestoreStatusRegion>
-        <div className="mt-4 flex items-center gap-3">
-          <RestorePrimaryButton testId="cancel-read" onClick={onCancelRead}>
-            {COPY.reading.cancel}
-          </RestorePrimaryButton>
-          <RestoreBackButton onBack={onBack} />
-        </div>
+      <RestorePanel title={COPY.picker.title}>
+        <RestoreStatusRegion>Checking local credentials before restore…</RestoreStatusRegion>
+        <RestoreBackButton onBack={onBack} />
       </RestorePanel>
     );
+  }
+  if (view.screen === 'reading') {
+    return <ReadingScreen onCancelRead={onCancelRead} onBack={onBack} />;
   }
 
   const sessionOnlyGate = sessionOnlyOnly && !sessionAcknowledged;
   return (
-    <RestorePanel title={COPY.picker.title}>
+    <RestorePanel title={COPY.picker.title} focusTarget={sessionOnlyGate ? undefined : view.focusTarget} focusKey={`${view.screen}:${view.failureCode ?? ''}`}>
       {sessionOnlyGate ? (
         <>
           <RestoreStatusRegion>{COPY.protection.sessionOnlyWarning}</RestoreStatusRegion>
@@ -85,7 +100,7 @@ export function PickerReadScreen({ view, sessionOnlyOnly, onChooseFile, onCancel
             onChange={handleFileSelection}
           />
           <div className="mt-4 flex flex-wrap items-center gap-3">
-            <RestorePrimaryButton testId="choose-file" onClick={openFilePicker} fullWidth>
+            <RestorePrimaryButton testId="choose-file" focusTarget="chooseFileButton" onClick={openFilePicker} fullWidth>
               {view.failureCode !== null ? COPY.picker.different : COPY.picker.choose}
             </RestorePrimaryButton>
             <RestoreBackButton onBack={onBack} />
@@ -138,7 +153,7 @@ export function PasswordScreen({ view, selectedFileName, onSubmit, onToggleVisib
   };
 
   return (
-    <RestorePanel title={COPY.password.title}>
+    <RestorePanel title={COPY.password.title} focusTarget={view.screen === 'password' ? view.focusTarget : undefined} focusKey={`${view.screen}:${view.failureCode ?? ''}`}>
       <div
         role="status"
         className="selection-display mb-4 flex items-center gap-3 px-4 text-sm font-semibold text-[var(--text)]"
@@ -175,6 +190,7 @@ export function PasswordScreen({ view, selectedFileName, onSubmit, onToggleVisib
             placeholder="Enter backup-file password"
             onInput={(event) => { setHasPassword(event.currentTarget.value.length > 0); }}
             data-testid="backup-password-input"
+            data-restore-focus="passwordField"
             className="text-input pr-20 text-sm"
           />
           <button
@@ -220,6 +236,14 @@ export function PasswordScreen({ view, selectedFileName, onSubmit, onToggleVisib
 /** Structural/authentication/semantic error copy (bounded; never echoes values). */
 export function errorCopy(code: string): string {
   switch (code) {
+    case 'READ_INACTIVITY_TIMEOUT':
+      return 'Reading the credential file timed out. Choose the file again.';
+    case 'READ_PARTIAL':
+      return 'The credential file could not be read completely. Choose the file again.';
+    case 'READ_UNAVAILABLE':
+      return 'The credential file could not be read. Choose the file again.';
+    case 'BACKUP_PASSWORD_TOO_LONG':
+      return 'The backup-file password exceeds 4096 UTF-8 bytes.';
     case 'AUTHENTICATION_FAILED':
       return COPY.errors.combined;
     case 'BACKOFF_ACTIVE':
@@ -235,10 +259,13 @@ export function errorCopy(code: string): string {
     case 'PAYLOAD_INVALID_FIELD':
       return COPY.errors.inconsistentKeys;
     case 'ENVELOPE_TOO_SHORT':
+      return 'This credential backup is incomplete.';
     case 'ENVELOPE_OVERSIZE':
+      return 'This credential backup exceeds the 1 MiB size limit.';
     case 'INVALID_MAGIC':
-    case 'UNSUPPORTED_VERSION':
       return COPY.errors.invalidFile;
+    case 'UNSUPPORTED_VERSION':
+      return 'This credential backup version is not supported.';
     case 'SERVER_PROOF_REJECTED':
       return COPY.errors.serverProof;
     case 'CLEANUP_FAILURE':

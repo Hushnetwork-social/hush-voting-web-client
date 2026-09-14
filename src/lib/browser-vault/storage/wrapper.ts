@@ -39,6 +39,8 @@ export interface VaultTransactionOptions {
 export interface VaultStorageSession {
   readonly databaseName: string;
   readonly schemaVersion: number;
+  /** Browser-only non-secret capability probe; absence is never a passing preflight. */
+  probeStorage?(): Promise<VaultResult<{ readonly ok: true }>>;
   readRecord(store: VaultStoreName, key: string): Promise<VaultResult<{ readonly record: unknown }>>;
   writeRecord(store: VaultStoreName, key: string, value: unknown): Promise<VaultResult<{ readonly ok: true }>>;
   deleteRecord(store: VaultStoreName, key: string): Promise<VaultResult<{ readonly ok: true }>>;
@@ -67,6 +69,13 @@ export async function openVaultStorage(
       onVersionChange: () => undefined,
     });
     const opened: OpenedSession = { db, session: createSession(db) };
+    // Opening/reading alone cannot establish that subsequent secret storage
+    // is writable. This runs in the adapter before any session is exposed.
+    const probe = await opened.session.probeStorage!();
+    if (!probe.ok) {
+      opened.session.close();
+      return probe;
+    }
     return success({ session: opened.session });
   } catch (error) {
     return storageFailureToVaultResult(classifyStorageError(error));
@@ -116,6 +125,55 @@ function runTransaction<T>(
 }
 
 function createSession(db: IDBDatabase): VaultStorageSession {
+  // Use one existing non-secret allowlisted key inside a single transaction.
+  // Restore its exact prior value before commit; no probe value is observable
+  // outside this transaction and failure rolls back every probe write.
+  const probeStorage = (): Promise<VaultResult<{ readonly ok: true }>> => new Promise(resolve => {
+    let transaction: IDBTransaction;
+    try { transaction = db.transaction('operationalSidecars', 'readwrite'); }
+    catch (error) { resolve(storageFailureToVaultResult(classifyStorageError(error))); return; }
+    const store = transaction.objectStore('operationalSidecars');
+    const key = 'persistenceAck';
+    assertAllowedStorageKey('operationalSidecars', key);
+    let verified = false;
+    let failureResult: VaultResult<{ readonly ok: true }> = failure('StorageUnavailable');
+    const abort = (error?: unknown): void => {
+      if (error !== undefined) failureResult = storageFailureToVaultResult(classifyStorageError(error));
+      try { transaction.abort(); } catch { /* Completion handler owns the result. */ }
+    };
+    const timeout = setTimeout(() => abort(), 5_000);
+    transaction.onabort = () => { clearTimeout(timeout); resolve(failureResult); };
+    transaction.onerror = () => { /* IndexedDB aborts failed requests atomically. */ };
+    transaction.oncomplete = () => {
+      clearTimeout(timeout);
+      resolve(verified ? success({ ok: true }) : failure('StorageUnavailable'));
+    };
+    const guarded = (action: () => void): void => { try { action(); } catch (error) { abort(error); } };
+    guarded(() => {
+      const original = store.get(key);
+      original.onsuccess = () => guarded(() => {
+        const prior = original.result;
+        const write = store.put('hushvoting-storage-preflight-v1', key);
+        write.onsuccess = () => guarded(() => {
+          const read = store.get(key);
+          read.onsuccess = () => guarded(() => {
+            const value: unknown = read.result;
+            if (value !== 'hushvoting-storage-preflight-v1') { abort(); return; }
+            const remove = store.delete(key);
+            remove.onsuccess = () => guarded(() => {
+              const absent = store.get(key);
+              absent.onsuccess = () => guarded(() => {
+                if (absent.result !== undefined) { abort(); return; }
+                if (prior === undefined) { verified = true; return; }
+                const restore = store.put(prior, key);
+                restore.onsuccess = () => { verified = true; };
+              });
+            });
+          });
+        });
+      });
+    });
+  });
   const readRecord: VaultStorageSession['readRecord'] = async (store, key) => {
     try {
       assertAllowedStorageKey(store, key);
@@ -259,6 +317,7 @@ function createSession(db: IDBDatabase): VaultStorageSession {
   const session: VaultStorageSession = {
     databaseName: db.name,
     schemaVersion: db.version,
+    probeStorage,
     readRecord,
     writeRecord,
     deleteRecord,

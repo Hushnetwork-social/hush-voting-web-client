@@ -3,14 +3,19 @@
  *
  * One generic origin-scoped database with a fixed schema:
  *
- *   Database: hushvoting-vault | Schema version: 1
- *   Stores: vaultSlots, vaultJournal, operationalSidecars
+ *   Database: hushvoting-vault | Schema version: 2
+ *   Stores: vaultSlots, vaultJournal, operationalSidecars, licenceJournal
  *
  * - `vaultSlots` uses only fixed opaque keys `slot-a` and `slot-b`.
  * - `vaultJournal` uses fixed key `current` for the active pointer/generation.
  * - `operationalSidecars` uses fixed allowlisted keys only (throttle, removal
  *   tombstone, lease/ownership, persistence acknowledgement, and other
  *   FEAT-003-allowlisted non-secret state).
+ * - `licenceJournal` (FEAT-016 additive schema v2) holds the encrypted
+ *   two-slot pending licence transaction journal under the fixed keys
+ *   `slot-a`, `slot-b`, and `pointer` only. Values are opaque encrypted
+ *   blobs produced by the authority; no identity/transaction-derived key is
+ *   ever written.
  * - No database/store/key/index contains an alias, address, identity, network,
  *   endpoint, or credential-derived value.
  *
@@ -18,17 +23,18 @@
  * to the closed FEAT-003 typed result vocabulary.
  *
  * Normative source: FEAT-004 FeatureDescription "IndexedDB Storage Model";
- * FEAT-003 `src/lib/vault-core/contracts/results.ts`.
+ * FEAT-003 `src/lib/vault-core/contracts/results.ts`; FEAT-016 FeatureDescription
+ * "Licence Transaction and Pending Journal" (encrypted authority journal).
  */
 import { failure, type VaultFailure, type VaultResultCode } from '../../vault-core/contracts/results';
 
 /** Generic origin-scoped database name (no identity-bearing value). */
 export const VAULT_DATABASE_NAME = 'hushvoting-vault' as const;
 /** Fixed schema version; upgrades bump this monotonically without recreating data. */
-export const VAULT_SCHEMA_VERSION = 1 as const;
+export const VAULT_SCHEMA_VERSION = 2 as const;
 
 /** Closed fixed object-store names. */
-export const VAULT_STORES = ['vaultSlots', 'vaultJournal', 'operationalSidecars'] as const;
+export const VAULT_STORES = ['vaultSlots', 'vaultJournal', 'operationalSidecars', 'licenceJournal'] as const;
 export type VaultStoreName = (typeof VAULT_STORES)[number];
 
 /** Fixed opaque slot keys; never identity-derived. */
@@ -50,6 +56,10 @@ export const ALLOWED_SIDECAR_KEYS = [
   'epoch',
 ] as const;
 export type VaultSidecarKey = (typeof ALLOWED_SIDECAR_KEYS)[number];
+
+/** Fixed keys of the encrypted licence journal store (schema v2 additive). */
+export const LICENCE_JOURNAL_KEYS = ['slot-a', 'slot-b', 'pointer'] as const;
+export type LicenceJournalKey = (typeof LICENCE_JOURNAL_KEYS)[number];
 
 /** Journal record shape stored under `current`. */
 export interface VaultJournalRecord {
@@ -128,6 +138,9 @@ export function assertAllowedStorageKey(store: VaultStoreName, key: string): voi
   }
   if (store === 'operationalSidecars' && !(ALLOWED_SIDECAR_KEYS as readonly string[]).includes(key)) {
     throw new Error(`disallowed key for operationalSidecars: ${key}`);
+  }
+  if (store === 'licenceJournal' && !(LICENCE_JOURNAL_KEYS as readonly string[]).includes(key)) {
+    throw new Error(`disallowed key for licenceJournal: ${key}`);
   }
 }
 

@@ -53,6 +53,16 @@ export interface PreflightProps {
 
 /** Wireframe-gated preflight — generation blocked when unsafe. */
 export function PreflightScreen({ outcome, onRetry, onBack }: PreflightProps) {
+  if (outcome.kind === 'checking') {
+    return (
+      <SurfacePanel title={PREF_LIGHT.title}>
+        <StatusRegion>Checking this device before setup…</StatusRegion>
+        <div className="mt-4">
+          <ActionButton onClick={onBack} variant="secondary">Back</ActionButton>
+        </div>
+      </SurfacePanel>
+    );
+  }
   if (outcome.kind === 'passed') {
     return (
       <SurfacePanel title={PREF_LIGHT.title}>

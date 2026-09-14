@@ -9,15 +9,19 @@
  * feedback and three-attempt invalidation.
  */
 
-import { useState } from 'react';
+import type { RecoveryWordDisplay } from '../../../lib/auth/web/recovery-word-display';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useClipboardController } from '../../../lib/browser-vault/ui/hooks';
 import { CONFIRM, RECOVERY } from './copy';
 import { ActionButton, BackButton, FieldError, StatusRegion, SurfacePanel } from './surfaces';
 
 export interface RecoveryProps {
   /** Null while concealed; present only inside the bounded reveal exception. */
-  readonly words: readonly string[] | null;
+  readonly display: RecoveryWordDisplay;
+  readonly visible: boolean;
   readonly onCopy: () => void;
-  readonly onRegenerateRequest: () => void;
+  readonly onRegenerateRequest: (confirmed?: true) => void;
+  readonly onReveal?: () => void;
   readonly onContinue: () => void;
   readonly onBack: () => void;
   readonly acknowledged: boolean;
@@ -26,14 +30,58 @@ export interface RecoveryProps {
 }
 
 /** Wireframe 3 — Save recovery words (semantic ordered list, responsive). */
-export function RecoveryScreen({ words, onCopy, onRegenerateRequest, onContinue, onBack, acknowledged, onAcknowledge, timeoutMessage }: RecoveryProps) {
-  const visible = words !== null;
-  const [copyOutcome, setCopyOutcome] = useState<'idle' | 'copied' | 'unavailable'>('idle');
+export function RecoveryScreen({ display, visible, onCopy, onRegenerateRequest, onReveal, onContinue, onBack, acknowledged, onAcknowledge, timeoutMessage }: RecoveryProps) {
+  const listRef = useRef<HTMLOListElement>(null);
+  const [copyOutcome, setCopyOutcome] = useState<'idle' | 'copied' | 'unavailable' | 'cleanupDenied'>('idle');
+  const [regenerationRequested, setRegenerationRequested] = useState(false);
+  const { cleanupAfter } = useClipboardController(typeof navigator === 'undefined' ? null : navigator.clipboard ?? null);
+  const copied = useRef(false);
+  const mounted = useRef(false);
+  const copyEpoch = useRef(0);
+  const cleanupTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    mounted.current = true;
+    const cleanup = () => {
+      copyEpoch.current++;
+      if (cleanupTimer.current !== null) clearTimeout(cleanupTimer.current);
+      cleanupTimer.current = null;
+      if (!copied.current) return;
+      copied.current = false;
+      // Lifecycle cleanup is attempted immediately, even if the browser may
+      // deny a write after losing focus. Never inspect the current clipboard.
+      void cleanupAfter(0, false);
+    };
+    const onVisibility = () => { if (document.visibilityState !== 'visible') cleanup(); };
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('pagehide', cleanup);
+    if (!visible || regenerationRequested) cleanup();
+    return () => {
+      mounted.current = false;
+      cleanup();
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pagehide', cleanup);
+    };
+  }, [cleanupAfter, visible, regenerationRequested]);
+
+  useLayoutEffect(() => {
+    if (visible && !regenerationRequested && listRef.current) return display.attach(listRef.current);
+  }, [display, visible, regenerationRequested]);
 
   const copyWords = async () => {
-    if (words === null) return;
+    if (!visible) return;
+    const epoch = copyEpoch.current;
     try {
-      await navigator.clipboard.writeText(words.join(' '));
+      if (!await display.copy()) { setCopyOutcome('unavailable'); return; }
+      if (!mounted.current || epoch !== copyEpoch.current || document.visibilityState !== 'visible') { void cleanupAfter(0, false); return; }
+      copied.current = true;
+      if (cleanupTimer.current !== null) clearTimeout(cleanupTimer.current);
+      cleanupTimer.current = setTimeout(() => {
+        cleanupTimer.current = null;
+        copied.current = false;
+        void cleanupAfter(0).then(result => {
+          if (result === 'denied' && mounted.current) setCopyOutcome('cleanupDenied');
+        });
+      }, 30_000);
       onCopy();
       setCopyOutcome('copied');
     } catch {
@@ -41,30 +89,40 @@ export function RecoveryScreen({ words, onCopy, onRegenerateRequest, onContinue,
     }
   };
 
+  if (regenerationRequested) {
+    return (
+      <div role="alertdialog" aria-label={RECOVERY.regenerateConfirmTitle}>
+        <SurfacePanel title={RECOVERY.regenerateConfirmTitle}>
+          <p className="text-sm text-[var(--text-muted)]">{RECOVERY.regenerateConfirmDetail}</p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <ActionButton variant="secondary" onClick={() => setRegenerationRequested(false)}>Keep current words</ActionButton>
+            <ActionButton variant="danger" onClick={() => {
+              setRegenerationRequested(false);
+              onRegenerateRequest(true);
+            }}>{RECOVERY.regenerateConfirmAction}</ActionButton>
+          </div>
+        </SurfacePanel>
+      </div>
+    );
+  }
+
   return (
     <SurfacePanel title={RECOVERY.title}>
       <p className="mb-3 text-sm text-[var(--text-muted)]">{RECOVERY.detail}</p>
       {visible ? (
         <>
-          <ol className="grid grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-2 lg:grid-cols-4" data-testid="recovery-list">
-            {words.map((word, i) => (
-              <li key={i} className="flex gap-2 rounded-lg bg-[var(--surface-strong)] px-3 py-1.5 text-sm text-[var(--text)]">
-                <span className="font-mono text-xs text-[var(--text-muted)]">{String(i + 1).padStart(2, '0')}</span>
-                <span>{word}</span>
-              </li>
-            ))}
-          </ol>
+          <ol ref={listRef} className="grid grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-2 lg:grid-cols-4" data-testid="recovery-list" />
           <div className="mt-3 flex flex-wrap gap-3">
-            <ActionButton onClick={() => void copyWords()}>
+            <ActionButton variant="secondary" onClick={() => void copyWords()}>
               {copyOutcome === 'copied' ? 'Copied' : RECOVERY.copy}
             </ActionButton>
-            <ActionButton variant="danger" onClick={onRegenerateRequest}>
+            <ActionButton variant="danger" onClick={() => setRegenerationRequested(true)}>
               {RECOVERY.regenerate}
             </ActionButton>
           </div>
           <p className="mt-2 text-xs text-[var(--text-muted)]">{RECOVERY.copyWarning}</p>
-          <div className={copyOutcome === 'unavailable' ? 'mt-2 text-xs text-[var(--warning)]' : 'sr-only'} role="status" aria-live="polite">
-            {copyOutcome === 'copied' ? 'Recovery words copied.' : copyOutcome === 'unavailable' ? 'Clipboard copy is unavailable. Save the visible words manually.' : ''}
+          <div className={copyOutcome === 'unavailable' || copyOutcome === 'cleanupDenied' ? 'mt-2 text-xs text-[var(--warning)]' : 'sr-only'} role="status" aria-live="polite">
+            {copyOutcome === 'copied' ? 'Recovery words copied.' : copyOutcome === 'unavailable' ? 'Clipboard copy is unavailable. Save the visible words manually.' : copyOutcome === 'cleanupDenied' ? 'The browser refused clipboard cleanup. Clear your clipboard manually.' : ''}
           </div>
           <label className="mt-3 flex items-start gap-2 text-sm text-[var(--text)]">
             <input
@@ -77,7 +135,10 @@ export function RecoveryScreen({ words, onCopy, onRegenerateRequest, onContinue,
           </label>
         </>
       ) : (
-        <StatusRegion>{timeoutMessage ?? RECOVERY.concealed}</StatusRegion>
+        <>
+          <StatusRegion>{timeoutMessage ?? RECOVERY.concealed}</StatusRegion>
+          {onReveal ? <ActionButton variant="secondary" onClick={onReveal}>{RECOVERY.reveal}</ActionButton> : null}
+        </>
       )}
       <div className="mt-4 flex items-center gap-3">
         <BackButton onClick={onBack} />

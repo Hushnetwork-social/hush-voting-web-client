@@ -10,13 +10,16 @@
 import type { RecoveryViewState } from '../../../lib/recovery-words/presentation/view';
 import type { WordGridProjection, CandidateReviewProjection, ProtectionProjection, StagedPreviewProjection } from '../../../lib/recovery-words/contracts/projection';
 import type { ProtectionMode } from '../../../lib/recovery-words/contracts/envelope';
+import type { DeploymentManifest } from '../../../lib/runtime/deployment';
 import { WordEntryScreen } from './word-entry';
 import { CandidateReviewScreen, LookupProgress } from './candidate-review';
 import { FinishRestoringScreen, ProtectionScreen, RecreateScreen, StagingScreen, SuccessScreen } from './lifecycle';
 import { LocalUserGuard, OwnerBlockedScreen, QuarantineScreen, RemovalConfirmation } from './guards';
+import { RecoveryActionButton, RecoveryBackButton, RecoveryFieldError, RecoveryPanel, RecoveryStatusRegion } from './surfaces';
 
 export interface RecoveryFlowProps {
   readonly view: RecoveryViewState;
+  readonly network: Pick<DeploymentManifest, 'canonicalNetworkId' | 'classification'>;
   readonly wordGrid: WordGridProjection | null;
   readonly candidateReview: CandidateReviewProjection | null;
   readonly protection: ProtectionProjection | null;
@@ -34,7 +37,9 @@ export interface RecoveryFlowProps {
   readonly onCopyAddress: (address: string) => void;
   readonly onChooseProtection: (mode: ProtectionMode) => void;
   readonly onAcknowledgeProtection: () => void;
+  readonly onProtect?: (password: string) => void;
   readonly onConfirmRecreate: (alias: string, visibility: 'private' | 'public') => void;
+  readonly onCheckAgain?: () => void;
   readonly onFinishRestoringUnlock: () => void;
   readonly onLock: () => void;
   readonly onRemoveLocalUser: () => void;
@@ -60,6 +65,15 @@ export function RecoveryFlow(props: RecoveryFlowProps) {
       // The three-choice entry is rendered by the FEAT-002 auth shell.
       return null;
     case 'vaultGuard':
+      if (view.error === null || view.error.code === 'VAULT_NOT_VERIFIED_EMPTY') {
+        return <RecoveryPanel title="Restore Recovery Words">
+          {view.error === null
+            ? <RecoveryStatusRegion>Checking local credentials before recovery…</RecoveryStatusRegion>
+            : <><RecoveryFieldError id="rw-entry-custody-error">Recovery cannot start until local credential absence is verified.</RecoveryFieldError>
+              <RecoveryActionButton onClick={props.onRetry}>Retry</RecoveryActionButton></>}
+          <RecoveryBackButton onClick={props.onBack} />
+        </RecoveryPanel>;
+      }
       if (view.error?.code === 'QUARANTINED') {
         return <QuarantineScreen onRetry={props.onRetry} />;
       }
@@ -68,6 +82,11 @@ export function RecoveryFlow(props: RecoveryFlowProps) {
     case 'verifying':
     case 'deriving':
       return props.wordGrid ? (
+        <>
+        <p data-testid="recovery-network" className="mb-4 text-sm text-[var(--text-muted)]">
+          Target network: {props.network.canonicalNetworkId}
+          {props.network.classification === 'isolated-non-production' ? ' · Test network' : ''}
+        </p>
         <WordEntryScreen
           grid={props.wordGrid}
           onSelectCount={props.onSelectCount}
@@ -77,9 +96,18 @@ export function RecoveryFlow(props: RecoveryFlowProps) {
           onVerify={props.onVerify}
           onBack={props.onBack}
         />
+        </>
       ) : null;
     case 'lookup':
     case 'resolving':
+      if (view.error !== null) return (
+        <RecoveryPanel title="Checking your identity">
+          <RecoveryFieldError id="rw-lookup-error">{view.error.message}</RecoveryFieldError>
+          {props.lookupProgress && <LookupProgress done={props.lookupProgress.done} total={props.lookupProgress.total} />}
+          <RecoveryActionButton onClick={props.onRetryLookup}>Retry unresolved checks</RecoveryActionButton>
+          <RecoveryBackButton onClick={props.onBack} />
+        </RecoveryPanel>
+      );
       if (props.lookupProgress) {
         return <LookupProgress done={props.lookupProgress.done} total={props.lookupProgress.total} />;
       }
@@ -110,13 +138,21 @@ export function RecoveryFlow(props: RecoveryFlowProps) {
       ) : null;
     case 'protection':
       return props.protection ? (
-        <ProtectionScreen protection={props.protection} onChooseMode={props.onChooseProtection} onAcknowledge={props.onAcknowledgeProtection} onBack={props.onBack} />
+        <ProtectionScreen protection={props.protection} onChooseMode={props.onChooseProtection} onAcknowledge={props.onAcknowledgeProtection} onProtect={props.onProtect} onBack={props.onBack} />
       ) : null;
     case 'staging':
+    case 'proof':
       return <StagingScreen failed={view.error !== null} onBack={props.onBack} />;
     case 'recreateReview':
       return <RecreateScreen networkLabel={props.candidateReview?.networkLabel ?? 'this network'} onConfirm={props.onConfirmRecreate} onBack={props.onBack} />;
     case 'registration':
+      return <RecoveryPanel title="Waiting for your restored identity">
+        <p>Your identity transaction is awaiting blockchain confirmation.</p>
+        <p>You can lock or close HushVoting safely and unlock this device to check again.</p>
+        {view.error && <RecoveryFieldError id="rw-registration-error">{view.error.message}</RecoveryFieldError>}
+        <RecoveryActionButton onClick={props.onLock}>Lock</RecoveryActionButton>
+        <RecoveryActionButton onClick={() => props.onCheckAgain?.()} disabled={!props.onCheckAgain}>Check again</RecoveryActionButton>
+      </RecoveryPanel>;
     case 'activating':
       return <StagingScreen failed={false} onBack={props.onBack} />;
     case 'finishRestoring':

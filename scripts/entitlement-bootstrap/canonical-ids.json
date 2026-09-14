@@ -1,0 +1,53 @@
+{
+  "schema": "feat016-canonical-ids-v1",
+  "feature": "FEAT-016",
+  "scenarioIds": [
+    { "id": "AT-LIC-002", "kind": "twintest-paired", "twinServer": true },
+    { "id": "AT-LIC-003", "kind": "twintest-paired", "twinServer": true },
+    { "id": "AT-LIC-007", "kind": "twintest-paired", "twinServer": true },
+    { "id": "AT-LIC-010", "kind": "twintest-paired", "twinServer": true },
+    { "id": "AT-LIC-011", "kind": "twintest-paired", "twinServer": true },
+    { "id": "AT-LIC-012", "kind": "twintest-paired", "twinServer": true },
+    { "id": "AT-LIC-016-001", "kind": "client-only", "twinServer": false },
+    { "id": "AT-LIC-016-002", "kind": "client-only", "twinServer": false },
+    { "id": "AT-LIC-016-003", "kind": "client-only", "twinServer": false },
+    { "id": "AT-LIC-016-004", "kind": "client-only", "twinServer": false },
+    { "id": "AT-LIC-016-005", "kind": "client-only", "twinServer": false },
+    { "id": "AT-LIC-016-006", "kind": "client-only", "twinServer": false },
+    { "id": "AT-LIC-016-007", "kind": "client-only", "twinServer": false }
+  ],
+  "acceptanceCriteria": [
+    "AC-016-001",
+    "AC-016-002",
+    "AC-016-003",
+    "AC-016-004",
+    "AC-016-005",
+    "AC-016-006",
+    "AC-016-007",
+    "AC-016-008",
+    "AC-016-009",
+    "AC-016-010",
+    "AC-016-011",
+    "AC-016-012",
+    "AC-016-013",
+    "AC-016-014",
+    "AC-016-015",
+    "AC-016-016",
+    "AC-016-017",
+    "AC-016-018",
+    "AC-016-019",
+    "AC-016-020",
+    "AC-016-021",
+    "AC-016-022",
+    "AC-016-023",
+    "AC-016-024",
+    "AC-016-025",
+    "AC-016-026",
+    "AC-016-027",
+    "AC-016-028"
+  ],
+  "manualObligations": [
+    { "id": "MT-QUAL-ANDROID-016-001", "taskId": "phase-7-task-7-7" },
+    { "id": "MT-QUAL-UBUNTU-016-001", "taskId": "phase-7-task-7-8" }
+  ]
+}

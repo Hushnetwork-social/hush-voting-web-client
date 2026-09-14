@@ -117,6 +117,10 @@ export function normalizeSubmitReply(reply: SubmitSignedTransactionReply | null 
   if (reply.successfull !== true && reply.successfull !== false) {
     return { kind: 'compatibilityError' };
   }
+  if (reply.validationCode !== null && reply.validationCode !== undefined && typeof reply.validationCode !== 'string') {
+    return { kind: 'compatibilityError' };
+  }
+  if (status !== 'REJECTED' && reply.validationCode) return { kind: 'compatibilityError' };
   switch (status) {
     case 'ACCEPTED':
       return reply.successfull === true ? { kind: 'accepted' } : { kind: 'compatibilityError' };
@@ -125,6 +129,7 @@ export function normalizeSubmitReply(reply: SubmitSignedTransactionReply | null 
     case 'ALREADY_EXISTS':
       return reply.successfull === true ? { kind: 'alreadyExists' } : { kind: 'compatibilityError' };
     case 'REJECTED': {
+      if (reply.successfull !== false) return { kind: 'compatibilityError' };
       const code = reply.validationCode ?? null;
       if (code === null || code.length === 0) {
         // A rejection without a stable code cannot drive correction.

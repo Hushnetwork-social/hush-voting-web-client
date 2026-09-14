@@ -56,9 +56,9 @@ export type SnapshotResult = RestoreResult<AcceptedSnapshot>;
 
 const failure = (code: RestoreFailure['code'], message: string): RestoreFailure => ({ ok: false, code, message, supportCode: `SNAP-${code}` });
 
-/** Cap a read to 1 MiB + one overflow byte; reject anything larger. */
+/** The extra byte detects overflow; an accepted snapshot never exceeds 1 MiB. */
 export function enforceReadBound(byteLength: number): { readonly ok: true } | { readonly ok: false; readonly code: 'FILE_TOO_LARGE' } {
-  if (byteLength > RESTORE_MAX_SNAPSHOT_BYTES) {
+  if (byteLength > RESTORE_READ_HARD_BOUND_BYTES) {
     return { ok: false, code: 'FILE_TOO_LARGE' };
   }
   return { ok: true };
@@ -74,7 +74,9 @@ export type EnvelopeGateOutcome =
 
 /** Map the FEAT-001 envelope inspection result to the closed FEAT-009 gate. */
 export function evaluateEnvelopeGate(envelope: Uint8Array): EnvelopeGateOutcome {
-  if (envelope.byteLength > RESTORE_MAX_SNAPSHOT_BYTES) {
+  // Header plus the complete 128-bit GCM tag must be present before asking for a password.
+  if (envelope.byteLength < 52) return { kind: 'tooShort' };
+  if (envelope.byteLength > RESTORE_READ_HARD_BOUND_BYTES) {
     return { kind: 'tooLarge' };
   }
   const inspection = inspectDatEnvelope(envelope);

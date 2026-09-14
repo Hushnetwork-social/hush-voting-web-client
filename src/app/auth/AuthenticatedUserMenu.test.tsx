@@ -10,6 +10,18 @@ const identity = {
 };
 
 describe('authenticated user popup', () => {
+  it('restores focus when the focused Close control is activated by keyboard', async () => {
+    const user = userEvent.setup();
+    render(<AuthenticatedUserMenu identity={identity} onLock={() => undefined} />);
+    const trigger = screen.getByRole('button', { name: 'Alice' });
+    trigger.focus();
+    await user.keyboard('{Enter}');
+    expect(screen.getByRole('button', { name: 'Close user information' })).toHaveFocus();
+    await user.keyboard('{Enter}');
+    expect(screen.queryByRole('dialog', { name: 'User information' })).toBeNull();
+    expect(trigger).toHaveFocus();
+  });
+
   it('shows only verified public identity information', async () => {
     const user = userEvent.setup();
     render(<AuthenticatedUserMenu identity={identity} onLock={() => undefined} />);

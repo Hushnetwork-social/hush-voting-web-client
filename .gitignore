@@ -19,6 +19,7 @@ src-tauri/target/
 coverage/
 playwright-report/
 test-results/
+.hepha/
 .nyc_output/
 
 # Runtime logs
@@ -57,3 +58,5 @@ conformance/archive/
 # Playwright-bdd generated specs
 .features-gen/
 .features-gen-auth-lifecycle/
+.features-gen-entitlement-bootstrap/
+.features-gen-licence-upgrade/

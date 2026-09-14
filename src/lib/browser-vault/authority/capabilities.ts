@@ -93,13 +93,24 @@ export const FRESH_CAPABILITY_REQUIRED_BY_OPERATION: Readonly<Record<BrowserOper
   createCandidate: null,
   revealCandidateWords: null,
   concealCandidate: null,
+  discardSecretTransfers: null,
   destroyCandidate: null,
   deriveWordsCandidate: null,
+  deriveRecoveryCandidates: null,
   importFileCandidate: null,
   retainTransactionDigest: null,
   submitIdentityTransaction: null,
   promoteLifecycle: null,
   inspectStartup: null,
+  // FEAT-016 additive: entitlement bootstrap steps require no fresh
+  // password capability (authenticated session only).
+  licenceBootstrapStart: null,
+  licenceBootstrapControl: null,
+  licenceBootstrapEligibility: null,
+  // FEAT-017 additive: confirmed-upgrade ops require no fresh password
+  // capability (authenticated session only; same rule as bootstrap ops).
+  licenceUpgradeConfirm: null,
+  licenceUpgradeAcknowledge: null,
 } as const;
 
 /** Safe session projection vocabulary for clients (never secrets). */

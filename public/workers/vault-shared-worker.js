@@ -21774,60 +21774,60 @@ var require_wordlists = __commonJS({
   "node_modules/bip39/src/_wordlists.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    var wordlists3 = {};
-    exports.wordlists = wordlists3;
+    var wordlists4 = {};
+    exports.wordlists = wordlists4;
     var _default;
     exports._default = _default;
     try {
       exports._default = _default = require_czech();
-      wordlists3.czech = _default;
+      wordlists4.czech = _default;
     } catch (err2) {
     }
     try {
       exports._default = _default = require_chinese_simplified();
-      wordlists3.chinese_simplified = _default;
+      wordlists4.chinese_simplified = _default;
     } catch (err2) {
     }
     try {
       exports._default = _default = require_chinese_traditional();
-      wordlists3.chinese_traditional = _default;
+      wordlists4.chinese_traditional = _default;
     } catch (err2) {
     }
     try {
       exports._default = _default = require_korean();
-      wordlists3.korean = _default;
+      wordlists4.korean = _default;
     } catch (err2) {
     }
     try {
       exports._default = _default = require_french();
-      wordlists3.french = _default;
+      wordlists4.french = _default;
     } catch (err2) {
     }
     try {
       exports._default = _default = require_italian();
-      wordlists3.italian = _default;
+      wordlists4.italian = _default;
     } catch (err2) {
     }
     try {
       exports._default = _default = require_spanish();
-      wordlists3.spanish = _default;
+      wordlists4.spanish = _default;
     } catch (err2) {
     }
     try {
       exports._default = _default = require_japanese();
-      wordlists3.japanese = _default;
-      wordlists3.JA = _default;
+      wordlists4.japanese = _default;
+      wordlists4.JA = _default;
     } catch (err2) {
     }
     try {
       exports._default = _default = require_portuguese();
-      wordlists3.portuguese = _default;
+      wordlists4.portuguese = _default;
     } catch (err2) {
     }
     try {
       exports._default = _default = require_english();
-      wordlists3.english = _default;
-      wordlists3.EN = _default;
+      wordlists4.english = _default;
+      wordlists4.EN = _default;
     } catch (err2) {
     }
   }
@@ -22044,7 +22044,7 @@ function validateClientMessage(value) {
   }
 }
 var OPERATION_PAYLOAD_SCHEMAS = {
-  provisionFromValidatedBundle: ["candidateRef", "alias", "visibility"],
+  provisionFromValidatedBundle: ["candidateRef", "alias", "visibility", "protectionMode"],
   unlockPassword: [],
   changeDevicePassword: [],
   verifyOnlineIdentity: [],
@@ -22055,13 +22055,23 @@ var OPERATION_PAYLOAD_SCHEMAS = {
   createCandidate: [],
   revealCandidateWords: ["candidateRef"],
   concealCandidate: ["candidateRef"],
+  discardSecretTransfers: ["transferOperationId"],
   destroyCandidate: ["candidateRef"],
   deriveWordsCandidate: ["producerId", "wordCount"],
-  importFileCandidate: [],
+  deriveRecoveryCandidates: ["wordCount"],
+  importFileCandidate: ["emptyV1Confirmed"],
   retainTransactionDigest: ["digest"],
   submitIdentityTransaction: ["alias", "visibility"],
   promoteLifecycle: ["status"],
-  inspectStartup: []
+  inspectStartup: [],
+  // FEAT-016 additive: closed entitlement-bootstrap control payloads.
+  licenceBootstrapStart: ["networkBinding"],
+  licenceBootstrapControl: ["control", "trigger"],
+  licenceBootstrapEligibility: ["foreground", "connectivity"],
+  // FEAT-017 additive: confirmed-upgrade activation carries only the bounded
+  // server plan handle; acknowledge carries no payload.
+  licenceUpgradeConfirm: ["targetPlanId"],
+  licenceUpgradeAcknowledge: []
 };
 var FORBIDDEN_PAYLOAD_MARKERS = ["password", "mnemonic", "secret", "key", "salt", "nonce", "decrypted", "bundle", "private", "fileBytes", "bytes"];
 function hasSecretShapedField(value) {
@@ -22193,13 +22203,22 @@ var OPERATION_KINDS = /* @__PURE__ */ new Set([
   "createCandidate",
   "revealCandidateWords",
   "concealCandidate",
+  "discardSecretTransfers",
   "destroyCandidate",
   "deriveWordsCandidate",
+  "deriveRecoveryCandidates",
   "importFileCandidate",
   "retainTransactionDigest",
   "submitIdentityTransaction",
   "promoteLifecycle",
-  "inspectStartup"
+  "inspectStartup",
+  // FEAT-016 additive.
+  "licenceBootstrapStart",
+  "licenceBootstrapControl",
+  "licenceBootstrapEligibility",
+  // FEAT-017 additive: closed confirmed-upgrade op kinds.
+  "licenceUpgradeConfirm",
+  "licenceUpgradeAcknowledge"
 ]);
 function validateSecretTransfer(record) {
   if (!hasNoUnknownFields(record, ["kind", "operationId", "clientChannel", "authorityEpoch", "purpose", "value"])) {
@@ -22211,11 +22230,11 @@ function validateSecretTransfer(record) {
   if (record.purpose !== "devicePassword" && record.purpose !== "mnemonic" && record.purpose !== "filePassword" && record.purpose !== "fileBytes") {
     return null;
   }
-  if (typeof record.value !== "string" || record.value.length === 0) {
+  if (typeof record.value !== "string" || record.value.length === 0 && record.purpose !== "filePassword") {
     return null;
   }
   const maxBytes = record.purpose === "fileBytes" ? 14e5 : 4096;
-  if (record.value.length > maxBytes) {
+  if ((record.purpose === "fileBytes" ? record.value.length : new TextEncoder().encode(record.value).byteLength) > maxBytes) {
     return null;
   }
   return {
@@ -22323,13 +22342,24 @@ var FRESH_CAPABILITY_REQUIRED_BY_OPERATION = {
   createCandidate: null,
   revealCandidateWords: null,
   concealCandidate: null,
+  discardSecretTransfers: null,
   destroyCandidate: null,
   deriveWordsCandidate: null,
+  deriveRecoveryCandidates: null,
   importFileCandidate: null,
   retainTransactionDigest: null,
   submitIdentityTransaction: null,
   promoteLifecycle: null,
-  inspectStartup: null
+  inspectStartup: null,
+  // FEAT-016 additive: entitlement bootstrap steps require no fresh
+  // password capability (authenticated session only).
+  licenceBootstrapStart: null,
+  licenceBootstrapControl: null,
+  licenceBootstrapEligibility: null,
+  // FEAT-017 additive: confirmed-upgrade ops require no fresh password
+  // capability (authenticated session only; same rule as bootstrap ops).
+  licenceUpgradeConfirm: null,
+  licenceUpgradeAcknowledge: null
 };
 
 // src/lib/browser-vault/authority/authority.ts
@@ -22445,6 +22475,14 @@ var WorkerAuthority = class {
     if (!this.isKnownChannel(request.clientChannel)) {
       return { accepted: false, outcome: "OPERATION_UNKNOWN_CHANNEL" };
     }
+    if (request.operation === "lockAll") {
+      this.epoch += 1;
+      this.freshCapabilities.clear();
+      this.env.onInvalidate?.();
+      this.activeOperationId = request.operationId;
+      void this.runOperation(request);
+      return { accepted: true, outcome: "OPERATION_STARTED" };
+    }
     if (this.activeOperationId !== null) {
       this.deliverOperationRejection(request, "AUTHORITY_BUSY");
       return { accepted: false, outcome: "OPERATION_BUSY" };
@@ -22494,6 +22532,15 @@ var WorkerAuthority = class {
         ...result.supportCode !== void 0 ? { supportCode: result.supportCode } : {},
         ...result.payload !== void 0 ? { payload: result.payload } : {}
       });
+      if (request.operation === "lockAll") {
+        this.phase = "locked";
+        this.acceptedChannels.clear();
+        this.env.broadcast({
+          kind: "global-invalidation",
+          authorityEpoch: this.epoch,
+          reason: result.outcome === "OK" || result.outcome === "SUCCESS" ? "lock" : "cleanup-failed"
+        });
+      }
     } finally {
       if (this.activeOperationId === request.operationId) {
         this.activeOperationId = null;
@@ -22510,6 +22557,10 @@ var WorkerAuthority = class {
   handleLifecycle(request) {
     if (!this.isKnownChannel(request.clientChannel) || request.authorityEpoch !== this.epoch) {
       return { accepted: false, outcome: "LIFECYCLE_REJECTED" };
+    }
+    if (this.env.shouldInvalidateOnLifecycle?.(request.signal)) {
+      this.invalidate("authority-loss");
+      return { accepted: true, outcome: "LIFECYCLE_ACCEPTED" };
     }
     if (request.signal === "disconnect") {
       this.acceptedChannels.delete(request.clientChannel);
@@ -22541,6 +22592,7 @@ var WorkerAuthority = class {
     this.activeOperationId = null;
     this.freshCapabilities.clear();
     this.acceptedChannels.clear();
+    this.env.onInvalidate?.();
     this.env.broadcast({ kind: "global-invalidation", authorityEpoch: this.epoch, reason });
   }
   /** Update-mismatch handling: no new capability, safe abort, global lock. */
@@ -22587,8 +22639,8 @@ function success(value) {
 
 // src/lib/browser-vault/contracts/storage.ts
 var VAULT_DATABASE_NAME = "hushvoting-vault";
-var VAULT_SCHEMA_VERSION = 1;
-var VAULT_STORES = ["vaultSlots", "vaultJournal", "operationalSidecars"];
+var VAULT_SCHEMA_VERSION = 2;
+var VAULT_STORES = ["vaultSlots", "vaultJournal", "operationalSidecars", "licenceJournal"];
 var VAULT_SLOT_KEYS = ["slot-a", "slot-b"];
 var VAULT_JOURNAL_KEY = "current";
 var ALLOWED_SIDECAR_KEYS = [
@@ -22598,6 +22650,7 @@ var ALLOWED_SIDECAR_KEYS = [
   "persistenceAck",
   "epoch"
 ];
+var LICENCE_JOURNAL_KEYS = ["slot-a", "slot-b", "pointer"];
 function classifyStorageError(error) {
   if (error instanceof DOMException) {
     switch (error.name) {
@@ -22649,6 +22702,9 @@ function assertAllowedStorageKey(store, key) {
   }
   if (store === "operationalSidecars" && !ALLOWED_SIDECAR_KEYS.includes(key)) {
     throw new Error(`disallowed key for operationalSidecars: ${key}`);
+  }
+  if (store === "licenceJournal" && !LICENCE_JOURNAL_KEYS.includes(key)) {
+    throw new Error(`disallowed key for licenceJournal: ${key}`);
   }
 }
 function verifyDatabaseLayout(stores) {
@@ -22727,6 +22783,11 @@ async function openVaultStorage(factory, options = {}) {
       onVersionChange: () => void 0
     });
     const opened = { db, session: createSession(db) };
+    const probe = await opened.session.probeStorage();
+    if (!probe.ok) {
+      opened.session.close();
+      return probe;
+    }
     return success({ session: opened.session });
   } catch (error) {
     return storageFailureToVaultResult(classifyStorageError(error));
@@ -22768,6 +22829,80 @@ function runTransaction(db, store, mode, work) {
   });
 }
 function createSession(db) {
+  const probeStorage = () => new Promise((resolve) => {
+    let transaction;
+    try {
+      transaction = db.transaction("operationalSidecars", "readwrite");
+    } catch (error) {
+      resolve(storageFailureToVaultResult(classifyStorageError(error)));
+      return;
+    }
+    const store = transaction.objectStore("operationalSidecars");
+    const key = "persistenceAck";
+    assertAllowedStorageKey("operationalSidecars", key);
+    let verified = false;
+    let failureResult = failure("StorageUnavailable");
+    const abort = (error) => {
+      if (error !== void 0) failureResult = storageFailureToVaultResult(classifyStorageError(error));
+      try {
+        transaction.abort();
+      } catch {
+      }
+    };
+    const timeout = setTimeout(() => abort(), 5e3);
+    transaction.onabort = () => {
+      clearTimeout(timeout);
+      resolve(failureResult);
+    };
+    transaction.onerror = () => {
+    };
+    transaction.oncomplete = () => {
+      clearTimeout(timeout);
+      resolve(verified ? success({ ok: true }) : failure("StorageUnavailable"));
+    };
+    const guarded = (action) => {
+      try {
+        action();
+      } catch (error) {
+        abort(error);
+      }
+    };
+    guarded(() => {
+      const original = store.get(key);
+      original.onsuccess = () => guarded(() => {
+        const prior = original.result;
+        const write = store.put("hushvoting-storage-preflight-v1", key);
+        write.onsuccess = () => guarded(() => {
+          const read = store.get(key);
+          read.onsuccess = () => guarded(() => {
+            const value = read.result;
+            if (value !== "hushvoting-storage-preflight-v1") {
+              abort();
+              return;
+            }
+            const remove = store.delete(key);
+            remove.onsuccess = () => guarded(() => {
+              const absent = store.get(key);
+              absent.onsuccess = () => guarded(() => {
+                if (absent.result !== void 0) {
+                  abort();
+                  return;
+                }
+                if (prior === void 0) {
+                  verified = true;
+                  return;
+                }
+                const restore = store.put(prior, key);
+                restore.onsuccess = () => {
+                  verified = true;
+                };
+              });
+            });
+          });
+        });
+      });
+    });
+  });
   const readRecord = async (store, key) => {
     try {
       assertAllowedStorageKey(store, key);
@@ -22898,6 +23033,7 @@ function createSession(db) {
   const session = {
     databaseName: db.name,
     schemaVersion: db.version,
+    probeStorage,
     readRecord,
     writeRecord,
     deleteRecord,
@@ -24218,6 +24354,52 @@ function createBrowserSuiteExecutor(env = BROWSER_CRYPTO_ENVIRONMENT) {
   };
 }
 
+// src/lib/identity-compatibility/historical-profile.ts
+var HISTORICAL_ALIAS_MAX_UTF8_BYTES = 4096;
+var IDENTITY_RESPONSE_MAX_BYTES = 65536;
+function hasBoundedHistoricalName(value) {
+  if (typeof value !== "string" || value.length > HISTORICAL_ALIAS_MAX_UTF8_BYTES) return false;
+  const bytes = new TextEncoder().encode(value);
+  return bytes.byteLength <= HISTORICAL_ALIAS_MAX_UTF8_BYTES && new TextDecoder().decode(bytes) === value;
+}
+async function readIdentityResponse(response, signal) {
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error("IDENTITY_RESPONSE_UNAVAILABLE");
+  const chunks = [];
+  let total = 0;
+  let done = false;
+  let abort;
+  const aborted = new Promise((_, reject) => {
+    abort = () => reject(new DOMException("Identity response canceled", "AbortError"));
+  });
+  signal?.addEventListener("abort", abort, { once: true });
+  try {
+    if (signal?.aborted) throw new DOMException("Identity response canceled", "AbortError");
+    if (Number(response.headers.get("content-length")) > IDENTITY_RESPONSE_MAX_BYTES) throw new Error("IDENTITY_RESPONSE_TOO_LARGE");
+    while (true) {
+      const part = await Promise.race([reader.read(), aborted]);
+      if (part.done) {
+        done = true;
+        break;
+      }
+      total += part.value.byteLength;
+      if (total > IDENTITY_RESPONSE_MAX_BYTES) throw new Error("IDENTITY_RESPONSE_TOO_LARGE");
+      chunks.push(part.value);
+    }
+    const bytes = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+  } finally {
+    signal?.removeEventListener("abort", abort);
+    if (!done) void reader.cancel().catch(() => void 0);
+    reader.releaseLock();
+  }
+}
+
 // src/lib/runtime/deployment.ts
 var ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 var ENDPOINT_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
@@ -25533,83 +25715,65 @@ function entropyToMnemonicWorker(entropy) {
   }
   return words.join(" ");
 }
-function mnemonicToEntropyWorker(mnemonic) {
-  const normalized = mnemonic.toLowerCase().split(/[ \t\n\r]+/).filter((word) => word.length > 0).join(" ");
-  const words = normalized.split(" ");
-  const validCounts = /* @__PURE__ */ new Set([12, 15, 18, 21, 24]);
-  if (!validCounts.has(words.length)) {
-    return null;
-  }
-  const indexByWord = /* @__PURE__ */ new Map();
-  WORDLIST.forEach((word, index) => {
-    indexByWord.set(word, index);
-  });
-  let binary = "";
-  for (const word of words) {
-    const index = indexByWord.get(word);
-    if (index === void 0) {
-      return null;
-    }
-    binary += index.toString(2).padStart(11, "0");
-  }
-  const CS = words.length / 3;
-  const ENT = binary.length - CS;
-  const entropyBits = binary.slice(0, ENT);
-  const checksumBits = binary.slice(ENT);
-  const entropy = new Uint8Array(ENT / 8);
-  for (let i = 0; i < entropy.length; i += 1) {
-    entropy[i] = parseInt(entropyBits.slice(i * 8, i * 8 + 8), 2);
-  }
-  const hash = sha256(entropy);
-  const expected = toBinaryString(hash).slice(0, CS);
-  if (expected !== checksumBits) {
-    return null;
-  }
-  return entropy;
-}
-function validateMnemonicWorker(mnemonic) {
-  return mnemonicToEntropyWorker(mnemonic) !== null;
-}
 function mnemonicToSeedWorker(mnemonic, passphrase = "") {
   const encoder = new TextEncoder();
   return pbkdf2(sha512, encoder.encode(mnemonic), encoder.encode(`mnemonic${passphrase}`), { c: 2048, dkLen: 64 });
 }
 function deriveP01KeysWorker(mnemonic) {
   const seed = mnemonicToSeedWorker(mnemonic);
-  const signingPrivateKey = bytesToHexLower(hkdfSha256(seed, "signing"));
-  const encryptionPrivateKey = bytesToHexLower(hkdfSha256(seed, "encryption"));
-  if (!isUsableScalar(signingPrivateKey) || !isUsableScalar(encryptionPrivateKey)) {
-    return null;
+  let signingBytes;
+  let encryptionBytes;
+  try {
+    signingBytes = hkdfSha256(seed, "signing");
+    encryptionBytes = hkdfSha256(seed, "encryption");
+    const signingPrivateKey = bytesToHexLower(signingBytes);
+    const encryptionPrivateKey = bytesToHexLower(encryptionBytes);
+    if (!isUsableScalar(signingPrivateKey) || !isUsableScalar(encryptionPrivateKey)) return null;
+    return {
+      signingPrivateKey,
+      encryptionPrivateKey,
+      signingAddress: derivePublicKey(signingPrivateKey, "COMPRESSED"),
+      encryptionAddress: derivePublicKey(encryptionPrivateKey, "COMPRESSED"),
+      publicKeyEncoding: "COMPRESSED"
+    };
+  } finally {
+    seed.fill(0);
+    signingBytes?.fill(0);
+    encryptionBytes?.fill(0);
   }
-  return {
-    signingPrivateKey,
-    encryptionPrivateKey,
-    signingAddress: derivePublicKey(signingPrivateKey, "COMPRESSED"),
-    encryptionAddress: derivePublicKey(encryptionPrivateKey, "COMPRESSED"),
-    publicKeyEncoding: "COMPRESSED"
-  };
 }
 function deriveP02KeysWorker(mnemonic) {
   const seed = mnemonicToSeedWorker(mnemonic);
   const deriveWithRetry = (info) => {
     let attempt = 0;
-    let keyMaterial = hkdfSha256(seed, info);
-    while (!isUsableScalar(bytesToHexLower(keyMaterial))) {
+    while (true) {
+      const keyMaterial = hkdfSha256(seed, attempt === 0 ? info : `${info}/${attempt}`);
+      try {
+        const key = bytesToHexLower(keyMaterial);
+        if (isUsableScalar(key)) return key;
+      } finally {
+        keyMaterial.fill(0);
+      }
       attempt += 1;
-      keyMaterial = hkdfSha256(seed, `${info}/${attempt}`);
     }
-    return bytesToHexLower(keyMaterial);
   };
-  const signingPrivateKey = deriveWithRetry("hush/signing/secp256k1/v1");
-  const encryptionPrivateKey = deriveWithRetry("hush/encrypt/secp256k1/v1");
-  return {
-    signingPrivateKey,
-    encryptionPrivateKey,
-    signingAddress: derivePublicKey(signingPrivateKey, "UNCOMPRESSED"),
-    encryptionAddress: derivePublicKey(encryptionPrivateKey, "UNCOMPRESSED"),
-    publicKeyEncoding: "UNCOMPRESSED"
-  };
+  try {
+    const signingPrivateKey = deriveWithRetry("hush/signing/secp256k1/v1");
+    const encryptionPrivateKey = deriveWithRetry("hush/encrypt/secp256k1/v1");
+    return {
+      signingPrivateKey,
+      encryptionPrivateKey,
+      signingAddress: derivePublicKey(signingPrivateKey, "UNCOMPRESSED"),
+      encryptionAddress: derivePublicKey(encryptionPrivateKey, "UNCOMPRESSED"),
+      publicKeyEncoding: "UNCOMPRESSED"
+    };
+  } finally {
+    seed.fill(0);
+  }
 }
+
+// src/lib/browser-vault/production/sealed-vault.ts
+var import_bip393 = __toESM(require_src(), 1);
 
 // src/lib/browser-vault/lifecycle/journal.ts
 var DEFAULT_ROLLBACK_CLEANUP_MS = 24 * 60 * 60 * 1e3;
@@ -25708,6 +25872,10 @@ function createAtomicJournal(session, ports) {
       return readBack;
     }
     if (readBack.value.record === null || readBack.value.record.generation !== params.candidateGeneration) {
+      return failure("StorageUnavailable");
+    }
+    const persistedBytes = readBack.value.record.bytes;
+    if (persistedBytes.byteLength !== params.candidateBytes.byteLength || !persistedBytes.every((byte, index) => byte === params.candidateBytes[index])) {
       return failure("StorageUnavailable");
     }
     const verified = await ports.verifyCandidate(readBack.value.record.bytes, params.candidateGeneration);
@@ -25893,8 +26061,80 @@ function checkSupportedVersion(version) {
   return { ok: false, code: "UNSUPPORTED_CRITICAL_VERSION" };
 }
 
+// src/lib/identity-convergence/pending-transaction.ts
+var PENDING_TRANSACTION_SCHEMA_VERSION = 2;
+var PENDING_TRANSACTION_MAX_JSON_BYTES = 65536;
+var PENDING_TRANSACTION_MAX_ATTEMPT_EVIDENCE = 64;
+var PENDING_TRANSACTION_ID_MAX_LENGTH = 128;
+function isRetryEligible(record) {
+  if (record.rollbackState !== "postSeal" && record.rollbackState !== "postSubmit") {
+    return false;
+  }
+  return record.lifecycle === "sealed" || record.lifecycle === "waitingAccepted" || record.lifecycle === "waitingPending";
+}
+function verifyDigest(record) {
+  return digestOf(record.transaction.exactJson) === record.transaction.digest;
+}
+function digestOf(exactJson) {
+  return sha256Hex(new TextEncoder().encode(exactJson));
+}
+function validatePendingTransaction(record) {
+  const objectWithKeys = (value, keys) => typeof value === "object" && value !== null && !Array.isArray(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
+  const boundedText = (value, max) => typeof value === "string" && value.length > 0 && new TextEncoder().encode(value).length <= max;
+  if (!objectWithKeys(record, ["schemaVersion", "transaction", "transactionId", "reviewedMetadata", "lifecycle", "attemptEvidence", "epochBinding", "networkBinding", "rollbackState"]) || !objectWithKeys(record.transaction, ["exactJson", "digest"]) || !boundedText(record.transaction.exactJson, PENDING_TRANSACTION_MAX_JSON_BYTES) || typeof record.transaction.digest !== "string" || !/^[0-9a-f]{64}$/.test(record.transaction.digest) || !boundedText(record.transactionId, PENDING_TRANSACTION_ID_MAX_LENGTH) || !objectWithKeys(record.reviewedMetadata, ["alias", "visibility"]) || !boundedText(record.reviewedMetadata.alias, 256) || !["private", "public"].includes(record.reviewedMetadata.visibility) || !["sealed", "waitingAccepted", "waitingPending", "confirmed", "rejectedEditable", "discarded"].includes(record.lifecycle) || !["preSeal", "postSeal", "postSubmit"].includes(record.rollbackState) || !boundedText(record.epochBinding, 256) || !boundedText(record.networkBinding, 256) || !Array.isArray(record.attemptEvidence) || record.attemptEvidence.length > PENDING_TRANSACTION_MAX_ATTEMPT_EVIDENCE) {
+    return { ok: false, reason: "invalid pending record shape" };
+  }
+  for (const attempt of record.attemptEvidence) {
+    if (!objectWithKeys(attempt, ["at", "outcome"]) || typeof attempt.at !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{3})?)?Z$/.test(attempt.at) || !Number.isFinite(Date.parse(attempt.at)) || typeof attempt.outcome !== "string" || !["accepted", "pending", "alreadyExists", "rejectedEditable", "rejectedTerminal", "transportUncertain"].includes(attempt.outcome)) {
+      return { ok: false, reason: "invalid attempt evidence" };
+    }
+  }
+  if (record.schemaVersion !== PENDING_TRANSACTION_SCHEMA_VERSION) {
+    return { ok: false, reason: "unsupported schema version" };
+  }
+  if (new TextEncoder().encode(record.transaction.exactJson).length > PENDING_TRANSACTION_MAX_JSON_BYTES) {
+    return { ok: false, reason: "exact transaction exceeds size bound" };
+  }
+  if (record.transactionId.length === 0 || record.transactionId.length > PENDING_TRANSACTION_ID_MAX_LENGTH) {
+    return { ok: false, reason: "transaction id out of bounds" };
+  }
+  if (record.attemptEvidence.length > PENDING_TRANSACTION_MAX_ATTEMPT_EVIDENCE) {
+    return { ok: false, reason: "attempt evidence exceeds bound" };
+  }
+  if (record.epochBinding.length === 0 || record.networkBinding.length === 0) {
+    return { ok: false, reason: "epoch/network binding missing" };
+  }
+  if (!verifyDigest(record)) {
+    return { ok: false, reason: "digest mismatch" };
+  }
+  return { ok: true };
+}
+
 // src/lib/identity-compatibility/producers.ts
 var failure2 = (code, message) => ({ ok: false, code, message });
+var APPROVED_DERIVATION_PRODUCERS = [
+  {
+    producerId: "P-01",
+    name: "Hush Feeds Web Client (TypeScript)",
+    precedence: 1,
+    mnemonicSupport: "12_AND_24",
+    publicKeyEncoding: "COMPRESSED"
+  },
+  {
+    producerId: "P-02",
+    name: "Olimpo.KeyDerivation (.NET)",
+    precedence: 2,
+    mnemonicSupport: "24",
+    publicKeyEncoding: "UNCOMPRESSED"
+  },
+  {
+    producerId: "P-03",
+    name: "Hush Desktop Client (Avalonia, historical HushClient)",
+    precedence: 5,
+    mnemonicSupport: "24",
+    publicKeyEncoding: "UNCOMPRESSED"
+  }
+];
 function normalizeMnemonicOlimpo(mnemonic) {
   return mnemonic.toLowerCase().split(/[ \t\n\r]+/).filter((w) => w.length > 0).join(" ");
 }
@@ -25945,6 +26185,16 @@ function bytesToHexString(bytes) {
   return bytesToHexLower(bytes);
 }
 
+// src/lib/credential-file-restore/contracts/import.ts
+var BACKOFF_SCHEDULE_SECONDS = [0, 0, 2, 4, 8, 16, 30];
+function backoffDelaySeconds(failedAttempts) {
+  if (failedAttempts <= 0) return 0;
+  if (failedAttempts <= BACKOFF_SCHEDULE_SECONDS.length) {
+    return BACKOFF_SCHEDULE_SECONDS[failedAttempts - 1] ?? 0;
+  }
+  return BACKOFF_SCHEDULE_SECONDS[BACKOFF_SCHEDULE_SECONDS.length - 1] ?? 0;
+}
+
 // src/lib/identity-compatibility/dat.ts
 var DAT_MAGIC = "HUSH";
 var DAT_VERSION = 1;
@@ -25983,7 +26233,13 @@ function inspectDatEnvelope(envelope) {
   return { ok: true, value: { version } };
 }
 async function deriveDatKey(password, salt) {
-  const keyMaterial = await subtle2().importKey("raw", ENCODER2.encode(password), "PBKDF2", false, ["deriveKey"]);
+  const passwordBytes = ENCODER2.encode(password);
+  let keyMaterial;
+  try {
+    keyMaterial = await subtle2().importKey("raw", passwordBytes, "PBKDF2", false, ["deriveKey"]);
+  } finally {
+    passwordBytes.fill(0);
+  }
   const saltBuffer = salt.buffer.slice(salt.byteOffset, salt.byteOffset + salt.byteLength);
   return subtle2().deriveKey(
     { name: "PBKDF2", salt: saltBuffer, iterations: DAT_PBKDF2_ITERATIONS, hash: "SHA-256" },
@@ -26002,14 +26258,24 @@ async function decryptDatV1(envelope, password) {
   try {
     const key = await deriveDatKey(password, salt);
     const plaintext = await subtle2().decrypt({ name: "AES-GCM", iv: nonce, tagLength: 128 }, key, ciphertext);
-    return { ok: true, value: new TextDecoder().decode(plaintext) };
+    try {
+      return { ok: true, value: new TextDecoder().decode(plaintext) };
+    } finally {
+      new Uint8Array(plaintext).fill(0);
+    }
   } catch {
     return failure3("DAT_WRONG_PASSWORD", "AES-GCM authentication failed");
   }
 }
 function hasDuplicateKeys(jsonText) {
-  const keys = [...jsonText.matchAll(/"((?:[^"\\]|\\.)*)"\s*:/g)].map((m) => m[1]);
-  return new Set(keys).size !== keys.length;
+  const keys = /* @__PURE__ */ new Set();
+  for (const match of jsonText.matchAll(/"(?:[^"\\]|\\[\s\S])*"/g)) {
+    if (!/^\s*:/.test(jsonText.slice(match.index + match[0].length))) continue;
+    const key = JSON.parse(match[0]);
+    if (keys.has(key)) return true;
+    keys.add(key);
+  }
+  return false;
 }
 var ALLOWED_FIELDS = /* @__PURE__ */ new Set(["ProfileName", "PublicSigningAddress", "PrivateSigningKey", "PublicEncryptAddress", "PrivateEncryptKey", "IsPublic", "Mnemonic"]);
 function isWellFormedJson(jsonText) {
@@ -26024,14 +26290,16 @@ function parsePortableCredentialsStrict(jsonText) {
   if (!isWellFormedJson(jsonText)) return failure3("DAT_MALFORMED", "decrypted payload is not valid JSON");
   if (hasDuplicateKeys(jsonText)) return failure3("DAT_DUPLICATE_FIELD", "duplicate property in portable credentials");
   const parsed = JSON.parse(jsonText);
-  for (const key of Object.keys(parsed)) {
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return failure3("DAT_INVALID_FIELD", "credential payload must be an object");
+  const record = parsed;
+  for (const key of Object.keys(record)) {
     if (!ALLOWED_FIELDS.has(key)) return failure3("DAT_UNKNOWN_FIELD", `unknown property: ${key}`);
   }
   for (const key of ALLOWED_FIELDS) {
-    if (!(key in parsed)) return failure3("DAT_MISSING_FIELD", `missing required property: ${key}`);
+    if (!(key in record)) return failure3("DAT_MISSING_FIELD", `missing required property: ${key}`);
   }
   const s = (key) => {
-    const v = parsed[key];
+    const v = record[key];
     if (typeof v !== "string") return "";
     return v;
   };
@@ -26040,8 +26308,8 @@ function parsePortableCredentialsStrict(jsonText) {
   const signingPrivate = s("PrivateSigningKey");
   const encryptAddress = s("PublicEncryptAddress");
   const encryptPrivate = s("PrivateEncryptKey");
-  const mnemonic = parsed.Mnemonic;
-  const isPublic = parsed.IsPublic;
+  const mnemonic = record.Mnemonic;
+  const isPublic = record.IsPublic;
   if (profileName.length === 0 || profileName.length > PROFILE_NAME_MAX_LENGTH || /[\u0000-\u001f\u007f]/.test(profileName)) {
     return failure3("DAT_INVALID_FIELD", "ProfileName violates compatibility bounds");
   }
@@ -26237,6 +26505,389 @@ function corpusTimestamp(date = /* @__PURE__ */ new Date()) {
   return date.toISOString();
 }
 
+// src/lib/identity-creation/wire.ts
+var ALLOWED_TRANSACTION_STATUSES = ["UNSPECIFIED", "ACCEPTED", "ALREADY_EXISTS", "PENDING", "REJECTED"];
+function isTransactionStatus(value) {
+  return typeof value === "string" && ALLOWED_TRANSACTION_STATUSES.includes(value);
+}
+function normalizeSubmitReply(reply, editableCodeAllowlist) {
+  if (reply === null || reply === void 0 || typeof reply !== "object") {
+    return { kind: "compatibilityError" };
+  }
+  const status = reply.status ?? null;
+  if (status === null || status === "UNSPECIFIED") {
+    return { kind: "compatibilityError" };
+  }
+  if (!isTransactionStatus(status)) {
+    return { kind: "compatibilityError" };
+  }
+  if (reply.successfull !== true && reply.successfull !== false) {
+    return { kind: "compatibilityError" };
+  }
+  if (reply.validationCode !== null && reply.validationCode !== void 0 && typeof reply.validationCode !== "string") {
+    return { kind: "compatibilityError" };
+  }
+  if (status !== "REJECTED" && reply.validationCode) return { kind: "compatibilityError" };
+  switch (status) {
+    case "ACCEPTED":
+      return reply.successfull === true ? { kind: "accepted" } : { kind: "compatibilityError" };
+    case "PENDING":
+      return reply.successfull === true ? { kind: "pending" } : { kind: "compatibilityError" };
+    case "ALREADY_EXISTS":
+      return reply.successfull === true ? { kind: "alreadyExists" } : { kind: "compatibilityError" };
+    case "REJECTED": {
+      if (reply.successfull !== false) return { kind: "compatibilityError" };
+      const code = reply.validationCode ?? null;
+      if (code === null || code.length === 0) {
+        return { kind: "unknownRejection" };
+      }
+      if (editableCodeAllowlist.has(code)) {
+        return { kind: "editableRejection", validationCode: code };
+      }
+      return { kind: "terminalRejection", validationCode: code };
+    }
+    default:
+      return { kind: "compatibilityError" };
+  }
+}
+
+// src/lib/licensing/contracts.ts
+var LICENCE_QUERY_SIGNATORY_HEADER = "x-hush-licence-query-signatory";
+var LICENCE_QUERY_SIGNED_AT_HEADER = "x-hush-licence-query-signed-at";
+var LICENCE_QUERY_SIGNATURE_HEADER = "x-hush-licence-query-signature";
+var LICENCE_QUERY_METHOD = "GetMyEntitlement";
+var LICENCE_ASSIGNMENT_PAYLOAD_KIND = "71370664-5eb4-4ce9-b96a-d7e7ffe53db5";
+var LICENCE_PLAN_DIRECT_FREE = "hushvoting.direct.free";
+var LICENCE_CATALOGUE_VERSION_V1 = "hushvoting-licence-catalogue/v1.0.0";
+var LICENCE_TRANSITION_INTENT_BASELINE_FREE = "baseline_free";
+var LICENCE_TRANSITION_INTENT_CONFIRMED_UPGRADE = "confirmed_upgrade";
+var KNOWN_LICENCE_PLAN_IDS = [
+  LICENCE_PLAN_DIRECT_FREE,
+  "hushvoting.veritas.500",
+  "hushvoting.veritas.2000",
+  "hushvoting.veritas.10000",
+  "hushvoting.enterprise"
+];
+var KNOWN_GOVERNANCE_OPTION_IDS = [
+  "no-customer-trustees",
+  "trustees-3of5",
+  "trustees-7of10",
+  "trustees-8of13"
+];
+function licenceQuerySignedJson(envelope) {
+  return `{"actorAddress":"${envelope.actorAddress}","method":"${envelope.method}","request":{},"signedAt":"${envelope.signedAt}"}`;
+}
+
+// src/lib/licensing/canonical.ts
+function licencePayloadSizeBytes(payload) {
+  return new TextEncoder().encode(JSON.stringify(payload)).length;
+}
+function serializeLicenceUnsignedTransaction(tx) {
+  return JSON.stringify({
+    TransactionId: tx.TransactionId,
+    PayloadKind: tx.PayloadKind,
+    TransactionTimeStamp: tx.TransactionTimeStamp,
+    Payload: tx.Payload,
+    PayloadSize: tx.PayloadSize
+  });
+}
+function licenceTransactionDigest(canonicalJson) {
+  return sha256Hex(new TextEncoder().encode(canonicalJson));
+}
+
+// src/lib/licensing/sealing.ts
+var LICENCE_USER_SIGNATURE_MEMBER = "UserSignature";
+function isLicenceOuterEnvelopeJson(value) {
+  if (typeof value !== "string" || value.length === 0 || value.length > 65536) {
+    return false;
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return false;
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    return false;
+  }
+  const record = parsed;
+  if (typeof record.TransactionId !== "string" || typeof record.PayloadKind !== "string") {
+    return false;
+  }
+  if (typeof record.TransactionTimeStamp !== "string" || typeof record.Payload !== "object" || record.Payload === null) {
+    return false;
+  }
+  if (typeof record.PayloadSize !== "number" || !Number.isInteger(record.PayloadSize)) {
+    return false;
+  }
+  return true;
+}
+function isLicenceCanonicalUnsignedJson(value) {
+  if (!isLicenceOuterEnvelopeJson(value)) {
+    return false;
+  }
+  return JSON.parse(value).UserSignature === void 0;
+}
+function isLicenceSignedTransactionJson(value) {
+  if (!isLicenceOuterEnvelopeJson(value)) {
+    return false;
+  }
+  const signature = JSON.parse(value)[LICENCE_USER_SIGNATURE_MEMBER];
+  if (typeof signature !== "object" || signature === null) {
+    return false;
+  }
+  const member = signature;
+  return typeof member.Signatory === "string" && member.Signatory.length > 0 && typeof member.Signature === "string" && member.Signature.length > 0;
+}
+function sealLicenceTransaction(input) {
+  if (!isLicenceCanonicalUnsignedJson(input.unsignedJson)) {
+    return { ok: false, code: "malformed-unsigned" };
+  }
+  if (!/^[0-9a-fA-F]{64}$/.test(input.signingPrivateKeyHex)) {
+    return { ok: false, code: "missing-signer" };
+  }
+  if (typeof input.signingAddress !== "string" || input.signingAddress.length === 0) {
+    return { ok: false, code: "missing-signer" };
+  }
+  const signed = signMessage(input.unsignedJson, input.signingPrivateKeyHex);
+  if (!signed.ok) {
+    return { ok: false, code: "signature-failed" };
+  }
+  const parsed = JSON.parse(input.unsignedJson);
+  const signedJson = JSON.stringify({
+    ...parsed,
+    [LICENCE_USER_SIGNATURE_MEMBER]: {
+      Signatory: input.signingAddress,
+      Signature: signed.value.compactBase64
+    }
+  });
+  return { ok: true, signedJson, signedDigest: sha256Hex(utf8Bytes(signedJson)) };
+}
+function signLicenceQueryEnvelope(input) {
+  if (!/^[0-9a-fA-F]{64}$/.test(input.signingPrivateKeyHex)) {
+    return { ok: false, code: "missing-signer" };
+  }
+  const envelope = {
+    actorAddress: input.actorAddress,
+    method: LICENCE_QUERY_METHOD,
+    request: {},
+    signedAt: input.signedAt
+  };
+  const canonicalJson = licenceQuerySignedJson(envelope);
+  const signed = signMessage(canonicalJson, input.signingPrivateKeyHex);
+  if (!signed.ok) {
+    return { ok: false, code: "signature-failed" };
+  }
+  return {
+    ok: true,
+    headers: {
+      signatory: input.actorAddress.toLowerCase(),
+      signedAt: input.signedAt,
+      signature: signed.value.compactBase64
+    }
+  };
+}
+function licenceFreshTimestampUtc(nowMs) {
+  return new Date(nowMs).toISOString();
+}
+
+// src/lib/licensing/pending-transaction.ts
+var LICENCE_PENDING_PURPOSE = "pending_licence_transaction";
+var LICENCE_PENDING_AAD_LABEL = "hushvoting-licence-pending-v1";
+var LICENCE_PENDING_STORE_NAMESPACE = "hushvoting-licence-journal";
+var LICENCE_PENDING_SCHEMA_VERSION = 1;
+var LICENCE_PENDING_MAX_JSON_BYTES = 65536;
+var LICENCE_PENDING_MAX_ATTEMPT_EVIDENCE = 64;
+var LICENCE_PENDING_ID_MAX_LENGTH = 128;
+var LICENCE_PENDING_IDENTITY_MAX_LENGTH = 130;
+function isConfirmedUpgradePendingRecord(record) {
+  return record.upgradeBinding !== void 0;
+}
+function parseUpgradeBinding(value) {
+  if (!isRecordValue(value)) {
+    return null;
+  }
+  const kind = value.kind;
+  if (kind !== LICENCE_TRANSITION_INTENT_CONFIRMED_UPGRADE) {
+    return null;
+  }
+  const expectedCurrent = value.expectedCurrentLicenceTransactionId;
+  if (!isBoundedString2(expectedCurrent, LICENCE_PENDING_ID_MAX_LENGTH) || !UUID_RE.test(expectedCurrent)) {
+    return null;
+  }
+  const expectedPlan = value.expectedCurrentPlanId;
+  const requestedPlan = value.requestedPlanId;
+  if (!isBoundedString2(expectedPlan, LICENCE_PENDING_ID_MAX_LENGTH) || !isBoundedString2(requestedPlan, LICENCE_PENDING_ID_MAX_LENGTH)) {
+    return null;
+  }
+  if (requestedPlan === expectedPlan) {
+    return null;
+  }
+  if (requestedPlan === LICENCE_PLAN_DIRECT_FREE) {
+    return null;
+  }
+  const catalogue = value.observedCatalogueVersion;
+  if (!isBoundedString2(catalogue, 256) || catalogue !== LICENCE_CATALOGUE_VERSION_V1) {
+    return null;
+  }
+  return {
+    kind: LICENCE_TRANSITION_INTENT_CONFIRMED_UPGRADE,
+    expectedCurrentLicenceTransactionId: expectedCurrent,
+    expectedCurrentPlanId: expectedPlan,
+    requestedPlanId: requestedPlan,
+    observedCatalogueVersion: catalogue
+  };
+}
+var SHA256_HEX_RE = /^[0-9a-f]{64}$/;
+var ISO_UTC_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/;
+var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+var TARGET_BINDINGS = ["web-sharedworker", "ubuntu-native", "android-native"];
+var RECOVERY_STATES = [
+  "sealed",
+  "waitingAccepted",
+  "waitingPending",
+  "confirmedIndexed",
+  "superseded",
+  "retired",
+  "unrecoverable"
+];
+var ATTEMPT_OUTCOMES = [
+  "accepted",
+  "pending",
+  "alreadyExists",
+  "uncertain",
+  "terminalRejected",
+  "superseded"
+];
+function digestOfPendingLicence(exactJson) {
+  return sha256Hex(new TextEncoder().encode(exactJson));
+}
+function isRecordValue(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function isBoundedString2(value, max = LICENCE_PENDING_MAX_JSON_BYTES) {
+  return typeof value === "string" && value.length > 0 && value.length <= max;
+}
+function isIsoUtc(value) {
+  return typeof value === "string" && ISO_UTC_RE.test(value);
+}
+function parsePendingLicenceRecord(value) {
+  if (!isRecordValue(value)) {
+    return null;
+  }
+  if (value.schemaVersion !== LICENCE_PENDING_SCHEMA_VERSION || value.purpose !== LICENCE_PENDING_PURPOSE) {
+    return null;
+  }
+  const tx = value.transaction;
+  if (!isRecordValue(tx) || !isBoundedString2(tx.exactJson) || !isBoundedString2(tx.digest, 64) || !SHA256_HEX_RE.test(tx.digest)) {
+    return null;
+  }
+  if (digestOfPendingLicence(tx.exactJson) !== tx.digest) {
+    return null;
+  }
+  if (!isBoundedString2(value.transactionId, LICENCE_PENDING_ID_MAX_LENGTH) || !UUID_RE.test(value.transactionId)) {
+    return null;
+  }
+  if (!isBoundedString2(value.identityBinding, LICENCE_PENDING_IDENTITY_MAX_LENGTH) || !isBoundedString2(value.networkBinding, LICENCE_PENDING_ID_MAX_LENGTH)) {
+    return null;
+  }
+  const target = value.targetBinding;
+  if (typeof target !== "string" || !TARGET_BINDINGS.includes(target)) {
+    return null;
+  }
+  if (!isIsoUtc(value.createdUtc)) {
+    return null;
+  }
+  if (value.submittedUtc !== void 0 && value.submittedUtc !== null && !isIsoUtc(value.submittedUtc)) {
+    return null;
+  }
+  if (value.indexObservedUtc !== void 0 && value.indexObservedUtc !== null && !isIsoUtc(value.indexObservedUtc)) {
+    return null;
+  }
+  const recoveryState = value.recoveryState;
+  if (typeof recoveryState !== "string" || !RECOVERY_STATES.includes(recoveryState)) {
+    return null;
+  }
+  let upgradeBinding;
+  if (value.upgradeBinding !== void 0 && value.upgradeBinding !== null) {
+    const parsedBinding = parseUpgradeBinding(value.upgradeBinding);
+    if (parsedBinding === null) {
+      return null;
+    }
+    if (parsedBinding.expectedCurrentLicenceTransactionId === value.transactionId) {
+      return null;
+    }
+    upgradeBinding = parsedBinding;
+  }
+  const attempts = value.attemptEvidence;
+  if (!Array.isArray(attempts) || attempts.length > LICENCE_PENDING_MAX_ATTEMPT_EVIDENCE) {
+    return null;
+  }
+  for (const attempt of attempts) {
+    if (!isRecordValue(attempt) || !isIsoUtc(attempt.at) || typeof attempt.outcome !== "string" || !ATTEMPT_OUTCOMES.includes(attempt.outcome)) {
+      return null;
+    }
+  }
+  return {
+    schemaVersion: LICENCE_PENDING_SCHEMA_VERSION,
+    purpose: LICENCE_PENDING_PURPOSE,
+    transaction: { exactJson: tx.exactJson, digest: tx.digest },
+    transactionId: value.transactionId,
+    identityBinding: value.identityBinding,
+    networkBinding: value.networkBinding,
+    targetBinding: target,
+    createdUtc: value.createdUtc,
+    submittedUtc: value.submittedUtc === void 0 || value.submittedUtc === null ? void 0 : value.submittedUtc,
+    indexObservedUtc: value.indexObservedUtc === void 0 || value.indexObservedUtc === null ? void 0 : value.indexObservedUtc,
+    attemptEvidence: attempts.map((attempt) => ({
+      at: attempt.at,
+      outcome: attempt.outcome
+    })),
+    recoveryState,
+    ...upgradeBinding !== void 0 ? { upgradeBinding } : {}
+  };
+}
+function parsePendingLicenceRecordJson(json) {
+  try {
+    return parsePendingLicenceRecord(JSON.parse(json));
+  } catch {
+    return null;
+  }
+}
+function serializePendingLicenceRecord(record) {
+  const json = {
+    schemaVersion: record.schemaVersion,
+    purpose: record.purpose,
+    transaction: { exactJson: record.transaction.exactJson, digest: record.transaction.digest },
+    transactionId: record.transactionId,
+    identityBinding: record.identityBinding,
+    networkBinding: record.networkBinding,
+    targetBinding: record.targetBinding,
+    createdUtc: record.createdUtc,
+    attemptEvidence: record.attemptEvidence.map((attempt) => ({
+      at: attempt.at,
+      outcome: attempt.outcome
+    })),
+    recoveryState: record.recoveryState
+  };
+  if (record.submittedUtc !== void 0) {
+    json.submittedUtc = record.submittedUtc;
+  }
+  if (record.indexObservedUtc !== void 0) {
+    json.indexObservedUtc = record.indexObservedUtc;
+  }
+  if (record.upgradeBinding !== void 0) {
+    json.upgradeBinding = {
+      kind: record.upgradeBinding.kind,
+      expectedCurrentLicenceTransactionId: record.upgradeBinding.expectedCurrentLicenceTransactionId,
+      expectedCurrentPlanId: record.upgradeBinding.expectedCurrentPlanId,
+      requestedPlanId: record.upgradeBinding.requestedPlanId,
+      observedCatalogueVersion: record.upgradeBinding.observedCatalogueVersion
+    };
+  }
+  return JSON.stringify(json);
+}
+
 // src/lib/vault-core/contracts/sidecar.ts
 var THROTTLE_SCHEDULE = [
   null,
@@ -26284,7 +26935,11 @@ var RECORD_BOUNDS = {
 
 // src/lib/browser-vault/production/sealed-vault.ts
 var CREDENTIAL_KEK_LABEL = "hush/vault/v1/credential-kek";
+var LICENCE_JOURNAL_STORE = "licenceJournal";
+var LICENCE_JOURNAL_POINTER_KEY = "pointer";
+var LICENCE_JOURNAL_SLOT_KEYS = ["slot-a", "slot-b"];
 var KDF_SALT_EXTENSION = "hush.vault.kdf-salt";
+var MAX_HIDDEN_GENERATION_ATTEMPTS = 3;
 function b64url(bytes) {
   let binary = "";
   for (let i = 0; i < bytes.byteLength; i++) {
@@ -26361,7 +27016,13 @@ function readThrottle(value) {
 var SealedVaultEngine = class {
   constructor(deps) {
     this.candidates = /* @__PURE__ */ new Map();
+    this.recoveryExpiryTimers = /* @__PURE__ */ new Map();
     this.session = null;
+    this.volatileLicenceJournal = null;
+    this.verifiedProfile = null;
+    this.secretGeneration = 0;
+    this.importFailures = 0;
+    this.importRetryDeadlineMs = 0;
     this.phase = "locked";
     this.storage = deps.storage;
     this.suite = deps.suite;
@@ -26381,9 +27042,16 @@ var SealedVaultEngine = class {
   }
   /** Wipe every in-worker secret (Lock/removal/authority loss). */
   wipeSecrets() {
+    this.secretGeneration += 1;
+    this.importFailures = 0;
+    this.importRetryDeadlineMs = 0;
+    for (const timer of this.recoveryExpiryTimers.values()) clearTimeout(timer);
+    this.recoveryExpiryTimers.clear();
     this.session?.dek.fill(0);
     this.session?.kek.fill(0);
     this.session = null;
+    this.volatileLicenceJournal = null;
+    this.verifiedProfile = null;
     for (const key of this.candidates.keys()) {
       this.candidates.delete(key);
     }
@@ -26397,38 +27065,45 @@ var SealedVaultEngine = class {
     if (this.candidates.size >= 4) {
       return { code: "INVALID_INPUT", reason: "candidate-limit" };
     }
-    const mnemonic = entropyToMnemonicWorker(this.suite.randomBytes(32));
-    const derived = deriveP01KeysWorker(mnemonic);
-    if (derived === null) {
-      return { code: "UNKNOWN_FAILURE", supportCode: this.randomId("sc-") };
+    for (let attempt = 0; attempt < MAX_HIDDEN_GENERATION_ATTEMPTS; attempt++) {
+      try {
+        const entropy = this.suite.randomBytes(32);
+        let mnemonic;
+        try {
+          mnemonic = entropyToMnemonicWorker(entropy);
+        } finally {
+          entropy.fill(0);
+        }
+        const derived = deriveP01KeysWorker(mnemonic);
+        if (derived === null) continue;
+        const ref = this.randomId("cand-");
+        this.candidates.set(ref, {
+          ref,
+          kind: "create",
+          mnemonic,
+          signingPrivateKey: derived.signingPrivateKey,
+          encryptionPrivateKey: derived.encryptionPrivateKey,
+          signingAddress: derived.signingAddress,
+          encryptionAddress: derived.encryptionAddress,
+          producerId: "P-01",
+          producerVersion: "1.0.0",
+          createdAtMs: this.nowMs(),
+          revealedWords: false
+        });
+        return { code: "OK", detail: { ref, signingAddress: derived.signingAddress, encryptionAddress: derived.encryptionAddress, wordCount: 24 } };
+      } catch {
+      }
     }
-    const ref = this.randomId("cand-");
-    this.candidates.set(ref, {
-      ref,
-      kind: "create",
-      mnemonic,
-      signingPrivateKey: derived.signingPrivateKey,
-      encryptionPrivateKey: derived.encryptionPrivateKey,
-      signingAddress: derived.signingAddress,
-      encryptionAddress: derived.encryptionAddress,
-      producerId: "P-01",
-      producerVersion: "1.0.0",
-      createdAtMs: this.nowMs(),
-      revealedWords: false
-    });
-    return { code: "OK", detail: { ref, signingAddress: derived.signingAddress, encryptionAddress: derived.encryptionAddress, wordCount: 24 } };
+    return { code: "UNKNOWN_FAILURE", supportCode: this.randomId("sc-") };
   }
-  /** Reveal the candidate's recovery words (user-facing; 60 s bound, one reveal). */
+  /** Each explicit reveal grants at most 60 seconds; concealment does not destroy the candidate. */
   revealWords(candidateRef) {
     const candidate = this.candidates.get(candidateRef);
-    if (!candidate || candidate.mnemonic === null) {
+    if (!candidate || candidate.kind !== "create" || candidate.mnemonic === null) {
       return { code: "INVALID_INPUT", reason: "unknown-candidate" };
     }
-    if (this.nowMs() - candidate.createdAtMs > 6e4) {
-      return { code: "INVALID_INPUT", reason: "reveal-window-expired" };
-    }
     candidate.revealedWords = true;
-    return { code: "OK", detail: { words: candidate.mnemonic.split(" ") } };
+    return { code: "OK", detail: { words: candidate.mnemonic.split(" "), expiresAtMs: this.nowMs() + 6e4 } };
   }
   /** Conceal (visual/accessibility conceal) — the candidate stays alive. */
   concealCandidate(candidateRef) {
@@ -26439,6 +27114,9 @@ var SealedVaultEngine = class {
   }
   /** Destructively destroy a candidate (regeneration/cancel). */
   destroyCandidate(candidateRef) {
+    const timer = this.recoveryExpiryTimers.get(candidateRef);
+    if (timer !== void 0) clearTimeout(timer);
+    this.recoveryExpiryTimers.delete(candidateRef);
     if (this.candidates.delete(candidateRef)) {
       return { code: "OK" };
     }
@@ -26446,10 +27124,7 @@ var SealedVaultEngine = class {
   }
   /** Validate a user-supplied mnemonic and derive the selected producer's keys (worker-held). */
   deriveWordsCandidate(input) {
-    const normalized = normalizeMnemonicOlimpo(input.mnemonic);
-    if (!validateMnemonicWorker(normalized)) {
-      return { code: "INVALID_INPUT", reason: "invalid-mnemonic" };
-    }
+    const normalized = normalizeMnemonicOlimpo(input.mnemonic.normalize("NFKD"));
     const words = normalized.split(" ");
     if (words.length !== input.wordCount) {
       return { code: "INVALID_INPUT", reason: "wrong-word-count" };
@@ -26457,9 +27132,10 @@ var SealedVaultEngine = class {
     const producer = input.producerId;
     const validation = validateMnemonicForProducer(normalized, producer);
     if (!validation.valid) {
-      return { code: "INVALID_INPUT", reason: validation.code };
+      const invalidPositions = validation.code === "UNKNOWN_WORD" ? words.flatMap((word, index) => import_bip393.wordlists.english.includes(word) ? [] : [index + 1]) : [];
+      return { code: "INVALID_INPUT", reason: validation.code, invalidPositions };
     }
-    const derived = producer === "P-02" ? deriveP02KeysWorker(normalized) : deriveP01KeysWorker(normalized);
+    const derived = producer === "P-02" || producer === "P-03" ? deriveP02KeysWorker(normalized) : deriveP01KeysWorker(normalized);
     if (derived === null) {
       return { code: "INVALID_INPUT", reason: "derivation-failed" };
     }
@@ -26477,20 +27153,63 @@ var SealedVaultEngine = class {
       createdAtMs: this.nowMs(),
       revealedWords: false
     });
+    this.recoveryExpiryTimers.set(ref, setTimeout(() => {
+      this.destroyCandidate(ref);
+    }, 10 * 6e4));
     return { code: "OK", detail: { ref, signingAddress: derived.signingAddress, encryptionAddress: derived.encryptionAddress, producerId: producer } };
+  }
+  /** One secret handoff derives the complete approved set; a partial set is never returned. */
+  deriveRecoveryCandidates(input) {
+    const candidates = [];
+    const ownedRefs = [];
+    let succeeded = false;
+    try {
+      for (const producer of APPROVED_DERIVATION_PRODUCERS) {
+        if (input.wordCount === 12 && producer.mnemonicSupport !== "12_AND_24") continue;
+        const result = this.deriveWordsCandidate({ ...input, producerId: producer.producerId });
+        if (result.code !== "OK") return { ...result, detail: void 0 };
+        if (!result.detail) return { code: "UNKNOWN_FAILURE", supportCode: "RECOVERY_DERIVATION_INCOMPLETE" };
+        const detail = result.detail;
+        ownedRefs.push(detail.ref);
+        const previous = candidates.findIndex((candidate) => candidate.signingAddress === detail.signingAddress && candidate.encryptionAddress === detail.encryptionAddress);
+        if (previous >= 0) {
+          candidates[previous] = { ...candidates[previous], producerIds: [...candidates[previous].producerIds, producer.producerId] };
+          this.destroyCandidate(detail.ref);
+        } else candidates.push({ ref: detail.ref, signingAddress: detail.signingAddress, encryptionAddress: detail.encryptionAddress, producerIds: [producer.producerId] });
+      }
+      if (candidates.length === 0) return { code: "INVALID_INPUT", reason: "UNSUPPORTED_PRODUCER" };
+      succeeded = true;
+      return { code: "OK", detail: { candidates } };
+    } catch {
+      return { code: "UNKNOWN_FAILURE", supportCode: "RECOVERY_DERIVATION_FAILED" };
+    } finally {
+      if (!succeeded) for (const ref of ownedRefs) this.destroyCandidate(ref);
+    }
   }
   /** Decrypt a HUSH .dat file inside the worker and hold the imported candidate. */
   async importFileCandidate(input) {
+    if (this.nowMs() < this.importRetryDeadlineMs) return { code: "THROTTLED", cooldownDeadlineMs: this.importRetryDeadlineMs };
+    const generation = this.secretGeneration;
     const decoded = await decodeDatV1(input.fileBytes, input.filePassword);
+    if (generation !== this.secretGeneration) return { code: "INVALID_INPUT", reason: "import-authority-revoked" };
     if (!decoded.ok) {
+      if (decoded.code === "DAT_WRONG_PASSWORD") {
+        this.importFailures += 1;
+        this.importRetryDeadlineMs = this.nowMs() + backoffDelaySeconds(this.importFailures) * 1e3;
+        return { code: "WRONG_PASSWORD_OR_DAMAGED", cooldownDeadlineMs: this.importRetryDeadlineMs };
+      }
       return { code: "INVALID_INPUT", reason: decoded.code };
     }
+    this.importFailures = 0;
+    this.importRetryDeadlineMs = 0;
     const { record } = decoded.value;
     const ref = this.randomId("cand-");
     this.candidates.set(ref, {
       ref,
       kind: "file",
-      mnemonic: typeof record.Mnemonic === "string" && record.Mnemonic.length > 0 ? record.Mnemonic : null,
+      // The optional legacy phrase has completed consistency validation. Only
+      // concrete keys belong to the import candidate and subsequent vault.
+      mnemonic: null,
       signingPrivateKey: record.PrivateSigningKey,
       encryptionPrivateKey: record.PrivateEncryptKey,
       signingAddress: record.PublicSigningAddress,
@@ -26508,11 +27227,63 @@ var SealedVaultEngine = class {
   // ---------------------------------------------------------------------
   // Provisioning (current no-mnemonic network-bound record)
   // ---------------------------------------------------------------------
-  /**
-   * Provision the encrypted current vault from a worker-held candidate.
-   * Builds the sealed envelope, commits it through the two-slot CAS journal,
-   * and initializes the throttle sidecar. Failure never leaves partial slots.
-   */
+  /** FEAT-008/009: selected recovered keys in worker memory, with no wrapping or vault write. */
+  async provisionSessionOnly(input) {
+    const candidate = this.candidates.get(input.candidateRef);
+    const generation = this.secretGeneration;
+    if (!candidate || candidate.kind === "create" || this.session !== null || !input.alias || input.configurationId !== this.manifest.configurationId || input.networkBinding.canonicalNetworkId !== this.manifest.canonicalNetworkId || input.networkBinding.networkMagic !== this.manifest.networkMagic) {
+      return { code: "INVALID_INPUT", reason: "session-input" };
+    }
+    const tombstone = await this.storage.readRecord("operationalSidecars", REMOVAL_TOMBSTONE_KEY);
+    if (!tombstone.ok || tombstone.value.record !== void 0) return { code: "INVALID_INPUT", reason: "local-authority-present" };
+    const state = await this.journal.readState();
+    if (!state.ok || state.value.activeGeneration !== 0) return { code: "INVALID_INPUT", reason: "local-authority-present" };
+    for (const slot of ["slot-a", "slot-b"]) {
+      const read = await this.storage.readRecord("vaultSlots", slot);
+      if (!read.ok || read.value.record !== void 0) return { code: "INVALID_INPUT", reason: "local-authority-present" };
+    }
+    if (generation !== this.secretGeneration || !this.candidates.has(input.candidateRef)) return { code: "INVALID_INPUT", reason: "stale-candidate" };
+    this.session = {
+      epoch: this.nowMs(),
+      signingPrivateKey: candidate.signingPrivateKey,
+      encryptionPrivateKey: candidate.encryptionPrivateKey,
+      // No wrapping authority is created for a volatile session.
+      dek: new Uint8Array(0),
+      kek: new Uint8Array(0),
+      record: {
+        schemaVersion: 1,
+        alias: input.alias,
+        visibility: input.visibility,
+        producerId: candidate.producerId,
+        producerVersion: candidate.producerVersion,
+        lifecycleStatus: "PendingRegistration",
+        networkBinding: input.networkBinding,
+        keyBinding: { signingAddress: candidate.signingAddress, encryptionAddress: candidate.encryptionAddress },
+        signingPrivateKey: candidate.signingPrivateKey,
+        encryptionPrivateKey: candidate.encryptionPrivateKey,
+        protectionModeClass: "session-only",
+        generation: 0,
+        transactionDigest: null
+      },
+      preview: {
+        alias: input.alias,
+        signingAddressPrefix: candidate.signingAddress.slice(0, PREVIEW_SIGNING_ADDRESS_PREFIX_LENGTH),
+        signingAddressSuffix: candidate.signingAddress.slice(-PREVIEW_SIGNING_ADDRESS_SUFFIX_LENGTH),
+        lifecycleStatus: "PendingRegistration",
+        envelopeFormatVersion: 1,
+        parameterSuiteVersion: 1,
+        recordSchemaVersion: 1
+      }
+    };
+    this.phase = "verificationOnly";
+    this.volatileLicenceJournal = null;
+    for (const ref of [...this.candidates.keys()]) this.destroyCandidate(ref);
+    return { code: "OK" };
+  }
+  isSessionOnly() {
+    return this.session?.record.protectionModeClass === "session-only";
+  }
+  /** Provision an encrypted vault through the existing two-slot CAS journal. */
   async provision(input) {
     const candidate = this.candidates.get(input.candidateRef);
     if (!candidate) {
@@ -26526,7 +27297,8 @@ var SealedVaultEngine = class {
     }
     const salt = this.suite.randomBytes(16);
     const passwordKey = await this.suite.derivePasswordKey({
-      passwordBytes: utf8Bytes(input.devicePassword),
+      // FEAT-003 Device-Password Contract: NFC, preserving case and whitespace.
+      passwordBytes: utf8Bytes(input.devicePassword.normalize("NFC")),
       salt,
       memoryKiB: SUITE_V1_KDF.memoryKiB,
       iterations: SUITE_V1_KDF.iterations,
@@ -26652,7 +27424,7 @@ var SealedVaultEngine = class {
       record: plaintext,
       preview
     };
-    this.candidates.delete(input.candidateRef);
+    this.destroyCandidate(input.candidateRef);
     return {
       code: "OK",
       detail: {
@@ -26689,7 +27461,8 @@ var SealedVaultEngine = class {
       recordSchemaVersion: envelope.recordSchemaVersion,
       platformWrapperVersion: envelope.platformWrapperVersion
     });
-    if (!versionCheck.ok) {
+    const supportedPendingVersion = envelope.envelopeFormatVersion === 1 && envelope.parameterSuiteVersion === 1 && envelope.recordSchemaVersion === 2 && envelope.platformWrapperVersion === 0;
+    if (!versionCheck.ok && !supportedPendingVersion) {
       return { code: "UNSUPPORTED_VAULT" };
     }
     const saltExtension = envelope.extensions?.extensions?.[KDF_SALT_EXTENSION] ?? null;
@@ -26738,7 +27511,7 @@ var SealedVaultEngine = class {
     let passwordKey;
     try {
       passwordKey = await this.suite.derivePasswordKey({
-        passwordBytes: utf8Bytes(input.devicePassword),
+        passwordBytes: utf8Bytes(input.devicePassword.normalize("NFC")),
         salt,
         memoryKiB: envelope.suite.kdf.minMemoryKiB,
         iterations: envelope.suite.kdf.iterations,
@@ -26754,7 +27527,7 @@ var SealedVaultEngine = class {
     try {
       dek = await this.suite.aes256GcmDecrypt({ key: kek, nonce: wrappingNonce, ciphertext: unwrapParts.ciphertext, tag: unwrapParts.tag, aad: aadBytes });
     } catch {
-      if (envelope.records.generation.active <= 1 || record.generation <= 1) {
+      if (envelope.recordSchemaVersion !== 1 || envelope.records.generation.active <= 1 || record.generation <= 1) {
         return recordFailure();
       }
       const provisioningPreview = {
@@ -26809,7 +27582,7 @@ var SealedVaultEngine = class {
       return recordFailure();
     }
     const parsed = parseCurrentRecord(utf8Text(plaintextBytes), record.generation);
-    if (!parsed.ok) {
+    if (!parsed.ok || parsed.record.schemaVersion !== envelope.recordSchemaVersion || record.schemaVersion !== envelope.recordSchemaVersion) {
       return { code: "CORRUPT_VAULT" };
     }
     const current = parsed.record;
@@ -26847,11 +27620,14 @@ var SealedVaultEngine = class {
   // ---------------------------------------------------------------------
   /** Fresh exact online verification: worker-owned BFF lookup, both keys equal. */
   async verifyOnline() {
+    this.verifiedProfile = null;
     if (this.session === null || this.phase === "locked" || this.phase === "noLocalUser") {
       return { code: "UNKNOWN_FAILURE", supportCode: this.randomId("sc-") };
     }
     const binding = this.session.record.keyBinding;
+    const generation = this.secretGeneration;
     const lookup = await this.lookupIdentity(binding.signingAddress);
+    if (generation !== this.secretGeneration || this.session === null) return { code: "UNKNOWN_FAILURE", supportCode: this.randomId("sc-") };
     switch (lookup.kind) {
       case "exact": {
         if (lookup.signingAddress !== binding.signingAddress) {
@@ -26860,13 +27636,18 @@ var SealedVaultEngine = class {
         if (lookup.encryptionAddress !== binding.encryptionAddress) {
           return { code: "ENCRYPTION_KEY_MISMATCH" };
         }
+        this.verifiedProfile = {
+          alias: lookup.profileName ?? this.session.record.alias,
+          visibility: lookup.visibility ?? this.session.record.visibility
+        };
         this.phase = "authenticated";
         return {
           code: "OK",
           detail: {
             profileName: lookup.profileName ?? this.session.record.alias,
             signingAddress: binding.signingAddress,
-            encryptionAddress: binding.encryptionAddress
+            encryptionAddress: binding.encryptionAddress,
+            requiresPromotion: this.session.record.lifecycleStatus === "PendingRegistration"
           }
         };
       }
@@ -26903,60 +27684,111 @@ var SealedVaultEngine = class {
     if (status === "Active" && this.phase !== "authenticated") {
       return { code: "UNKNOWN_FAILURE", supportCode: this.randomId("sc-") };
     }
-    const updated = { ...this.session.record, lifecycleStatus: status };
+    const updated = {
+      ...this.session.record,
+      lifecycleStatus: status,
+      ...status === "Active" ? {
+        ...this.verifiedProfile,
+        transactionDigest: null,
+        ...this.session.record.schemaVersion === 2 ? { pendingTransaction: null } : {}
+      } : {}
+    };
     return this.reencryptCurrentRecord(updated);
   }
   /**
    * Sign and submit the canonical FullIdentity transaction (worker-owned).
    * Returns the closed submission outcome; the exact signed transaction is
-   * retained in the record digest before the first network call.
+   * retained with its digest in encrypted record schema 2 before submission.
    */
   async submitIdentityTransaction(input) {
     if (this.session === null || this.phase === "locked" || this.phase === "noLocalUser") {
       return { code: "UNKNOWN_FAILURE", supportCode: this.randomId("sc-") };
     }
     const record = this.session.record;
-    const txId = createUuidV4();
-    const timestamp = corpusTimestamp();
-    const described = describeCanonicalTransaction({
-      normalizedAlias: input.alias,
-      publicSigningAddress: record.keyBinding.signingAddress,
-      publicEncryptAddress: record.keyBinding.encryptionAddress,
-      visibility: input.visibility,
-      transactionId: txId,
-      timestamp
-    });
-    if (!described.ok) {
-      return { code: "INVALID_INPUT", reason: described.code };
+    const generation = this.secretGeneration;
+    let pending = record.pendingTransaction ?? null;
+    if (pending !== null) {
+      if (!validatePendingTransaction(pending).ok || !isRetryEligible(pending) || pending.networkBinding !== this.manifest.configurationId || pending.reviewedMetadata.alias !== input.alias || pending.reviewedMetadata.visibility !== input.visibility) {
+        return { code: "INVALID_INPUT", reason: "pending-transaction-context" };
+      }
+      const lookup = await this.lookupIdentity(record.keyBinding.signingAddress);
+      if (generation !== this.secretGeneration || this.session === null) return { code: "UNKNOWN_FAILURE", supportCode: this.randomId("sc-") };
+      if (lookup.kind === "exact") {
+        if (lookup.signingAddress !== record.keyBinding.signingAddress || lookup.encryptionAddress !== record.keyBinding.encryptionAddress)
+          return { code: "ENCRYPTION_KEY_MISMATCH" };
+        return { code: "OK", detail: { status: "alreadyExists" } };
+      }
+      if (lookup.kind !== "missing") return { code: "OK", detail: { status: "transportFailure" } };
+    } else {
+      if (record.transactionDigest !== null) return { code: "INVALID_INPUT", reason: "legacy-pending-bytes-unavailable" };
+      const txId = createUuidV4();
+      const timestamp = corpusTimestamp();
+      const described = describeCanonicalTransaction({
+        normalizedAlias: input.alias,
+        publicSigningAddress: record.keyBinding.signingAddress,
+        publicEncryptAddress: record.keyBinding.encryptionAddress,
+        visibility: input.visibility,
+        transactionId: txId,
+        timestamp
+      });
+      if (!described.ok) {
+        return { code: "INVALID_INPUT", reason: described.code };
+      }
+      const unsignedJson = serializeUnsignedTransaction(described.value.unsignedTransaction);
+      const signed = signMessage(unsignedJson, this.session.signingPrivateKey);
+      if (!signed.ok) {
+        return { code: "UNKNOWN_FAILURE", supportCode: this.randomId("sc-") };
+      }
+      const signedTransaction = JSON.stringify({
+        ...described.value.unsignedTransaction,
+        UserSignature: { Signatory: record.keyBinding.signingAddress, Signature: signed.value.compactBase64 }
+      });
+      pending = {
+        schemaVersion: 2,
+        transaction: { exactJson: signedTransaction, digest: digestOf(signedTransaction) },
+        transactionId: txId,
+        reviewedMetadata: { alias: input.alias, visibility: input.visibility },
+        lifecycle: "sealed",
+        attemptEvidence: [],
+        epochBinding: String(generation),
+        networkBinding: this.manifest.configurationId,
+        rollbackState: "postSeal"
+      };
     }
-    const unsignedJson = serializeUnsignedTransaction(described.value.unsignedTransaction);
-    const signed = signMessage(unsignedJson, this.session.signingPrivateKey);
-    if (!signed.ok) {
-      return { code: "UNKNOWN_FAILURE", supportCode: this.randomId("sc-") };
-    }
-    const signedTransaction = JSON.stringify({
-      ...described.value.unsignedTransaction,
-      UserSignature: { Signatory: record.keyBinding.signingAddress, Signature: signed.value.compactBase64 }
+    pending = { ...pending, epochBinding: String(generation), rollbackState: "postSubmit" };
+    const retained = await this.reencryptCurrentRecord({
+      ...this.session.record,
+      schemaVersion: 2,
+      transactionDigest: pending.transaction.digest,
+      pendingTransaction: pending
     });
-    const digest = sha256Hex(utf8Bytes(signedTransaction));
-    const retained = await this.retainTransactionDigest(digest);
     if (retained.code !== "OK") {
       return { code: "UNKNOWN_FAILURE", supportCode: this.randomId("sc-") };
     }
-    const result = await input.submit(signedTransaction);
+    if (generation !== this.secretGeneration || this.session === null) return { code: "UNKNOWN_FAILURE", supportCode: this.randomId("sc-") };
+    const result = await input.submit(pending.transaction.exactJson);
+    if (generation !== this.secretGeneration || this.session === null) return { code: "UNKNOWN_FAILURE", supportCode: this.randomId("sc-") };
+    const normalized = result.ok ? normalizeSubmitReply({ ...result.reply, message: "" }, /* @__PURE__ */ new Set()) : { kind: "transportFailure" };
+    const outcome = normalized.kind === "transportFailure" ? "transportUncertain" : normalized.kind === "accepted" ? "accepted" : normalized.kind === "pending" ? "pending" : normalized.kind === "alreadyExists" ? "alreadyExists" : "rejectedTerminal";
+    const recorded = await this.reencryptCurrentRecord({ ...this.session.record, pendingTransaction: {
+      ...pending,
+      lifecycle: outcome === "accepted" ? "waitingAccepted" : outcome === "pending" ? "waitingPending" : pending.lifecycle,
+      attemptEvidence: [...pending.attemptEvidence.slice(-63), { at: new Date(this.nowMs()).toISOString(), outcome }]
+    } });
+    if (recorded.code !== "OK" || generation !== this.secretGeneration || this.session === null) return { code: "UNKNOWN_FAILURE", supportCode: this.randomId("sc-") };
     if (!result.ok) {
       return { code: "OK", detail: { status: "transportFailure" } };
     }
-    const reply = result.reply;
-    switch (reply.status) {
-      case "ACCEPTED":
+    switch (normalized.kind) {
+      case "accepted":
         return { code: "OK", detail: { status: "accepted" } };
-      case "PENDING":
+      case "pending":
         return { code: "OK", detail: { status: "pending" } };
-      case "ALREADY_EXISTS":
+      case "alreadyExists":
         return { code: "OK", detail: { status: "alreadyExists" } };
-      case "REJECTED":
-        return { code: "OK", detail: { status: "unknownRejection", validationCode: typeof reply.validationCode === "string" ? reply.validationCode : void 0 } };
+      case "terminalRejection":
+      case "unknownRejection":
+        return { code: "OK", detail: { status: "unknownRejection" } };
       default:
         return { code: "OK", detail: { status: "compatibilityError" } };
     }
@@ -26966,6 +27798,15 @@ var SealedVaultEngine = class {
     if (this.session === null) {
       return { code: "UNKNOWN_FAILURE", supportCode: this.randomId("sc-") };
     }
+    if (this.isSessionOnly()) {
+      this.session = {
+        ...this.session,
+        record: updated,
+        preview: { ...this.session.preview, lifecycleStatus: updated.lifecycleStatus }
+      };
+      return { code: "OK" };
+    }
+    const generation = this.secretGeneration;
     const envelope = await this.readActiveEnvelope();
     if (envelope === null) {
       return { code: "CORRUPT_VAULT" };
@@ -26979,12 +27820,12 @@ var SealedVaultEngine = class {
       lifecycleStatus: updated.lifecycleStatus,
       envelopeFormatVersion: 1,
       parameterSuiteVersion: 1,
-      recordSchemaVersion: 1
+      recordSchemaVersion: updated.schemaVersion
     };
     const aad = buildAadMetadata({
       envelopeFormatVersion: envelope.envelopeFormatVersion,
       parameterSuiteVersion: envelope.parameterSuiteVersion,
-      recordSchemaVersion: envelope.recordSchemaVersion,
+      recordSchemaVersion: updated.schemaVersion,
       platformWrapperVersion: envelope.platformWrapperVersion,
       suiteId: envelope.suite.id,
       kdfParameters: { algorithm: envelope.suite.kdf.algorithm, memoryKiB: envelope.suite.kdf.minMemoryKiB, iterations: envelope.suite.kdf.iterations, parallelism: envelope.suite.kdf.parallelism },
@@ -27015,12 +27856,14 @@ var SealedVaultEngine = class {
     });
     const nextEnvelope = {
       ...envelope,
+      recordSchemaVersion: updated.schemaVersion,
       preview: nextPreview,
       records: {
         ...envelope.records,
         generation: { active: nextGeneration },
         ordinary: {
           ...record,
+          schemaVersion: updated.schemaVersion,
           generation: nextGeneration,
           keyPackage: {
             wrappedDataKey: b64url(joinCipherAndTag(rewrapped.ciphertext, rewrapped.tag)),
@@ -27032,10 +27875,12 @@ var SealedVaultEngine = class {
       }
     };
     const serialized = canonicalizeJsonBytes(nextEnvelope);
+    if (generation !== this.secretGeneration || this.session === null) return { code: "UNKNOWN_FAILURE", supportCode: this.randomId("sc-") };
     const commit = await this.journal.commit({ expectedGeneration: envelope.records.generation.active, candidateGeneration: nextGeneration, candidateBytes: serialized });
     if (!commit.ok) {
       return { code: "UNKNOWN_FAILURE", supportCode: this.randomId("sc-") };
     }
+    if (generation !== this.secretGeneration || this.session === null) return { code: "UNKNOWN_FAILURE", supportCode: this.randomId("sc-") };
     this.session = { ...this.session, record: { ...updated, generation: nextGeneration }, preview: nextPreview };
     return { code: "OK" };
   }
@@ -27049,6 +27894,7 @@ var SealedVaultEngine = class {
   }
   /** Change the device password: rewrap the DEK under a fresh KEK, CAS new generation. */
   async changeDevicePassword(input) {
+    if (this.isSessionOnly()) return { code: "INVALID_INPUT", reason: "session-only" };
     if (this.session === null) {
       return { code: "UNKNOWN_FAILURE", supportCode: this.randomId("sc-") };
     }
@@ -27066,7 +27912,7 @@ var SealedVaultEngine = class {
     }
     const newSalt = this.suite.randomBytes(16);
     const newPasswordKey = await this.suite.derivePasswordKey({
-      passwordBytes: utf8Bytes(input.newPassword),
+      passwordBytes: utf8Bytes(input.newPassword.normalize("NFC")),
       salt: newSalt,
       memoryKiB: SUITE_V1_KDF.memoryKiB,
       iterations: SUITE_V1_KDF.iterations,
@@ -27107,7 +27953,7 @@ var SealedVaultEngine = class {
     let dek;
     try {
       const passwordKey = await this.suite.derivePasswordKey({
-        passwordBytes: utf8Bytes(input.currentPassword),
+        passwordBytes: utf8Bytes(input.currentPassword.normalize("NFC")),
         salt,
         memoryKiB: envelope.suite.kdf.minMemoryKiB,
         iterations: envelope.suite.kdf.iterations,
@@ -27179,38 +28025,43 @@ var SealedVaultEngine = class {
    * verify absence → clear tombstone. Never reports success before absence.
    */
   async removeLocalUser() {
-    const persist = async (stage) => {
-      await this.storage.writeRecord("operationalSidecars", REMOVAL_TOMBSTONE_KEY, { inProgress: true, startedAt: this.nowMs(), stage });
-    };
-    await persist("revoking-session");
+    if (this.isSessionOnly()) {
+      this.wipeSecrets();
+      return { code: "OK" };
+    }
+    const failed = () => ({ code: "UNKNOWN_FAILURE", supportCode: this.randomId("sc-") });
+    const persist = async (stage) => (await this.storage.writeRecord("operationalSidecars", REMOVAL_TOMBSTONE_KEY, { inProgress: true, startedAt: this.nowMs(), stage })).ok;
     this.wipeSecrets();
-    await persist("persisting-tombstone");
-    await persist("deleting-slots");
-    for (const slotKey of ["slot-a", "slot-b"]) {
-      await this.storage.deleteRecord("vaultSlots", slotKey);
+    if (!await persist("revoking-session")) return failed();
+    if (!await persist("persisting-tombstone")) return failed();
+    const slots = [
+      ...VAULT_SLOT_KEYS.map((key) => ["vaultSlots", key]),
+      ["vaultJournal", VAULT_JOURNAL_KEY],
+      ...[...LICENCE_JOURNAL_SLOT_KEYS, LICENCE_JOURNAL_POINTER_KEY].map((key) => [LICENCE_JOURNAL_STORE, key])
+    ];
+    const sidecars = ALLOWED_SIDECAR_KEYS.filter((key) => key !== REMOVAL_TOMBSTONE_KEY).map((key) => ["operationalSidecars", key]);
+    for (const [stage, records] of [["deleting-slots", slots], ["clearing-caches", sidecars]]) {
+      if (!await persist(stage)) return failed();
+      for (const [store, key] of records) {
+        if (!(await this.storage.deleteRecord(store, key)).ok) return failed();
+      }
     }
-    await this.storage.deleteRecord("vaultJournal", "current");
-    await persist("clearing-caches");
-    for (const key of ["throttle", "removalTombstone", "lease", "persistenceAck", "epoch"]) {
-      await this.storage.deleteRecord("operationalSidecars", key);
+    if (!await persist("verifying-absence")) return failed();
+    for (const [store, key] of [...slots, ...sidecars]) {
+      const result = await this.storage.readRecord(store, key);
+      if (!result.ok || result.value.record !== void 0) return failed();
     }
-    await persist("verifying-absence");
-    const journalCheck = await this.storage.readRecord("vaultJournal", "current");
-    const slotCheck = await this.storage.readRecord("vaultSlots", "slot-a");
-    if (journalCheck.ok && journalCheck.value.record !== void 0) {
-      return { code: "UNKNOWN_FAILURE", supportCode: this.randomId("sc-") };
-    }
-    if (slotCheck.ok && slotCheck.value.record !== void 0) {
-      return { code: "UNKNOWN_FAILURE", supportCode: this.randomId("sc-") };
-    }
-    await this.storage.deleteRecord("operationalSidecars", REMOVAL_TOMBSTONE_KEY);
+    if (!(await this.storage.deleteRecord("operationalSidecars", REMOVAL_TOMBSTONE_KEY)).ok) return failed();
+    const marker = await this.storage.readRecord("operationalSidecars", REMOVAL_TOMBSTONE_KEY);
+    if (!marker.ok || marker.value.record !== void 0) return failed();
     this.phase = "noLocalUser";
     return { code: "OK" };
   }
   /** Startup inspection: resolve the deterministic startup surface. */
   async inspectStartup() {
     const tombstone = await this.storage.readRecord("operationalSidecars", REMOVAL_TOMBSTONE_KEY);
-    if (tombstone.ok && tombstone.value.record !== void 0) {
+    if (!tombstone.ok) return { code: "UNKNOWN_FAILURE", supportCode: "STARTUP_STORAGE_UNAVAILABLE" };
+    if (tombstone.value.record !== void 0) {
       return { code: "OK", detail: { surface: "removalTombstone" } };
     }
     const state = await this.journal.readState();
@@ -27220,9 +28071,11 @@ var SealedVaultEngine = class {
     if (state.value.activeGeneration === 0) {
       const slotA = await this.storage.readRecord("vaultSlots", "slot-a");
       const slotB = await this.storage.readRecord("vaultSlots", "slot-b");
-      if (slotA.ok && slotA.value.record !== void 0 || slotB.ok && slotB.value.record !== void 0) {
+      if (!slotA.ok || !slotB.ok) return { code: "UNKNOWN_FAILURE", supportCode: "STARTUP_STORAGE_UNAVAILABLE" };
+      if (slotA.value.record !== void 0 || slotB.value.record !== void 0) {
         return { code: "OK", detail: { surface: "quarantine", reason: "incompleteRemoval" } };
       }
+      if (this.candidates.size > 0 || this.session !== null) return { code: "UNKNOWN_FAILURE", supportCode: "STARTUP_AUTHORITY_PRESENT" };
       return { code: "OK", detail: { surface: "verifiedAbsent" } };
     }
     const envelope = await this.readActiveEnvelope();
@@ -27233,7 +28086,209 @@ var SealedVaultEngine = class {
       alias: envelope.preview.alias,
       abbreviatedSigningAddress: `${envelope.preview.signingAddressPrefix}\u2026${envelope.preview.signingAddressSuffix}`
     };
-    return { code: "OK", detail: { surface: "lockedVault", safeIdentity } };
+    return { code: "OK", detail: { surface: envelope.preview.lifecycleStatus === "PendingRegistration" ? "staged" : "lockedVault", safeIdentity } };
+  }
+  // ---------------------------------------------------------------------
+  // FEAT-016 licence authority operations (Phase 6)
+  //
+  // Closed licence operations hosted inside the ONE credential authority.
+  // Signing uses the session concrete signing key; the encrypted pending
+  // licence journal is AES-GCM sealed under the session KEK (purpose-bound
+  // AAD, two-slot CAS, read-back verified). Exact signed bytes and
+  // signatures never leave this boundary.
+  // ---------------------------------------------------------------------
+  /**
+   * Current authenticated licence actor (public signing address). Null unless
+   * the engine holds an authenticated session. Page proposals are always
+   * re-verified against this authority-owned truth.
+   */
+  licenceActor() {
+    if (this.session === null || this.phase !== "authenticated") {
+      return null;
+    }
+    return { signingAddress: this.session.record.keyBinding.signingAddress };
+  }
+  /**
+   * One fresh signed `GetMyEntitlement` query. The authority mints a new UTC
+   * `signedAt`, signs the frozen canonical envelope bytes with the user's
+   * signing key, and hands the resulting three headers to the injected
+   * submit function (same-origin BFF). Failures map to the closed transport
+   * vocabulary; nothing here throws.
+   */
+  async licenceQuery(submit) {
+    if (this.session === null || this.phase !== "authenticated") {
+      return { ok: false, status: "UNAVAILABLE" };
+    }
+    try {
+      const signed = signLicenceQueryEnvelope({
+        actorAddress: this.session.record.keyBinding.signingAddress,
+        signedAt: licenceFreshTimestampUtc(this.nowMs()),
+        signingPrivateKeyHex: this.session.signingPrivateKey
+      });
+      if (!signed.ok) {
+        return { ok: false, status: "UNAVAILABLE" };
+      }
+      return await submit(signed.headers);
+    } catch {
+      return { ok: false, status: "UNAVAILABLE" };
+    }
+  }
+  /**
+   * Sign one canonical unsigned licence envelope into the exact sealed form
+   * (deterministic RFC 6979; byte-identical reuse across retry/restart). The
+   * caller persists the sealed bytes through `licenceJournalWrite` before
+   * the first submission.
+   */
+  licenceSignBaseline(unsignedJson) {
+    if (this.session === null || this.phase !== "authenticated") {
+      return { ok: false, code: "not-authenticated" };
+    }
+    const sealed = sealLicenceTransaction({
+      unsignedJson,
+      signingPrivateKeyHex: this.session.signingPrivateKey,
+      signingAddress: this.session.record.keyBinding.signingAddress
+    });
+    if (!sealed.ok) {
+      return { ok: false, code: sealed.code === "malformed-unsigned" ? "malformed" : "signature-failed" };
+    }
+    return { ok: true, signedJson: sealed.signedJson, signedDigest: sealed.signedDigest };
+  }
+  /**
+   * Encrypted two-slot CAS journal write (read-back verified). Values are
+   * opaque; the host validates the pending-licence record JSON before and
+   * after encryption. The journal survives Lock/restart and is readable
+   * again after the next successful unlock (KEK re-derivation).
+   */
+  async licenceJournalWrite(recordJson) {
+    if (this.session === null || this.phase === "locked" || this.phase === "noLocalUser") {
+      return { ok: false, reason: "not-authenticated" };
+    }
+    if (typeof recordJson !== "string" || recordJson.length === 0 || recordJson.length > 65536) {
+      return { ok: false, reason: "malformed" };
+    }
+    if (this.isSessionOnly()) {
+      this.volatileLicenceJournal = recordJson;
+      return { ok: true };
+    }
+    const aad = this.licenceJournalAad();
+    try {
+      const nonce = this.suite.randomBytes(12);
+      const encrypted = await this.suite.aes256GcmEncrypt({ key: this.session.kek, nonce, plaintext: utf8Bytes(recordJson), aad });
+      const blob = { v: 1, nonce: b64url(nonce), ct: b64url(joinCipherAndTag(encrypted.ciphertext, encrypted.tag)) };
+      const pointerResult = await this.storage.readRecord(LICENCE_JOURNAL_STORE, LICENCE_JOURNAL_POINTER_KEY);
+      if (!pointerResult.ok) {
+        return { ok: false, reason: "storage-unavailable" };
+      }
+      const pointer = pointerResult.value.record ?? "";
+      const target = pointer === "slot-b" ? "slot-a" : "slot-b";
+      const write = await this.storage.writeRecord(LICENCE_JOURNAL_STORE, target, blob);
+      if (!write.ok) {
+        return { ok: false, reason: "storage-unavailable" };
+      }
+      const readBack = await this.storage.readRecord(LICENCE_JOURNAL_STORE, target);
+      if (!readBack.ok || readBack.value.record === void 0) {
+        return { ok: false, reason: "storage-unavailable" };
+      }
+      const decrypted = await this.decryptLicenceJournalBlob(readBack.value.record);
+      if (decrypted === null || decrypted !== recordJson) {
+        return { ok: false, reason: "corrupt" };
+      }
+      const pointerWrite = await this.storage.writeRecord(LICENCE_JOURNAL_STORE, LICENCE_JOURNAL_POINTER_KEY, target);
+      if (!pointerWrite.ok) {
+        return { ok: false, reason: "storage-unavailable" };
+      }
+      return { ok: true };
+    } catch {
+      return { ok: false, reason: "storage-unavailable" };
+    }
+  }
+  /** Read the committed journal record (two-slot rollback on corruption). */
+  async licenceJournalRead() {
+    if (this.session === null || this.phase === "locked" || this.phase === "noLocalUser") {
+      return { ok: false, reason: "not-authenticated" };
+    }
+    if (this.isSessionOnly()) return { ok: true, recordJson: this.volatileLicenceJournal };
+    try {
+      const pointerResult = await this.storage.readRecord(LICENCE_JOURNAL_STORE, LICENCE_JOURNAL_POINTER_KEY);
+      if (!pointerResult.ok) {
+        return { ok: false, reason: "storage-unavailable" };
+      }
+      const pointer = pointerResult.value.record ?? "";
+      if (pointer === "" || !LICENCE_JOURNAL_SLOT_KEYS.includes(pointer)) {
+        return { ok: true, recordJson: null };
+      }
+      const slot = await this.storage.readRecord(LICENCE_JOURNAL_STORE, pointer);
+      if (slot.ok && slot.value.record !== void 0) {
+        const decrypted = await this.decryptLicenceJournalBlob(slot.value.record);
+        if (decrypted !== null) {
+          return { ok: true, recordJson: decrypted };
+        }
+      }
+      const otherKey = pointer === "slot-b" ? "slot-a" : "slot-b";
+      const other = await this.storage.readRecord(LICENCE_JOURNAL_STORE, otherKey);
+      if (other.ok && other.value.record !== void 0) {
+        const decrypted = await this.decryptLicenceJournalBlob(other.value.record);
+        if (decrypted !== null) {
+          return { ok: true, recordJson: decrypted };
+        }
+      }
+      return { ok: false, reason: "corrupt" };
+    } catch {
+      return { ok: false, reason: "storage-unavailable" };
+    }
+  }
+  /** Clear the encrypted licence journal (identity removal / resolution). */
+  async licenceJournalClear() {
+    if (this.isSessionOnly()) {
+      this.volatileLicenceJournal = null;
+      return { ok: true };
+    }
+    try {
+      for (const key of [...LICENCE_JOURNAL_SLOT_KEYS, LICENCE_JOURNAL_POINTER_KEY]) {
+        const deleted = await this.storage.deleteRecord(LICENCE_JOURNAL_STORE, key);
+        if (!deleted.ok) {
+          return { ok: false, reason: "storage-unavailable" };
+        }
+      }
+      return { ok: true };
+    } catch {
+      return { ok: false, reason: "storage-unavailable" };
+    }
+  }
+  /** Purpose-bound AAD for the encrypted licence journal. */
+  licenceJournalAad() {
+    return canonicalizeJsonBytes({ purpose: LICENCE_PENDING_AAD_LABEL, namespace: LICENCE_PENDING_STORE_NAMESPACE });
+  }
+  async decryptLicenceJournalBlob(blob) {
+    if (this.session === null) {
+      return null;
+    }
+    if (typeof blob !== "object" || blob === null || blob.v !== 1) {
+      return null;
+    }
+    const nonce = typeof blob.nonce === "string" ? unb64url(blob.nonce) : null;
+    const ctValue = typeof blob.ct === "string" ? unb64url(blob.ct) : null;
+    if (nonce === null || ctValue === null || nonce.byteLength !== 12) {
+      return null;
+    }
+    let parts;
+    try {
+      parts = splitCipherAndTag(ctValue);
+    } catch {
+      return null;
+    }
+    try {
+      const plaintext = await this.suite.aes256GcmDecrypt({
+        key: this.session.kek,
+        nonce,
+        ciphertext: parts.ciphertext,
+        tag: parts.tag,
+        aad: this.licenceJournalAad()
+      });
+      return utf8Text(plaintext);
+    } catch {
+      return null;
+    }
   }
   // ---------------------------------------------------------------------
   // Internal helpers
@@ -27264,7 +28319,7 @@ var SealedVaultEngine = class {
   async verifyEnvelopeBytes(bytes, generation) {
     try {
       const parsed = JSON.parse(utf8Text(bytes));
-      if (parsed.envelopeFormatVersion !== 1 || parsed.parameterSuiteVersion !== 1 || parsed.recordSchemaVersion !== 1) {
+      if (parsed.envelopeFormatVersion !== 1 || parsed.parameterSuiteVersion !== 1 || ![1, 2].includes(parsed.recordSchemaVersion)) {
         return false;
       }
       const records = parsed.records;
@@ -27288,7 +28343,24 @@ var SealedVaultEngine = class {
 function parseCurrentRecord(text, expectedGeneration) {
   try {
     const value = JSON.parse(text);
-    if (value.schemaVersion !== 1) return { ok: false };
+    if (value.schemaVersion !== 1 && value.schemaVersion !== 2) return { ok: false };
+    const fields = [
+      "schemaVersion",
+      "alias",
+      "visibility",
+      "producerId",
+      "producerVersion",
+      "lifecycleStatus",
+      "networkBinding",
+      "keyBinding",
+      "signingPrivateKey",
+      "encryptionPrivateKey",
+      "protectionModeClass",
+      "generation",
+      "transactionDigest"
+    ];
+    if (value.schemaVersion === 2) fields.push("pendingTransaction");
+    if (Object.keys(value).length !== fields.length || fields.some((field) => !Object.hasOwn(value, field))) return { ok: false };
     if (value.generation !== expectedGeneration) return { ok: false };
     if (typeof value.alias !== "string" || value.alias.length < 1 || value.alias.length > 64) return { ok: false };
     if (value.visibility !== "private" && value.visibility !== "public") return { ok: false };
@@ -27305,14 +28377,17 @@ function parseCurrentRecord(text, expectedGeneration) {
     const encryptionPrivateKey = value.encryptionPrivateKey;
     if (typeof signingPrivateKey !== "string" || !/^[0-9a-f]{64}$/.test(signingPrivateKey)) return { ok: false };
     if (typeof encryptionPrivateKey !== "string" || !/^[0-9a-f]{64}$/.test(encryptionPrivateKey)) return { ok: false };
-    const serialized = JSON.stringify(value);
-    for (const marker of ["mnemonic", "seed", "phrase", "recovery", "wordlist", "bip39"]) {
-      if (serialized.toLowerCase().includes(marker)) return { ok: false };
+    if (Object.keys(nb).length !== 3 || Object.keys(kb).length !== 2) return { ok: false };
+    const pending = value.schemaVersion === 2 ? value.pendingTransaction : null;
+    if (pending !== null) {
+      if (!validatePendingTransaction(pending).ok || pending.networkBinding !== nb.configurationId || pending.transaction.digest !== value.transactionDigest) return { ok: false };
+      const transaction = JSON.parse(pending.transaction.exactJson);
+      if (transaction.TransactionId !== pending.transactionId || transaction.PayloadKind !== "351cd60b-3fdf-48d4-b608-e93c0100f7d0" || transaction.Payload?.PublicSigningAddress !== kb.signingAddress || transaction.Payload?.PublicEncryptAddress !== kb.encryptionAddress || transaction.UserSignature?.Signatory !== kb.signingAddress || transaction.Payload?.IdentityAlias !== pending.reviewedMetadata.alias || transaction.Payload?.IsPublic !== (pending.reviewedMetadata.visibility === "public")) return { ok: false };
     }
     return {
       ok: true,
       record: {
-        schemaVersion: 1,
+        schemaVersion: value.schemaVersion,
         alias: value.alias,
         visibility: value.visibility,
         producerId: value.producerId,
@@ -27324,7 +28399,8 @@ function parseCurrentRecord(text, expectedGeneration) {
         encryptionPrivateKey,
         protectionModeClass: "device-password",
         generation: value.generation,
-        transactionDigest: typeof value.transactionDigest === "string" ? value.transactionDigest : null
+        transactionDigest: typeof value.transactionDigest === "string" ? value.transactionDigest : null,
+        ...value.schemaVersion === 2 ? { pendingTransaction: pending } : {}
       }
     };
   } catch {
@@ -27332,7 +28408,1664 @@ function parseCurrentRecord(text, expectedGeneration) {
   }
 }
 
+// src/lib/licensing/projection.ts
+var MAX_SAFE_TEXT_LENGTH = 512;
+var MAX_OPTION_COUNT = 64;
+var MAX_OPTION_TEXT_LENGTH = 256;
+var MAX_REFERENCE_LENGTH = 128;
+function isBoundedText(value, max = MAX_SAFE_TEXT_LENGTH) {
+  return typeof value === "string" && value.length > 0 && value.length <= max;
+}
+function isRecordValue2(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function isIsoUtc2(value) {
+  if (typeof value !== "string" || value.length === 0 || value.length > 64) {
+    return false;
+  }
+  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/.test(value);
+}
+function isKnownFamily(value) {
+  return value === "direct" || value === "veritas" || value === "enterprise";
+}
+function isOptionalSafeInteger(value) {
+  return value === void 0 || Number.isInteger(value) && value >= 0 && value <= Number.MAX_SAFE_INTEGER;
+}
+function isOptionalBoolean(value) {
+  return value === void 0 || typeof value === "boolean";
+}
+function isStructurallyValidOption(option) {
+  return isBoundedText(option.PlanId, MAX_OPTION_TEXT_LENGTH) && isBoundedText(option.DisplayName, MAX_OPTION_TEXT_LENGTH) && isBoundedText(option.SafeDescription, MAX_SAFE_TEXT_LENGTH) && isOptionalSafeInteger(option.EligibleVoterCap) && isOptionalBoolean(option.UnlimitedElections) && (option.TermKind === void 0 || isBoundedText(option.TermKind, MAX_OPTION_TEXT_LENGTH)) && isOptionalSafeInteger(option.TermYears);
+}
+function projectSafeHigherOptions(active) {
+  const enterprisePlanId = active.Enterprise !== void 0 && isRecordValue2(active.Enterprise) ? active.Enterprise.PlanId : void 0;
+  const seen = /* @__PURE__ */ new Set();
+  const options = [];
+  for (const raw of active.HigherOptions) {
+    if (!isRecordValue2(raw)) {
+      continue;
+    }
+    const option = raw;
+    if (!isBoundedText(option.PlanId, MAX_OPTION_TEXT_LENGTH) || !isBoundedText(option.DisplayName, MAX_OPTION_TEXT_LENGTH) || !isBoundedText(option.SafeDescription, MAX_SAFE_TEXT_LENGTH)) {
+      continue;
+    }
+    if (option.PlanId === active.PlanId) {
+      continue;
+    }
+    if (typeof enterprisePlanId === "string" && option.PlanId === enterprisePlanId) {
+      continue;
+    }
+    if (seen.has(option.PlanId)) {
+      continue;
+    }
+    seen.add(option.PlanId);
+    const safe = {
+      planId: option.PlanId,
+      displayName: option.DisplayName,
+      safeDescription: option.SafeDescription,
+      ...option.EligibleVoterCap !== void 0 ? { eligibleVoterCap: option.EligibleVoterCap } : {},
+      ...option.UnlimitedElections !== void 0 ? { unlimitedElections: option.UnlimitedElections } : {},
+      ...option.TermKind !== void 0 ? { termKind: option.TermKind } : {},
+      ...option.TermYears !== void 0 ? { termYears: option.TermYears } : {}
+    };
+    options.push(safe);
+  }
+  return options;
+}
+function projectSafeEnterprise(active) {
+  if (active.Enterprise === void 0 || !isRecordValue2(active.Enterprise) || !isBoundedText(active.Enterprise.PlanId) || !isBoundedText(active.Enterprise.DisplayName) || !isBoundedText(active.Enterprise.SafeDescription)) {
+    return null;
+  }
+  const enterprise = active.Enterprise;
+  return {
+    planId: enterprise.PlanId,
+    displayName: enterprise.DisplayName,
+    safeDescription: enterprise.SafeDescription
+  };
+}
+function buildLicenceSafeProjection(actorBinding, networkBinding, active) {
+  if (!active || typeof active !== "object") {
+    return { ok: false, reason: "missing-active-view" };
+  }
+  if (!isBoundedText(active.LicenceReference, MAX_REFERENCE_LENGTH)) {
+    return { ok: false, reason: "malformed-required-field" };
+  }
+  if (!isBoundedText(active.PlanId) || !isBoundedText(active.PlanFamily)) {
+    return { ok: false, reason: "malformed-required-field" };
+  }
+  if (!isKnownFamily(active.PlanFamily)) {
+    return { ok: false, reason: "unknown-plan-family" };
+  }
+  if (active.AssignedCatalogueVersion !== "hushvoting-licence-catalogue/v1.0.0") {
+    return { ok: false, reason: "incompatible-catalogue-version" };
+  }
+  if (!KNOWN_LICENCE_PLAN_IDS.includes(active.PlanId)) {
+    return { ok: false, reason: "unknown-plan-id" };
+  }
+  if (!isBoundedText(active.DisplayName)) {
+    return { ok: false, reason: "malformed-required-field" };
+  }
+  if (!isBoundedText(active.SafeDescription)) {
+    return { ok: false, reason: "malformed-required-field" };
+  }
+  if (!isIsoUtc2(active.EffectiveFromUtc)) {
+    return { ok: false, reason: "malformed-required-field" };
+  }
+  if (active.ExpiresAtUtc !== void 0 && !isIsoUtc2(active.ExpiresAtUtc)) {
+    return { ok: false, reason: "malformed-required-field" };
+  }
+  if (active.TermKind !== void 0 && !isBoundedText(active.TermKind)) {
+    return { ok: false, reason: "malformed-required-field" };
+  }
+  if (active.TermYears !== void 0 && (!Number.isInteger(active.TermYears) || active.TermYears < 0 || active.TermYears > Number.MAX_SAFE_INTEGER)) {
+    return { ok: false, reason: "malformed-required-field" };
+  }
+  if (active.EligibleVoterCap !== void 0 && (!Number.isInteger(active.EligibleVoterCap) || active.EligibleVoterCap < 0 || active.EligibleVoterCap > Number.MAX_SAFE_INTEGER)) {
+    return { ok: false, reason: "malformed-required-field" };
+  }
+  if (!Array.isArray(active.HigherOptions) || !Array.isArray(active.AllowedGovernanceOptionIds)) {
+    return { ok: false, reason: "malformed-required-field" };
+  }
+  if (active.HigherOptions.length > MAX_OPTION_COUNT) {
+    return { ok: false, reason: "unbounded-value" };
+  }
+  if (active.AllowedGovernanceOptionIds.length > MAX_OPTION_COUNT) {
+    return { ok: false, reason: "unbounded-value" };
+  }
+  if (!active.AllowedGovernanceOptionIds.every(
+    (option) => isBoundedText(option, MAX_OPTION_TEXT_LENGTH)
+  )) {
+    return { ok: false, reason: "malformed-required-field" };
+  }
+  if (active.HigherOptions.length > 0 && typeof active.HigherOptions[0] === "string") {
+    return { ok: false, reason: "malformed-required-field" };
+  }
+  if (!active.AllowedGovernanceOptionIds.every((option) => KNOWN_GOVERNANCE_OPTION_IDS.includes(option))) {
+    return { ok: false, reason: "unknown-governance-option" };
+  }
+  if (active.HigherOptions.some((option) => !isRecordValue2(option) || !isStructurallyValidOption(option))) {
+    return { ok: false, reason: "malformed-required-field" };
+  }
+  if (active.Enterprise !== void 0 && (!isRecordValue2(active.Enterprise) || !isBoundedText(active.Enterprise.PlanId) || !isBoundedText(active.Enterprise.DisplayName) || !isBoundedText(active.Enterprise.SafeDescription))) {
+    return { ok: false, reason: "malformed-required-field" };
+  }
+  const projection = {
+    kind: "licence-safe-projection",
+    schemaVersion: 1,
+    identityBinding: actorBinding,
+    networkBinding,
+    licenceReference: active.LicenceReference,
+    planId: active.PlanId,
+    planFamily: active.PlanFamily,
+    displayName: active.DisplayName,
+    safeDescription: active.SafeDescription,
+    effectiveFromUtc: active.EffectiveFromUtc,
+    expiresAtUtc: active.ExpiresAtUtc,
+    termKind: active.TermKind,
+    termYears: active.TermYears,
+    eligibleVoterCap: active.EligibleVoterCap,
+    unlimitedElections: active.UnlimitedElections,
+    allowedGovernanceOptionIds: [...active.AllowedGovernanceOptionIds],
+    catalogueVersion: active.AssignedCatalogueVersion,
+    higherOptions: projectSafeHigherOptions(active),
+    enterprise: projectSafeEnterprise(active),
+    provenance: "indexed-query"
+  };
+  return { ok: true, projection };
+}
+
+// src/lib/licensing/parser.ts
+var MAX_SAFE_TEXT_LENGTH2 = 512;
+function isBoundedString3(value, max = MAX_SAFE_TEXT_LENGTH2) {
+  return typeof value === "string" && value.length > 0 && value.length <= max;
+}
+function isRecord(value) {
+  return typeof value === "object" && value !== null;
+}
+function parseNoActiveTemplate(value) {
+  if (!isRecord(value)) {
+    return null;
+  }
+  if (value.TransitionIntent !== LICENCE_TRANSITION_INTENT_BASELINE_FREE) {
+    return null;
+  }
+  if (value.RequestedPlanId !== LICENCE_PLAN_DIRECT_FREE) {
+    return null;
+  }
+  if (!isBoundedString3(value.ObservedCatalogueVersion)) {
+    return null;
+  }
+  return {
+    TransitionIntent: LICENCE_TRANSITION_INTENT_BASELINE_FREE,
+    RequestedPlanId: LICENCE_PLAN_DIRECT_FREE,
+    ObservedCatalogueVersion: value.ObservedCatalogueVersion
+  };
+}
+function parseEntitlementQueryResult(result, actorBinding, networkBinding) {
+  if (!isRecord(result)) {
+    return { outcome: "malformed" };
+  }
+  if (result.ok === false) {
+    switch (result.status) {
+      case "UNAUTHENTICATED":
+        return { outcome: "unauthenticated" };
+      case "PERMISSION_DENIED":
+        return { outcome: "permissionDenied" };
+      case "INVALID_ARGUMENT":
+        return { outcome: "invalidArgument" };
+      case "UNIMPLEMENTED":
+        return { outcome: "unimplemented" };
+      case "UNAVAILABLE":
+        return { outcome: "unavailable", code: "licence_authority_unavailable" };
+      case "DEADLINE_EXCEEDED":
+      case "UNKNOWN":
+      default:
+        return { outcome: "transportFailure" };
+    }
+  }
+  switch (result.state) {
+    case "active": {
+      if (!isRecord(result.active)) {
+        return { outcome: "malformed" };
+      }
+      const built = buildLicenceSafeProjection(actorBinding, networkBinding, result.active);
+      if (!built.ok) {
+        if (built.reason === "unknown-plan-family" || built.reason === "unknown-plan-id" || built.reason === "unknown-governance-option" || built.reason === "incompatible-catalogue-version") {
+          return { outcome: "unsupported", reason: built.reason };
+        }
+        return { outcome: "malformed" };
+      }
+      return { outcome: "ready", projection: built.projection };
+    }
+    case "noActive": {
+      const template = parseNoActiveTemplate(result.template);
+      if (template === null) {
+        return { outcome: "malformed" };
+      }
+      return { outcome: "noActive", template };
+    }
+    case "unavailable": {
+      if (!isBoundedString3(result.code)) {
+        return { outcome: "malformed" };
+      }
+      return { outcome: "unavailable", code: result.code };
+    }
+    default:
+      return { outcome: "malformed" };
+  }
+}
+
+// src/lib/licensing/policy.ts
+var ENTITLEMENT_QUERY_POLL_INTERVAL_MS = 3e3;
+var ENTITLEMENT_CONFIRMATION_DELAYED_MS = 3e4;
+function classifyQueryOutcome(outcome) {
+  switch (outcome.outcome) {
+    case "ready":
+      return "ready";
+    case "noActive":
+      return "noActive";
+    case "unavailable":
+      return "unavailable";
+    case "unsupported":
+      return "unsupported";
+    case "unauthenticated":
+      return "authenticationFailure";
+    case "permissionDenied":
+    case "invalidArgument":
+    case "unimplemented":
+      return "terminalGuidance";
+    case "transportFailure":
+      return "transient";
+    case "malformed":
+      return "malformed";
+  }
+}
+
+// src/lib/licensing/direct-free.ts
+function buildDirectFreeUnsignedTransaction(template, transactionId, transactionTimestampUtc) {
+  if (template.TransitionIntent !== LICENCE_TRANSITION_INTENT_BASELINE_FREE || template.RequestedPlanId !== LICENCE_PLAN_DIRECT_FREE) {
+    return { ok: false, reason: "not-server-template" };
+  }
+  if (template.ObservedCatalogueVersion.length === 0 || template.ObservedCatalogueVersion.length > 256) {
+    return { ok: false, reason: "stale-or-unbounded-catalogue" };
+  }
+  const payload = {
+    TransitionIntent: LICENCE_TRANSITION_INTENT_BASELINE_FREE,
+    RequestedPlanId: LICENCE_PLAN_DIRECT_FREE,
+    ObservedCatalogueVersion: template.ObservedCatalogueVersion
+  };
+  const payloadSize = licencePayloadSizeBytes(payload);
+  const canonicalUnsignedJson = serializeLicenceUnsignedTransaction({
+    TransactionId: transactionId,
+    PayloadKind: "71370664-5eb4-4ce9-b96a-d7e7ffe53db5",
+    TransactionTimeStamp: transactionTimestampUtc,
+    Payload: payload,
+    PayloadSize: payloadSize
+  });
+  return {
+    ok: true,
+    payload,
+    payloadSize,
+    canonicalUnsignedJson,
+    digest: licenceTransactionDigest(canonicalUnsignedJson)
+  };
+}
+function decideSubmissionOutcome(outcome) {
+  switch (outcome) {
+    case "accepted":
+    case "pending":
+      return { kind: "reconcileByQuery" };
+    case "alreadyExists":
+      return { kind: "queryImmediately" };
+    case "terminalRejected":
+      return { kind: "failClosed" };
+    case "uncertain":
+      return { kind: "preserveAndReconcile" };
+  }
+}
+
+// src/lib/licensing/upgrade.ts
+var MAX_PLAN_ID_LENGTH = 128;
+var MAX_CATALOGUE_LENGTH = 256;
+var UUID_RE2 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+var ISO_UTC_RE2 = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/;
+function isBoundedText2(value, max) {
+  return typeof value === "string" && value.length > 0 && value.length <= max;
+}
+function buildConfirmedUpgradeUnsignedTransaction(input) {
+  if (!isBoundedText2(input.expectedCurrentLicenceTransactionId, MAX_PLAN_ID_LENGTH) || !UUID_RE2.test(input.expectedCurrentLicenceTransactionId)) {
+    return { ok: false, reason: "malformed-current-reference" };
+  }
+  if (!isBoundedText2(input.expectedCurrentPlanId, MAX_PLAN_ID_LENGTH) || !isBoundedText2(input.requestedPlanId, MAX_PLAN_ID_LENGTH)) {
+    return { ok: false, reason: "malformed-plan-id" };
+  }
+  if (input.requestedPlanId === input.expectedCurrentPlanId || input.requestedPlanId === LICENCE_PLAN_DIRECT_FREE) {
+    return { ok: false, reason: "self-target-or-direct-free" };
+  }
+  if (input.observedCatalogueVersion !== LICENCE_CATALOGUE_VERSION_V1 || input.observedCatalogueVersion.length > MAX_CATALOGUE_LENGTH) {
+    return { ok: false, reason: "stale-or-unbounded-catalogue" };
+  }
+  if (!isBoundedText2(input.transactionId, MAX_PLAN_ID_LENGTH) || !UUID_RE2.test(input.transactionId)) {
+    return { ok: false, reason: "malformed-transaction-id" };
+  }
+  if (input.transactionId === input.expectedCurrentLicenceTransactionId) {
+    return { ok: false, reason: "alias-new-transaction" };
+  }
+  if (!isBoundedText2(input.transactionTimestampUtc, 64) || !ISO_UTC_RE2.test(input.transactionTimestampUtc)) {
+    return { ok: false, reason: "malformed-timestamp" };
+  }
+  const payload = {
+    TransitionIntent: LICENCE_TRANSITION_INTENT_CONFIRMED_UPGRADE,
+    RequestedPlanId: input.requestedPlanId,
+    ObservedCatalogueVersion: input.observedCatalogueVersion,
+    ExpectedCurrentLicenceTransactionId: input.expectedCurrentLicenceTransactionId,
+    ExpectedCurrentPlanId: input.expectedCurrentPlanId
+  };
+  const payloadSize = licencePayloadSizeBytes(payload);
+  const canonicalUnsignedJson = serializeLicenceUnsignedTransaction({
+    TransactionId: input.transactionId,
+    PayloadKind: LICENCE_ASSIGNMENT_PAYLOAD_KIND,
+    TransactionTimeStamp: input.transactionTimestampUtc,
+    Payload: payload,
+    PayloadSize: payloadSize
+  });
+  return {
+    ok: true,
+    payload,
+    payloadSize,
+    canonicalUnsignedJson,
+    digest: licenceTransactionDigest(canonicalUnsignedJson)
+  };
+}
+function isBoundedPlanId(value) {
+  return isBoundedText2(value, MAX_PLAN_ID_LENGTH);
+}
+function licenceTransitionIntentOfPendingRecord(record) {
+  try {
+    const envelope = JSON.parse(record.transaction.exactJson);
+    const intent = envelope.Payload?.TransitionIntent;
+    return intent === "confirmed_upgrade" || intent === "baseline_free" ? intent : null;
+  } catch {
+    return null;
+  }
+}
+function isPendingRecordPurposeCoherent(record) {
+  const intent = licenceTransitionIntentOfPendingRecord(record);
+  if (intent === "confirmed_upgrade") {
+    return record.upgradeBinding !== void 0;
+  }
+  if (intent === "baseline_free") {
+    return record.upgradeBinding === void 0;
+  }
+  return false;
+}
+function resolveUpgradeTargetDisplayName(projection, targetPlanId) {
+  if (projection === null) {
+    return null;
+  }
+  if (projection.planId === targetPlanId) {
+    return projection.displayName;
+  }
+  const offered = projection.higherOptions.find((option) => option.planId === targetPlanId);
+  return offered === void 0 ? null : offered.displayName;
+}
+
+// src/lib/licensing/session-contract.ts
+var LICENCE_UPGRADE_OPERATION_STATUSES = [
+  "pending",
+  "delayed",
+  "stale",
+  "local-success",
+  "competing-activation"
+];
+function isLicenceUpgradeOperationStatus(value) {
+  return typeof value === "string" && LICENCE_UPGRADE_OPERATION_STATUSES.includes(value);
+}
+function isLicenceUpgradeStaleReason(value) {
+  return value === "current-changed" || value === "catalogue-changed" || value === "stale-rejection";
+}
+function buildLicenceUpgradeSafeOperation(input) {
+  if (!isLicenceUpgradeOperationStatus(input.status)) {
+    return { ok: false, reason: "invalid-input" };
+  }
+  if (input.status !== "stale" && input.reason !== void 0) {
+    return { ok: false, reason: "invalid-input" };
+  }
+  if ((input.status === "pending" || input.status === "delayed") && (input.operation === void 0 || input.operation === null)) {
+    return { ok: false, reason: "invalid-input" };
+  }
+  const base = {
+    kind: "licence-upgrade-safe-operation",
+    operation: input.operation ?? null,
+    currentPlanId: input.currentPlanId ?? null,
+    currentPlanDisplayName: input.currentPlanDisplayName ?? null,
+    targetPlanDisplayName: input.targetPlanDisplayName ?? null
+  };
+  if (input.status === "stale") {
+    if (!isLicenceUpgradeStaleReason(input.reason)) {
+      return { ok: false, reason: "invalid-input" };
+    }
+    return { ok: true, snapshot: { ...base, status: "stale", reason: input.reason } };
+  }
+  return { ok: true, snapshot: { ...base, status: input.status } };
+}
+var LICENCE_REVALIDATION_TRIGGERS = [
+  "foreground",
+  "reconnect",
+  "expiry",
+  "account-entry",
+  "authoritative-rejection",
+  "explicit-recovery"
+];
+function isLicenceRevalidationTrigger(value) {
+  return typeof value === "string" && LICENCE_REVALIDATION_TRIGGERS.includes(value);
+}
+function isLicenceConnectivityInput(value) {
+  return value === "online" || value === "offline" || value === "paused" || value === "reconnecting";
+}
+
+// src/lib/licensing/coordinator.ts
+var WEB_TARGET_BINDING = "web-sharedworker";
+var LicenceEntitlementCoordinator = class _LicenceEntitlementCoordinator {
+  constructor(actorBinding, networkBinding, ports) {
+    this.actorBinding = actorBinding;
+    this.networkBinding = networkBinding;
+    this.ports = ports;
+    this.phase = "resolving";
+    this.projection = null;
+    this.pendingTransactionId = null;
+    this.pendingRecord = null;
+    this.consecutiveUnauthenticated = 0;
+    this.attemptCount = 0;
+    this.inFlight = false;
+    this.cancelled = false;
+    this.needsImmediateQuery = false;
+    this.lastQueryAtMs = null;
+    this.reachableElapsedMs = 0;
+    this.lastReachableAtMs = null;
+    this.confirmationStartedReachableMs = null;
+    this.lastOutcomeCode = null;
+    /** Deduplicate a due boundary and rate-limit clock-skew rechecks. */
+    this.lastExpiryWakeup = null;
+    this.nextExpiryRecheckAtMs = 0;
+    /** FEAT-017: one-shot local-success notification eligibility (Task 3.3). */
+    this.upgradeNotificationEligible = false;
+    /**
+     * FEAT-017: delayed (D0) marker for a live upgrade operation while the old
+     * indexed licence keeps the machine phase ready (30 s advancing-chain or
+     * paused-chain; reset by a new submission/retry or by offline).
+     */
+    this.upgradeDelayed = false;
+    /** FEAT-017: retained terminal upgrade outcome until acknowledged. */
+    this.upgradeTerminal = null;
+    /** FEAT-017: consume-after-submit flag for the authoritative-rejection requery. */
+    this.upgradeRejectedRequery = false;
+  }
+  static {
+    /** Conservative retry after a due expiry query still returns active (FEAT-016 annual expiry). */
+    this.EXPIRY_RECHECK_INTERVAL_MS = 6e4;
+  }
+  snapshot() {
+    return {
+      phase: this.phase,
+      projection: this.projection,
+      pendingTransactionId: this.pendingTransactionId,
+      consecutiveUnauthenticated: this.consecutiveUnauthenticated,
+      reachableElapsedMs: this.reachableElapsedMs,
+      lastOutcomeCode: this.lastOutcomeCode,
+      upgradeOperation: this.buildUpgradeOperationSnapshot(),
+      upgradeNotificationEligible: this.upgradeNotificationEligible
+    };
+  }
+  /** Query-first start: restart, after-auth, and explicit bootstrap recovery. */
+  async start() {
+    this.cancelled = false;
+    this.lastExpiryWakeup = null;
+    this.nextExpiryRecheckAtMs = 0;
+    this.attemptCount = 0;
+    this.consecutiveUnauthenticated = 0;
+    this.projection = null;
+    this.upgradeDelayed = false;
+    this.upgradeTerminal = null;
+    this.upgradeNotificationEligible = false;
+    this.upgradeRejectedRequery = false;
+    this.phase = "resolving";
+    await this.runFreshQuery("start");
+    return this.snapshot();
+  }
+  /**
+   * One host-driven poll cycle. Query cadence is 3 s of reachable time, at
+   * most one call in flight; the 30 s window accumulates foreground/reachable
+   * monotonic time only and enters delayed confirmation at the threshold or
+   * immediately when the host reports paused.
+   */
+  async tick(eligibility) {
+    this.advanceReachable(eligibility);
+    if (!eligibility.authenticated || !eligibility.foregrounded || !eligibility.reachable || this.inFlight) {
+      return this.snapshot();
+    }
+    if (this.phase === "entitlementReady" && this.projection?.expiresAtUtc) {
+      const boundary = this.projection.expiresAtUtc;
+      const wakeup = `${this.projection.licenceReference}:${boundary}`;
+      const nowMs = this.ports.nowMs();
+      if (nowMs >= Date.parse(boundary) && (this.lastExpiryWakeup !== wakeup || nowMs >= this.nextExpiryRecheckAtMs)) {
+        this.lastExpiryWakeup = wakeup;
+        this.nextExpiryRecheckAtMs = nowMs + _LicenceEntitlementCoordinator.EXPIRY_RECHECK_INTERVAL_MS;
+        return this.revalidate("expiry");
+      }
+    }
+    if (this.phase !== "awaitingIndex" && this.phase !== "confirmationDelayed" && this.phase !== "entitlementUnavailable" && // FEAT-017 D017-01: while a confirmed-upgrade operation is unresolved
+    // the old indexed licence remains current; the authority must keep its
+    // query-only loop running even though the machine phase is ready.
+    !(this.phase === "entitlementReady" && this.hasLiveUpgradeOperation())) {
+      return this.snapshot();
+    }
+    if (this.lastQueryAtMs !== null && this.ports.nowMs() - this.lastQueryAtMs < ENTITLEMENT_QUERY_POLL_INTERVAL_MS) {
+      return this.snapshot();
+    }
+    await this.runFreshQuery("poll");
+    return this.snapshot();
+  }
+  /** Connectivity events: paused -> immediate delayed; offline -> gate and stop. */
+  async onConnectivity(event) {
+    if (event === "offline" || event === "reconnecting") {
+      if (this.phase !== "lockedOut") {
+        this.phase = "resolving";
+      }
+      this.projection = null;
+      this.reachableElapsedMs = 0;
+      this.lastReachableAtMs = null;
+      this.upgradeDelayed = false;
+      this.lastOutcomeCode = "offline";
+      return this.snapshot();
+    }
+    if (event === "paused") {
+      if (this.hasLiveUpgradeOperation() && this.projection !== null) {
+        this.upgradeDelayed = true;
+        this.lastOutcomeCode = "upgrade-chain-paused";
+        return this.snapshot();
+      }
+      if (this.phase === "awaitingIndex") {
+        this.phase = "confirmationDelayed";
+        this.lastOutcomeCode = "chain-paused";
+      }
+      return this.snapshot();
+    }
+    this.reachableElapsedMs = 0;
+    this.lastReachableAtMs = this.ports.nowMs();
+    if (this.phase === "resolving" || this.phase === "confirmationDelayed" || this.phase === "entitlementUnavailable") {
+      await this.runFreshQuery("reconnect");
+    }
+    return this.snapshot();
+  }
+  /** User/UI Retry: resubmits the exact sealed transaction (never a replacement). */
+  async retryExact() {
+    if (this.pendingRecord === null || this.pendingTransactionId === null) {
+      await this.start();
+      return this.snapshot();
+    }
+    this.confirmationStartedReachableMs = this.reachableElapsedMs;
+    this.lastOutcomeCode = "retry-exact";
+    await this.submitPending(this.pendingRecord);
+    return this.snapshot();
+  }
+  /** Manual/UI Retry after recoverable error states (fresh query first). */
+  async recoverFromError() {
+    if (this.pendingRecord !== null && this.pendingTransactionId !== null) {
+      await this.retryExact();
+      return this.snapshot();
+    }
+    await this.runFreshQuery("recovery");
+    return this.snapshot();
+  }
+  /**
+   * Revalidation triggers (foreground/resume, reconnect, expiry wake-up,
+   * account entry, authoritative rejection): gate first, then fresh query.
+   */
+  async revalidate(trigger) {
+    this.phase = "resolving";
+    this.projection = null;
+    this.lastOutcomeCode = `revalidate:${trigger}`;
+    await this.runFreshQuery(trigger);
+    return this.snapshot();
+  }
+  /**
+   * FEAT-017 Task 3.1 — one explicit confirmed-upgrade activation request.
+   *
+   * Consumes the closed higher-option handle the page selected and seals one
+   * exact confirmed-upgrade operation inside the existing credential
+   * authority. Deterministic rules (locked by Task 3.2 tests):
+   *  - opening/selection/confirmation never create a transaction — only this
+   *    explicit Activate request does;
+   *  - one authority operation owns construction, journaling, submission,
+   *    polling, and retry — duplicate confirmation (double click, tab race,
+   *    remount) coalesces or routes to the existing operation (D017-03);
+   *  - truth is re-queried fresh before sealing and the selected target must
+   *    still be a server-offered higher option of the SAME current licence the
+   *    page displayed (D017-06 stale detection; no seal on changed truth);
+   *  - the exact server-bound binding (expected current reference/plan, target,
+   *    catalogue) comes from the authority's own validated fresh projection —
+   *    never from client-authored policy;
+   *  - admission is never presented as activation; ordinary three-second
+   *    waiting only requeries, and Retry reuses the exact sealed transaction.
+   */
+  async confirmUpgrade(targetPlanId) {
+    this.clearUpgradePresentationArtifacts();
+    if (!isBoundedPlanId(targetPlanId)) {
+      this.lastOutcomeCode = "upgrade-invalid-input";
+      return this.snapshot();
+    }
+    const requestedPlanId = targetPlanId;
+    if (this.hasLiveUpgradeOperation()) {
+      this.lastOutcomeCode = "upgrade-already-pending";
+      return this.snapshot();
+    }
+    if (this.pendingRecord !== null || this.pendingTransactionId !== null) {
+      this.lastOutcomeCode = "upgrade-not-ready";
+      return this.snapshot();
+    }
+    if (this.phase !== "entitlementReady" || this.projection === null) {
+      this.lastOutcomeCode = "upgrade-not-ready";
+      return this.snapshot();
+    }
+    const displayed = this.projection;
+    await this.runFreshQuery("confirm-upgrade");
+    if (this.cancelled) {
+      return this.snapshot();
+    }
+    if (this.hasLiveUpgradeOperation()) {
+      this.lastOutcomeCode = "upgrade-already-pending";
+      return this.snapshot();
+    }
+    if (this.phase !== "entitlementReady" || this.projection === null) {
+      this.lastOutcomeCode = "upgrade-not-ready";
+      return this.snapshot();
+    }
+    const fresh = this.projection;
+    if (fresh.licenceReference !== displayed.licenceReference || fresh.planId !== displayed.planId || fresh.planId === requestedPlanId) {
+      this.upgradeTerminal = { status: "stale", reason: "current-changed" };
+      this.lastOutcomeCode = "upgrade-stale-current-changed";
+      return this.snapshot();
+    }
+    const offered = fresh.higherOptions.some((option) => option.planId === requestedPlanId);
+    if (!offered) {
+      this.upgradeTerminal = { status: "stale", reason: "catalogue-changed" };
+      this.lastOutcomeCode = "upgrade-stale-catalogue-changed";
+      return this.snapshot();
+    }
+    await this.sealAndSubmitConfirmedUpgrade(requestedPlanId, fresh);
+    return this.snapshot();
+  }
+  /**
+   * FEAT-017 Task 3.3 — authority-side acknowledgement that the page surfaced
+   * the terminal upgrade outcome (result view, one-time notification, stale
+   * review, or competing notice). Clears the retained terminal context and the
+   * one-shot notification eligibility. A live pending operation is untouched.
+   */
+  acknowledgeUpgradeOutcome() {
+    this.upgradeTerminal = null;
+    this.upgradeNotificationEligible = false;
+    this.lastOutcomeCode = "upgrade-outcome-acknowledged";
+    return this.snapshot();
+  }
+  /** Lock/invalidation: stop work, clear ephemeral projection, ignore late results. */
+  async lock() {
+    this.cancelled = true;
+    this.inFlight = false;
+    this.projection = null;
+    this.pendingRecord = null;
+    this.pendingTransactionId = null;
+    this.upgradeDelayed = false;
+    this.upgradeTerminal = null;
+    this.upgradeNotificationEligible = false;
+    this.upgradeRejectedRequery = false;
+    this.phase = "lockedOut";
+    this.lastOutcomeCode = "locked";
+    return this.snapshot();
+  }
+  advanceReachable(eligibility) {
+    const now = this.ports.nowMs();
+    if (eligibility.authenticated && eligibility.foregrounded && eligibility.reachable) {
+      if (this.lastReachableAtMs === null) {
+        this.lastReachableAtMs = now;
+      } else {
+        this.reachableElapsedMs += Math.max(0, now - this.lastReachableAtMs);
+        this.lastReachableAtMs = now;
+      }
+      if (this.confirmationStartedReachableMs !== null && this.reachableElapsedMs - this.confirmationStartedReachableMs >= ENTITLEMENT_CONFIRMATION_DELAYED_MS && (this.phase === "awaitingIndex" || this.phase === "baselineSubmitting" || this.phase === "entitlementReady" && this.hasLiveUpgradeOperation())) {
+        if (this.hasLiveUpgradeOperation() && this.projection !== null) {
+          this.upgradeDelayed = true;
+          this.lastOutcomeCode = "upgrade-confirmation-delayed-30s";
+        } else {
+          this.phase = "confirmationDelayed";
+          this.lastOutcomeCode = "confirmation-delayed-30s";
+        }
+      }
+    } else {
+      this.lastReachableAtMs = null;
+    }
+  }
+  /** One serialized query with the single fresh-envelope UNAUTHENTICATED retry. */
+  async runFreshQuery(reason) {
+    if (this.inFlight || this.cancelled) {
+      return;
+    }
+    this.inFlight = true;
+    try {
+      for (let attempt = 1; attempt <= 2; attempt += 1) {
+        if (this.cancelled) {
+          return;
+        }
+        this.attemptCount += 1;
+        const transport = await this.ports.queryTransport();
+        if (this.cancelled) {
+          return;
+        }
+        this.lastQueryAtMs = this.ports.nowMs();
+        const outcome = parseEntitlementQueryResult(
+          transport,
+          this.actorBinding,
+          this.networkBinding
+        );
+        if (outcome.outcome === "unauthenticated" && attempt === 1 && reason !== "retry") {
+          this.consecutiveUnauthenticated = 1;
+          this.lastOutcomeCode = "unauthenticated-retry-once";
+          continue;
+        }
+        if (outcome.outcome === "unauthenticated") {
+          this.consecutiveUnauthenticated = 2;
+          this.projection = null;
+          this.pendingRecord = null;
+          this.pendingTransactionId = null;
+          this.phase = "lockedOut";
+          this.lastOutcomeCode = "unauthenticated-forced-lock";
+          return;
+        }
+        this.consecutiveUnauthenticated = 0;
+        await this.applyQueryOutcome(outcome, reason);
+        return;
+      }
+    } finally {
+      this.inFlight = false;
+    }
+  }
+  async applyQueryOutcome(outcome, reason) {
+    const cls = classifyQueryOutcome(outcome);
+    switch (cls) {
+      case "ready": {
+        if (outcome.outcome !== "ready") return;
+        await this.attachBoundPendingRecordForReconciliation();
+        const reconciledUpgrade = this.reconcilePendingAgainstActive(outcome.projection.licenceReference);
+        this.projection = outcome.projection;
+        this.phase = "entitlementReady";
+        if (!reconciledUpgrade) {
+          this.lastOutcomeCode = "ready";
+        }
+        return;
+      }
+      case "noActive": {
+        if (outcome.outcome !== "noActive") return;
+        this.projection = null;
+        await this.handleNoActive(outcome.template, reason);
+        return;
+      }
+      case "unavailable":
+        this.projection = null;
+        this.phase = "entitlementUnavailable";
+        this.lastOutcomeCode = outcome.outcome === "unavailable" ? outcome.code : "unavailable";
+        return;
+      case "unsupported":
+        this.projection = null;
+        this.phase = "entitlementUnsupported";
+        this.lastOutcomeCode = outcome.outcome === "unsupported" ? outcome.reason === "unknown-plan-family" ? "plan-family-unknown" : outcome.reason === "incompatible-catalogue-version" ? "catalogue-incompatible" : "unsupported" : "unsupported";
+        return;
+      case "authenticationFailure":
+        this.phase = "lockedOut";
+        this.lastOutcomeCode = "unauthenticated-forced-lock";
+        return;
+      case "transient":
+        this.projection = null;
+        this.lastOutcomeCode = "transport-uncertain";
+        this.phase = this.pendingRecord !== null && this.pendingTransactionId !== null ? "awaitingIndex" : "entitlementUnavailable";
+        return;
+      case "malformed":
+        this.projection = null;
+        this.phase = "entitlementRepair";
+        this.lastOutcomeCode = "malformed-response";
+        return;
+      case "terminalGuidance":
+        this.projection = null;
+        this.phase = "entitlementUnsupported";
+        this.lastOutcomeCode = "terminal-guidance";
+        return;
+    }
+    void reason;
+  }
+  async handleNoActive(template, reason) {
+    const bound = await this.findBoundPending();
+    if (bound !== null) {
+      this.pendingRecord = bound;
+      this.pendingTransactionId = bound.transactionId;
+      if (isConfirmedUpgradePendingRecord(bound)) {
+        this.phase = "awaitingIndex";
+        this.lastOutcomeCode = "upgrade-no-active-query-only";
+        return;
+      }
+      if (reason === "poll") {
+        if (this.phase !== "confirmationDelayed") {
+          this.phase = "awaitingIndex";
+          this.lastOutcomeCode = "still-waiting-no-auto-resubmit";
+        }
+        return;
+      }
+      this.lastOutcomeCode = "no-active-resubmit-exact";
+      await this.submitPending(bound);
+      return;
+    }
+    this.phase = "baselineSigning";
+    this.lastOutcomeCode = "constructing-baseline";
+    const identity = this.ports.nextBaselineIdentity();
+    const built = buildDirectFreeUnsignedTransaction(template, identity.transactionId, identity.timestampUtc);
+    if (!built.ok) {
+      this.phase = "entitlementRepair";
+      this.lastOutcomeCode = "template-rejected";
+      return;
+    }
+    const record = {
+      schemaVersion: 1,
+      purpose: LICENCE_PENDING_PURPOSE,
+      transaction: { exactJson: built.canonicalUnsignedJson, digest: built.digest },
+      transactionId: identity.transactionId,
+      identityBinding: this.actorBinding,
+      networkBinding: this.networkBinding,
+      targetBinding: WEB_TARGET_BINDING,
+      createdUtc: identity.timestampUtc,
+      attemptEvidence: [],
+      recoveryState: "sealed"
+    };
+    const saved = this.ports.savePending(record);
+    if (!saved.ok) {
+      this.phase = "entitlementRepair";
+      this.lastOutcomeCode = "journal-unavailable";
+      return;
+    }
+    this.pendingRecord = record;
+    this.pendingTransactionId = record.transactionId;
+    await this.submitPending(record);
+  }
+  async findBoundPending() {
+    if (this.pendingTransactionId !== null) {
+      const direct = this.ports.loadPending(this.pendingTransactionId);
+      if (direct.ok && direct.record !== void 0) {
+        return direct.record;
+      }
+    }
+    const byIdentity = this.ports.loadPendingForIdentity(this.actorBinding, this.networkBinding);
+    if (byIdentity.ok && byIdentity.record !== void 0) {
+      return byIdentity.record;
+    }
+    return null;
+  }
+  /**
+   * @returns true when a confirmed-upgrade operation was processed against the
+   * fresh active reference (its purpose-specific outcome code was set); false
+   * for baseline/no-pending results (the caller reports plain 'ready').
+   */
+  reconcilePendingAgainstActive(activeLicenceReference) {
+    if (this.pendingTransactionId === null) {
+      return false;
+    }
+    if (this.pendingRecord !== null && isConfirmedUpgradePendingRecord(this.pendingRecord)) {
+      return this.reconcilePendingUpgrade(activeLicenceReference);
+    }
+    const pendingIsActive = activeLicenceReference === this.pendingTransactionId;
+    this.retirePending(pendingIsActive ? "confirmed-indexed" : "superseded");
+    this.pendingRecord = null;
+    this.pendingTransactionId = null;
+    return false;
+  }
+  /**
+   * FEAT-017 reconciliation of one confirmed-upgrade operation against fresh
+   * indexed truth (Task 3.3 table):
+   *  - expected OLD licence reference  -> preserve pending under old limits;
+   *  - exact sealed transaction UUID   -> local success emitted ONCE;
+   *  - any other changed compatible ref -> competing activation: accept
+   *    authoritative truth, retire obsolete pending, NO local-success claim.
+   *
+   * @returns true when this record was processed (outcome code set).
+   */
+  reconcilePendingUpgrade(activeLicenceReference) {
+    if (this.pendingRecord === null) {
+      return false;
+    }
+    const binding = this.pendingRecord.upgradeBinding;
+    if (binding === void 0) {
+      return false;
+    }
+    if (activeLicenceReference === binding.expectedCurrentLicenceTransactionId) {
+      this.lastOutcomeCode = "upgrade-pending-old-current";
+      return true;
+    }
+    if (activeLicenceReference === this.pendingRecord.transactionId) {
+      const operation = {
+        pendingTransactionId: this.pendingRecord.transactionId,
+        expectedCurrentPlanId: binding.expectedCurrentPlanId,
+        targetPlanId: binding.requestedPlanId,
+        observedCatalogueVersion: binding.observedCatalogueVersion,
+        sealedAtUtc: this.pendingRecord.createdUtc
+      };
+      this.retirePending("confirmed-indexed");
+      this.pendingRecord = null;
+      this.pendingTransactionId = null;
+      this.upgradeTerminal = { status: "local-success", operation };
+      this.upgradeNotificationEligible = true;
+      this.upgradeDelayed = false;
+      this.lastOutcomeCode = "upgrade-local-success";
+      return true;
+    }
+    this.retirePending("superseded");
+    this.pendingRecord = null;
+    this.pendingTransactionId = null;
+    this.upgradeTerminal = { status: "competing-activation" };
+    this.upgradeDelayed = false;
+    this.lastOutcomeCode = "upgrade-competing-activation";
+    return true;
+  }
+  async submitPending(record) {
+    if (this.cancelled) {
+      return;
+    }
+    if (!isPendingRecordPurposeCoherent(record)) {
+      this.phase = "entitlementRepair";
+      this.lastOutcomeCode = "upgrade-record-missing-binding";
+      return;
+    }
+    this.inFlight = true;
+    this.phase = "baselineSubmitting";
+    this.confirmationStartedReachableMs = this.reachableElapsedMs;
+    this.upgradeDelayed = false;
+    try {
+      const admission = await this.ports.submitBaseline(record);
+      if (this.cancelled) {
+        return;
+      }
+      this.recordAttempt(record, admission);
+      const decision = decideSubmissionOutcome(admission);
+      const upgrade = isConfirmedUpgradePendingRecord(record);
+      switch (decision.kind) {
+        case "reconcileByQuery":
+          if (upgrade && this.projection !== null) {
+            this.phase = "entitlementReady";
+          } else {
+            this.phase = "awaitingIndex";
+          }
+          this.lastOutcomeCode = admission === "accepted" ? "accepted" : "pending";
+          break;
+        case "queryImmediately":
+          this.phase = "resolving";
+          this.lastOutcomeCode = "already-exists-query-now";
+          this.needsImmediateQuery = true;
+          break;
+        case "failClosed":
+          if (upgrade) {
+            this.upgradeRejectedRequery = true;
+            this.lastOutcomeCode = "upgrade-terminal-rejected-requery";
+          } else {
+            this.phase = "entitlementRepair";
+            this.lastOutcomeCode = "terminal-rejected";
+          }
+          break;
+        case "preserveAndReconcile":
+          if (upgrade && this.projection !== null) {
+            this.phase = "entitlementReady";
+          } else {
+            this.phase = "awaitingIndex";
+          }
+          this.lastOutcomeCode = "submit-uncertain";
+          break;
+      }
+    } finally {
+      this.inFlight = false;
+    }
+    if (this.needsImmediateQuery && !this.cancelled) {
+      this.needsImmediateQuery = false;
+      await this.runFreshQuery("already-exists");
+    }
+    if (this.upgradeRejectedRequery && !this.cancelled) {
+      this.upgradeRejectedRequery = false;
+      await this.reconcileRejectedUpgrade();
+    }
+  }
+  /**
+   * FEAT-017 (D017-06): authoritative rejection of a sealed confirmed upgrade.
+   * Re-query indexed truth first: if another activation indexed meanwhile, the
+   * normal reconciliation outcomes apply (exact local success / competing). If
+   * truth is unchanged (the old licence still current), the attempted
+   * activation is terminal-obsolete: retire the sealed operation and require a
+   * fresh review (stale-rejection). No-active/unavailable truth keeps the
+   * operation in query-only recovery under the existing gates.
+   */
+  async reconcileRejectedUpgrade() {
+    const wasPendingId = this.pendingTransactionId;
+    await this.runFreshQuery("upgrade-rejected");
+    if (this.cancelled || wasPendingId === null) {
+      return;
+    }
+    if (this.pendingTransactionId === null || this.pendingRecord === null) {
+      return;
+    }
+    if (isConfirmedUpgradePendingRecord(this.pendingRecord) && this.phase === "entitlementReady" && this.projection !== null) {
+      this.retirePending("retired");
+      this.pendingRecord = null;
+      this.pendingTransactionId = null;
+      this.upgradeTerminal = { status: "stale", reason: "stale-rejection" };
+      this.upgradeDelayed = false;
+      this.lastOutcomeCode = "upgrade-stale-rejection";
+    }
+  }
+  recordAttempt(record, admission) {
+    const evidence = {
+      at: new Date(this.ports.nowMs()).toISOString(),
+      outcome: admission === "accepted" ? "accepted" : admission === "pending" ? "pending" : admission === "alreadyExists" ? "alreadyExists" : admission === "terminalRejected" ? "terminalRejected" : "uncertain"
+    };
+    const updated = {
+      ...record,
+      recoveryState: admission === "terminalRejected" ? "unrecoverable" : record.recoveryState === "sealed" ? admission === "accepted" ? "waitingAccepted" : "waitingPending" : record.recoveryState,
+      attemptEvidence: [...record.attemptEvidence, evidence]
+    };
+    this.ports.savePending(updated);
+    this.pendingRecord = updated;
+  }
+  retirePending(state) {
+    if (this.pendingTransactionId !== null) {
+      const loaded = this.ports.loadPending(this.pendingTransactionId);
+      if (loaded.ok && loaded.record !== void 0) {
+        const updated = {
+          ...loaded.record,
+          recoveryState: state === "confirmed-indexed" ? "confirmedIndexed" : state === "superseded" ? "superseded" : "retired"
+        };
+        this.ports.savePending(updated);
+      }
+      this.ports.deletePending(this.pendingTransactionId);
+    }
+  }
+  /** True while one confirmed-upgrade operation is sealed and unresolved. */
+  hasLiveUpgradeOperation() {
+    return this.pendingRecord !== null && this.pendingTransactionId !== null && isConfirmedUpgradePendingRecord(this.pendingRecord);
+  }
+  /**
+   * FEAT-017: page-safe snapshot of the live confirmed-upgrade operation
+   * (pending/delayed). Terminal outcomes (Task 3.3) replace the live view once
+   * the operation resolves. Built through the closed session-contract builder,
+   * so exact bytes, signatures, bindings, and journal state are structurally
+   * absent; display names come only from validated fresh projection data at
+   * snapshot time (Phase 2 review recommendation #4).
+   */
+  /**
+   * FEAT-017: page-safe confirmed-upgrade operation view. A live sealed
+   * operation renders as pending/delayed; a retained terminal outcome renders
+   * as local-success / competing-activation / stale. Built through the closed
+   * session-contract builder, so exact bytes, signatures, bindings, and journal
+   * state are structurally absent; display names come only from validated
+   * fresh projection data at snapshot time (Phase 2 review recommendation #4).
+   */
+  buildUpgradeOperationSnapshot() {
+    if (this.hasLiveUpgradeOperation() && this.pendingRecord !== null) {
+      const binding = this.pendingRecord.upgradeBinding;
+      if (binding !== void 0) {
+        const identity = {
+          pendingTransactionId: this.pendingRecord.transactionId,
+          expectedCurrentPlanId: binding.expectedCurrentPlanId,
+          targetPlanId: binding.requestedPlanId,
+          observedCatalogueVersion: binding.observedCatalogueVersion,
+          sealedAtUtc: this.pendingRecord.createdUtc
+        };
+        const delayed = this.upgradeDelayed || this.phase === "confirmationDelayed";
+        const built = buildLicenceUpgradeSafeOperation({
+          status: delayed ? "delayed" : "pending",
+          operation: identity,
+          currentPlanId: this.projection === null ? null : this.projection.planId,
+          currentPlanDisplayName: this.projection === null ? null : this.projection.displayName,
+          targetPlanDisplayName: resolveUpgradeTargetDisplayName(
+            this.projection,
+            binding.requestedPlanId
+          )
+        });
+        if (built.ok) {
+          return built.snapshot;
+        }
+      }
+    }
+    return this.buildUpgradeTerminalSnapshot();
+  }
+  /**
+   * FEAT-017: page-safe snapshot of the retained terminal upgrade outcome
+   * (local-success / competing-activation / stale with its closed reason).
+   * Display names resolve only from validated fresh projection data at
+   * snapshot time (never stale or invented copy).
+   */
+  buildUpgradeTerminalSnapshot() {
+    if (this.upgradeTerminal === null) {
+      return null;
+    }
+    const terminal = this.upgradeTerminal;
+    const currentPlanId = this.projection === null ? null : this.projection.planId;
+    const currentPlanDisplayName = this.projection === null ? null : this.projection.displayName;
+    if (terminal.status === "local-success") {
+      const built2 = buildLicenceUpgradeSafeOperation({
+        status: "local-success",
+        operation: terminal.operation,
+        currentPlanId,
+        currentPlanDisplayName,
+        targetPlanDisplayName: resolveUpgradeTargetDisplayName(
+          this.projection,
+          terminal.operation.targetPlanId
+        )
+      });
+      return built2.ok ? built2.snapshot : null;
+    }
+    if (terminal.status === "stale") {
+      const built2 = buildLicenceUpgradeSafeOperation({
+        status: "stale",
+        reason: terminal.reason,
+        operation: null,
+        currentPlanId,
+        currentPlanDisplayName,
+        targetPlanDisplayName: null
+      });
+      return built2.ok ? built2.snapshot : null;
+    }
+    const built = buildLicenceUpgradeSafeOperation({
+      status: "competing-activation",
+      operation: null,
+      currentPlanId,
+      currentPlanDisplayName,
+      targetPlanDisplayName: null
+    });
+    return built.ok ? built.snapshot : null;
+  }
+  /**
+   * Restart/reconnect recovery on READY truth: when no operation is loaded in
+   * memory but the durable journal still holds a bound pending record for this
+   * identity/network, attach it so reconciliation can preserve/retire it
+   * against the fresh active reference. FEAT-016 only recovered bound records
+   * under no-active truth; a confirmed-upgrade operation must ALSO survive a
+   * query-first restart while the old licence is still current.
+   */
+  async attachBoundPendingRecordForReconciliation() {
+    if (this.pendingRecord !== null || this.pendingTransactionId !== null) {
+      return;
+    }
+    const bound = await this.findBoundPending();
+    if (bound !== null) {
+      this.pendingRecord = bound;
+      this.pendingTransactionId = bound.transactionId;
+    }
+  }
+  /**
+   * FEAT-017: one new activation intent supersedes previously surfaced
+   * presentation artifacts (one-shot notification eligibility; Task 3.3 also
+   * clears retained terminal result/stale/competing notices here).
+   */
+  clearUpgradePresentationArtifacts() {
+    this.upgradeTerminal = null;
+    this.upgradeNotificationEligible = false;
+  }
+  /**
+   * FEAT-017: seal and submit ONE exact confirmed-upgrade operation from the
+   * authority's own validated fresh projection. The purpose-bound record is
+   * journaled BEFORE submission (seal-before-submit), binding the expected old
+   * current reference/plan, the requested target, and the observed catalogue
+   * release so a later query-first restart can recover and reconcile it.
+   */
+  async sealAndSubmitConfirmedUpgrade(requestedPlanId, truth) {
+    const identity = this.ports.nextBaselineIdentity();
+    const binding = {
+      kind: "confirmed_upgrade",
+      expectedCurrentLicenceTransactionId: truth.licenceReference,
+      expectedCurrentPlanId: truth.planId,
+      requestedPlanId,
+      observedCatalogueVersion: truth.catalogueVersion
+    };
+    const built = buildConfirmedUpgradeUnsignedTransaction({
+      expectedCurrentLicenceTransactionId: truth.licenceReference,
+      expectedCurrentPlanId: truth.planId,
+      requestedPlanId,
+      observedCatalogueVersion: truth.catalogueVersion,
+      transactionId: identity.transactionId,
+      transactionTimestampUtc: identity.timestampUtc
+    });
+    if (!built.ok) {
+      this.phase = "entitlementRepair";
+      this.lastOutcomeCode = `upgrade-template-rejected:${built.reason}`;
+      return;
+    }
+    const record = {
+      schemaVersion: 1,
+      purpose: LICENCE_PENDING_PURPOSE,
+      transaction: { exactJson: built.canonicalUnsignedJson, digest: built.digest },
+      transactionId: identity.transactionId,
+      identityBinding: this.actorBinding,
+      networkBinding: this.networkBinding,
+      targetBinding: WEB_TARGET_BINDING,
+      createdUtc: identity.timestampUtc,
+      attemptEvidence: [],
+      recoveryState: "sealed",
+      upgradeBinding: binding
+    };
+    const saved = this.ports.savePending(record);
+    if (!saved.ok) {
+      this.phase = "entitlementRepair";
+      this.lastOutcomeCode = "journal-unavailable";
+      return;
+    }
+    this.pendingRecord = record;
+    this.pendingTransactionId = record.transactionId;
+    await this.submitPending(record);
+  }
+};
+
+// src/lib/browser-vault/production/licence-session.ts
+function snapshotFromCoordinator(snapshot) {
+  return {
+    phase: snapshot.phase,
+    projection: snapshot.projection,
+    lastOutcomeCode: snapshot.lastOutcomeCode,
+    pendingTransactionId: snapshot.pendingTransactionId,
+    upgradeOperation: snapshot.upgradeOperation,
+    upgradeNotificationEligible: snapshot.upgradeNotificationEligible
+  };
+}
+var LicenceBootstrapSession = class {
+  constructor(deps) {
+    this.deps = deps;
+    this.coordinator = null;
+    this.eligibility = {
+      foregrounded: true,
+      reachable: true,
+      paused: false
+    };
+    this.mirror = /* @__PURE__ */ new Map();
+    this.durableHealthy = true;
+    this.actorSigningAddress = null;
+    this.networkBinding = null;
+    this.lastProgressKey = null;
+    this.lastConnectivity = null;
+  }
+  /** True while an authenticated session is bound (loop keep-alive). */
+  isActive() {
+    return this.coordinator !== null && this.deps.engine.licenceActor() !== null;
+  }
+  /** Current safe snapshot (null before the session is bound). */
+  snapshot() {
+    return this.coordinator === null ? null : snapshotFromCoordinator(this.coordinator.snapshot());
+  }
+  /**
+   * Start/resume query-first bootstrap after authentication or restart.
+   * `networkBinding` is re-verified against the authority-owned manifest.
+   */
+  async start(networkBinding) {
+    const actor = this.deps.engine.licenceActor();
+    if (actor === null) {
+      return { ok: false, reason: "not-authenticated" };
+    }
+    if (typeof networkBinding !== "string" || networkBinding.length === 0 || networkBinding.length > 256) {
+      return { ok: false, reason: "invalid-input" };
+    }
+    if (networkBinding !== this.deps.expectedNetworkBinding) {
+      return { ok: false, reason: "invalid-input" };
+    }
+    if (this.coordinator !== null && (this.actorSigningAddress !== actor.signingAddress || this.networkBinding !== networkBinding)) {
+      this.teardown();
+    }
+    if (this.coordinator !== null) {
+      const result = await this.pumpOnce();
+      return result.ok ? { ok: true, snapshot: result.snapshot } : { ok: false, reason: "authority-unavailable" };
+    }
+    this.actorSigningAddress = actor.signingAddress;
+    this.networkBinding = networkBinding;
+    const hydrated = await this.hydrateDurable();
+    if (!hydrated.ok) {
+      this.durableHealthy = false;
+    }
+    this.coordinator = new LicenceEntitlementCoordinator(
+      actor.signingAddress,
+      networkBinding,
+      this.buildPorts()
+    );
+    const started = await this.coordinator.start();
+    const snapshot = snapshotFromCoordinator(started);
+    await this.flushDurable();
+    this.emitProgress(snapshot);
+    return { ok: true, snapshot };
+  }
+  /** Page-pushed eligibility/lifecycle/connectivity inputs. */
+  async updateEligibility(input) {
+    if (this.coordinator === null) {
+      return { ok: false, reason: "not-authenticated" };
+    }
+    const foregrounded = input.foregrounded ?? this.eligibility.foregrounded;
+    if (typeof foregrounded !== "boolean") {
+      return { ok: false, reason: "invalid-input" };
+    }
+    this.eligibility = { ...this.eligibility, foregrounded };
+    if (input.connectivity !== void 0) {
+      if (!isLicenceConnectivityInput(input.connectivity)) {
+        return { ok: false, reason: "invalid-input" };
+      }
+      if (input.connectivity !== this.lastConnectivity) {
+        this.lastConnectivity = input.connectivity;
+        await this.coordinator.onConnectivity(input.connectivity);
+        this.applyConnectivityEligibility(input.connectivity);
+      }
+    }
+    return this.pumpOnce();
+  }
+  /** User/UI control intents (Retry, recovery, revalidation triggers). */
+  async control(kind, trigger) {
+    if (this.coordinator === null || this.deps.engine.licenceActor() === null) {
+      return { ok: false, reason: "not-authenticated" };
+    }
+    switch (kind) {
+      case "retry": {
+        await this.coordinator.retryExact();
+        break;
+      }
+      case "recover": {
+        await this.coordinator.recoverFromError();
+        break;
+      }
+      case "revalidate": {
+        if (!isLicenceRevalidationTrigger(trigger)) {
+          return { ok: false, reason: "invalid-input" };
+        }
+        await this.coordinator.revalidate(trigger);
+        break;
+      }
+      default:
+        return { ok: false, reason: "invalid-input" };
+    }
+    await this.flushDurable();
+    const snapshot = snapshotFromCoordinator(this.coordinator.snapshot());
+    this.emitProgress(snapshot);
+    return { ok: true, snapshot };
+  }
+  /**
+   * FEAT-017 Task 6.1 — one closed confirmed-upgrade activation routed
+   * through the SAME serialized authority session. The page hands a bounded
+   * server plan handle; the coordinator re-queries fresh truth, seals exactly
+   * one confirmed_upgrade record, and the existing journal/loop/retry own
+   * everything after that. A second request while an operation is live
+   * coalesces (never a second transaction).
+   */
+  async confirmUpgrade(targetPlanId) {
+    if (this.coordinator === null || this.deps.engine.licenceActor() === null) {
+      return { ok: false, reason: "not-authenticated" };
+    }
+    if (typeof targetPlanId !== "string" || !isBoundedPlanId(targetPlanId)) {
+      return { ok: false, reason: "invalid-input" };
+    }
+    await this.coordinator.confirmUpgrade(targetPlanId);
+    await this.flushDurable();
+    const snapshot = snapshotFromCoordinator(this.coordinator.snapshot());
+    this.emitProgress(snapshot);
+    return { ok: true, snapshot };
+  }
+  /** FEAT-017 Task 6.1 — acknowledge a surfaced terminal upgrade outcome. */
+  async acknowledgeUpgradeOutcome() {
+    if (this.coordinator === null || this.deps.engine.licenceActor() === null) {
+      return { ok: false, reason: "not-authenticated" };
+    }
+    this.coordinator.acknowledgeUpgradeOutcome();
+    await this.flushDurable();
+    const snapshot = snapshotFromCoordinator(this.coordinator.snapshot());
+    this.emitProgress(snapshot);
+    return { ok: true, snapshot };
+  }
+  /** One serialized pump cycle (authority-owned loop; ~1 s cadence). */
+  async pump() {
+    const result = await this.pumpOnce();
+    return result.ok ? result.snapshot : null;
+  }
+  /** Teardown: drop coordinator + mirror + binding (never the durable journal). */
+  teardown() {
+    this.coordinator = null;
+    this.mirror.clear();
+    this.actorSigningAddress = null;
+    this.networkBinding = null;
+    this.lastConnectivity = null;
+    this.lastProgressKey = null;
+    this.durableHealthy = true;
+    this.eligibility = { foregrounded: true, reachable: true, paused: false };
+  }
+  async pumpOnce() {
+    if (this.coordinator === null) {
+      return { ok: false, reason: "not-authenticated" };
+    }
+    if (this.deps.engine.licenceActor() === null) {
+      this.teardown();
+      return { ok: false, reason: "not-authenticated" };
+    }
+    const pending = this.coordinator.tick({
+      authenticated: true,
+      foregrounded: this.eligibility.foregrounded,
+      reachable: this.eligibility.reachable,
+      paused: this.eligibility.paused
+    });
+    this.emitProgress(snapshotFromCoordinator(this.coordinator.snapshot()));
+    const snapshot = await pending;
+    const safe = snapshotFromCoordinator(snapshot);
+    await this.flushDurable();
+    this.emitProgress(safe);
+    return { ok: true, snapshot: safe };
+  }
+  applyConnectivityEligibility(connectivity) {
+    switch (connectivity) {
+      case "online":
+        this.eligibility = { ...this.eligibility, reachable: true, paused: false };
+        break;
+      case "paused":
+        this.eligibility = { ...this.eligibility, reachable: true, paused: true };
+        break;
+      case "offline":
+      case "reconnecting":
+        this.eligibility = { ...this.eligibility, reachable: false, paused: false };
+        break;
+    }
+  }
+  buildPorts() {
+    return {
+      nowMs: () => this.deps.nowMs(),
+      queryTransport: async () => {
+        const actor = this.deps.engine.licenceActor();
+        if (actor === null) {
+          return { ok: false, status: "UNAVAILABLE" };
+        }
+        return this.deps.engine.licenceQuery((headers) => this.deps.querySubmit(headers));
+      },
+      submitBaseline: async (record) => this.submitBaseline(record),
+      nextBaselineIdentity: () => ({ transactionId: createUuidV4(), timestampUtc: new Date(this.deps.nowMs()).toISOString() }),
+      savePending: (record) => this.mirrorSave(record),
+      loadPending: (transactionId) => this.mirrorLoad(transactionId),
+      loadPendingForIdentity: (identityBinding, networkBinding) => this.mirrorLoadForIdentity(identityBinding, networkBinding),
+      deletePending: (transactionId) => this.mirrorDelete(transactionId)
+    };
+  }
+  /**
+   * Exact-bytes seam (Phase 3 review note 1): if the coordinator hands an
+   * unsigned envelope, the authority seals it deterministically, persists the
+   * exact signed form to the encrypted durable journal, and ONLY then submits
+   * the exact signed transaction through the canonical ingress.
+   */
+  async submitBaseline(record) {
+    let exactJson = record.transaction.exactJson;
+    let digest = record.transaction.digest;
+    if (!isLicenceSignedTransactionJson(exactJson)) {
+      const actor = this.deps.engine.licenceActor();
+      if (actor === null) {
+        return "terminalRejected";
+      }
+      const sealed = this.deps.engine.licenceSignBaseline(exactJson);
+      if (!sealed.ok) {
+        return "terminalRejected";
+      }
+      exactJson = sealed.signedJson;
+      digest = sealed.signedDigest;
+    }
+    const signedRecord = {
+      ...record,
+      transaction: { exactJson, digest },
+      submittedUtc: new Date(this.deps.nowMs()).toISOString()
+    };
+    const persisted = await this.writeDurable(signedRecord);
+    if (!persisted.ok) {
+      this.durableHealthy = false;
+      return "uncertain";
+    }
+    return this.deps.transactionSubmit(exactJson);
+  }
+  async writeDurable(record) {
+    const validated = parsePendingLicenceRecordJson(serializePendingLicenceRecord(record));
+    if (validated === null) {
+      return { ok: false };
+    }
+    const result = await this.deps.engine.licenceJournalWrite(serializePendingLicenceRecord(validated));
+    if (result.ok) {
+      this.mirror.set(record.transactionId, validated);
+      this.durableHealthy = true;
+    }
+    return { ok: result.ok };
+  }
+  /**
+   * Flush the in-memory mirror to the encrypted durable journal after every
+   * step. The durable record always carries the exact signed form (sealed
+   * deterministically here when the coordinator mirrored an unsigned staging
+   * envelope). An empty mirror clears the durable journal.
+   */
+  async flushDurable() {
+    if (this.mirror.size === 0) {
+      const cleared = await this.deps.engine.licenceJournalClear();
+      if (!cleared.ok) {
+        this.durableHealthy = false;
+      }
+      return;
+    }
+    const record = this.mirror.values().next().value;
+    if (record === void 0) {
+      return;
+    }
+    let durableRecord = record;
+    if (!isLicenceSignedTransactionJson(record.transaction.exactJson)) {
+      const sealed = this.deps.engine.licenceSignBaseline(record.transaction.exactJson);
+      if (sealed.ok) {
+        durableRecord = { ...record, transaction: { exactJson: sealed.signedJson, digest: sealed.signedDigest } };
+      }
+    }
+    const result = await this.deps.engine.licenceJournalWrite(serializePendingLicenceRecord(durableRecord));
+    if (result.ok) {
+      this.durableHealthy = true;
+      this.mirror.set(durableRecord.transactionId, durableRecord);
+    } else {
+      this.durableHealthy = false;
+    }
+  }
+  async hydrateDurable() {
+    const read = await this.deps.engine.licenceJournalRead();
+    if (!read.ok) {
+      return { ok: false };
+    }
+    if (read.recordJson === null) {
+      return { ok: true };
+    }
+    const record = parsePendingLicenceRecordJson(read.recordJson);
+    if (record === null) {
+      return { ok: false };
+    }
+    if (record.identityBinding !== this.actorSigningAddress || record.networkBinding !== this.networkBinding) {
+      return { ok: true };
+    }
+    this.mirror.set(record.transactionId, record);
+    this.durableHealthy = true;
+    return { ok: true };
+  }
+  mirrorSave(record) {
+    if (this.actorSigningAddress !== null && record.identityBinding !== this.actorSigningAddress) {
+      return { ok: false, reason: "binding-mismatch" };
+    }
+    if (!this.durableHealthy) {
+      return { ok: false, reason: "storage-unavailable" };
+    }
+    const validated = parsePendingLicenceRecordJson(serializePendingLicenceRecord(record));
+    if (validated === null) {
+      return { ok: false, reason: "corrupt" };
+    }
+    this.mirror.set(record.transactionId, validated);
+    return { ok: true };
+  }
+  mirrorLoad(transactionId) {
+    const record = this.mirror.get(transactionId);
+    if (record === void 0) {
+      return { ok: false, reason: "not-found" };
+    }
+    return { ok: true, record };
+  }
+  mirrorLoadForIdentity(identityBinding, networkBinding) {
+    for (const record of this.mirror.values()) {
+      if (record.identityBinding === identityBinding && record.networkBinding === networkBinding) {
+        return { ok: true, record };
+      }
+    }
+    return { ok: false };
+  }
+  mirrorDelete(transactionId) {
+    this.mirror.delete(transactionId);
+  }
+  /** Emit safe progress only when the observable surface changed. */
+  emitProgress(snapshot) {
+    const upgradeKey = snapshot.upgradeOperation === null ? "none" : `${snapshot.upgradeOperation.status}:${snapshot.upgradeOperation.operation?.pendingTransactionId ?? "-"}`;
+    const key = `${snapshot.phase}|${snapshot.lastOutcomeCode ?? ""}|${snapshot.projection === null ? "-" : snapshot.projection.licenceReference}|${upgradeKey}|${snapshot.upgradeNotificationEligible ? "n1" : "no-n1"}`;
+    if (key === this.lastProgressKey) {
+      return;
+    }
+    this.lastProgressKey = key;
+    this.deps.onProgress({ ...snapshot, emittedAtMs: this.deps.nowMs() });
+  }
+};
+
+// src/lib/licensing/licence-bff-http.ts
+function parseLicenceBffReply(body) {
+  if (body === null || typeof body !== "object" || Array.isArray(body)) {
+    return { ok: false, status: "UNKNOWN" };
+  }
+  const reply = body.reply;
+  if (reply === null || reply === void 0 || typeof reply !== "object" || Array.isArray(reply)) {
+    return { ok: false, status: "UNKNOWN" };
+  }
+  return reply;
+}
+
 // src/lib/browser-vault/production/worker-env.ts
+var BFF_LICENCE_QUERY_PATH = "/api/licence-entitlement";
+var LICENCE_BOOTSTRAP_LOOP_INTERVAL_MS = 1e3;
+function httpStatusToLicenceTransport(status) {
+  switch (status) {
+    case 400:
+      return "INVALID_ARGUMENT";
+    case 401:
+    case 403:
+      return "UNAUTHENTICATED";
+    case 404:
+    case 501:
+      return "UNIMPLEMENTED";
+    case 408:
+    case 504:
+      return "DEADLINE_EXCEEDED";
+    case 503:
+      return "UNAVAILABLE";
+    default:
+      return "UNKNOWN";
+  }
+}
 var BFF_IDENTITY_LOOKUP_PATH = "/api/identity";
 var BFF_BLOCKCHAIN_SUBMIT_PATH = "/api/blockchain";
 var LOOKUP_TIMEOUT_MS = 1e4;
@@ -27347,7 +30080,7 @@ function outcomeFromSealed(result) {
     case "OK":
       return { outcome: "OK", payload: result.detail };
     case "WRONG_PASSWORD_OR_DAMAGED":
-      return { outcome: "WRONG_PASSWORD_OR_DAMAGED" };
+      return { outcome: "WRONG_PASSWORD_OR_DAMAGED", retryDeadlineMs: result.cooldownDeadlineMs };
     case "THROTTLED":
       return { outcome: "THROTTLED", retryDeadlineMs: result.cooldownDeadlineMs };
     case "NETWORK_MISMATCH":
@@ -27367,7 +30100,7 @@ function outcomeFromSealed(result) {
     case "NETWORK_UNAVAILABLE":
       return { outcome: "NETWORK_UNAVAILABLE" };
     case "INVALID_INPUT":
-      return { outcome: "INVALID_INPUT", payload: { reason: result.reason } };
+      return { outcome: "INVALID_INPUT", payload: { reason: result.reason, ...result.invalidPositions ? { invalidPositions: result.invalidPositions } : {} } };
     case "UNKNOWN_FAILURE":
       return { outcome: "UNKNOWN_FAILURE", payload: { supportCode: result.supportCode } };
   }
@@ -27434,15 +30167,14 @@ function createWorkerBffIdentityLookup(fetchImpl = fetch) {
       if (!response.ok) {
         return { kind: "unavailable" };
       }
-      const payload = await response.json();
+      const payload = await readIdentityResponse(response, controller.signal);
       const reply = payload.reply;
-      if (reply === null || reply === void 0 || reply.successfull === false) {
-        return { kind: "missing" };
-      }
+      if (reply?.successfull === false) return { kind: "missing" };
+      if (reply?.successfull !== true) return { kind: "unavailable" };
       const signing = reply.publicSigningAddress;
       const encryption = reply.publicEncryptAddress;
-      if (typeof signing !== "string" || typeof encryption !== "string") {
-        return { kind: "missing" };
+      if (!hasBoundedHistoricalName(reply.profileName) || typeof signing !== "string" || signing.length === 0 || typeof encryption !== "string" || encryption.length === 0 || typeof reply.isPublic !== "boolean") {
+        return { kind: "unavailable" };
       }
       return {
         kind: "exact",
@@ -27479,7 +30211,19 @@ function createSecretTransferBook() {
     if (operation.size === 0) operations.delete(operationId);
     return transfer.value;
   };
-  return { store, take };
+  const discard = (operationId) => {
+    const operation = operations.get(operationId);
+    if (!operation) return;
+    for (const transfer of operation.values()) {
+      if (transfer.value instanceof Uint8Array) transfer.value.fill(0);
+      transfer.consumed = true;
+    }
+    operations.delete(operationId);
+  };
+  const clear = () => {
+    for (const operationId of operations.keys()) discard(operationId);
+  };
+  return { store, take, clear, discard };
 }
 function createProductionWorkerEnvironment(params) {
   const manifestResolution = resolveManifestForRuntimeConfig(params.runtimeConfigId);
@@ -27511,6 +30255,7 @@ function createProductionWorkerEnvironment(params) {
         executeOperation: failClosedOutcome,
         deliver: params.deliver,
         broadcast: params.broadcast,
+        onInvalidate: secretBook.clear,
         cleanupBoundMs: 1e3,
         onForceCleanup: params.onForceCleanup
       },
@@ -27533,6 +30278,126 @@ function createProductionWorkerEnvironment(params) {
     },
     onForceCleanup: params.onForceCleanup
   });
+  let licenceSession = null;
+  let licenceLoopTimer = null;
+  const licenceBffQuerySubmit = async (headers) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), LOOKUP_TIMEOUT_MS);
+    try {
+      const response = await (params.fetchImpl ?? fetch)(BFF_LICENCE_QUERY_PATH, {
+        method: "POST",
+        headers: {
+          [LICENCE_QUERY_SIGNATORY_HEADER]: headers.signatory,
+          [LICENCE_QUERY_SIGNED_AT_HEADER]: headers.signedAt,
+          [LICENCE_QUERY_SIGNATURE_HEADER]: headers.signature,
+          "content-type": "application/json"
+        },
+        body: "{}",
+        cache: "no-store",
+        signal: controller.signal
+      });
+      if (!response.ok) {
+        const status = httpStatusToLicenceTransport(response.status);
+        return { ok: false, status };
+      }
+      const body = await response.json();
+      return parseLicenceBffReply(body);
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        return { ok: false, status: "DEADLINE_EXCEEDED" };
+      }
+      return { ok: false, status: "UNAVAILABLE" };
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+  const licenceTransactionSubmit = async (signedJson) => {
+    const submit = createWorkerBffTransactionSubmit(params.fetchImpl);
+    const result = await submit(signedJson);
+    if (!result.ok) {
+      return "uncertain";
+    }
+    switch (result.reply.status) {
+      case "ACCEPTED":
+        return "accepted";
+      case "PENDING":
+        return "pending";
+      case "ALREADY_EXISTS":
+        return "alreadyExists";
+      case "REJECTED":
+        return "terminalRejected";
+      default:
+        return "uncertain";
+    }
+  };
+  const publishLicenceProgress = (payload) => {
+    try {
+      params.broadcast({
+        kind: "licence-progress",
+        phase: payload.phase,
+        projection: payload.projection ?? null,
+        lastOutcomeCode: payload.lastOutcomeCode,
+        pendingTransactionId: payload.pendingTransactionId,
+        upgradeOperation: payload.upgradeOperation ?? null,
+        upgradeNotificationEligible: payload.upgradeNotificationEligible === true,
+        emittedAtMs: payload.emittedAtMs
+      });
+    } catch {
+    }
+  };
+  const ensureLicenceLoop = (session) => {
+    licenceSession = session;
+    if (licenceLoopTimer !== null) {
+      return;
+    }
+    const loop = async () => {
+      const current = licenceSession;
+      if (current === null || !current.isActive()) {
+        stopLicenceLoop();
+        return;
+      }
+      try {
+        await current.pump();
+      } finally {
+        if (licenceSession !== null && licenceSession.isActive()) {
+          licenceLoopTimer = setTimeout(() => void loop(), LICENCE_BOOTSTRAP_LOOP_INTERVAL_MS);
+        } else {
+          stopLicenceLoop();
+        }
+      }
+    };
+    licenceLoopTimer = setTimeout(() => void loop(), LICENCE_BOOTSTRAP_LOOP_INTERVAL_MS);
+  };
+  const stopLicenceLoop = () => {
+    if (licenceLoopTimer !== null) {
+      clearTimeout(licenceLoopTimer);
+      licenceLoopTimer = null;
+    }
+    licenceSession = null;
+  };
+  const stopLicenceSession = () => {
+    licenceSession?.teardown();
+    stopLicenceLoop();
+  };
+  const getOrCreateLicenceSession = () => {
+    if (licenceSession !== null) {
+      return licenceSession;
+    }
+    if (engine.licenceActor() === null) {
+      return null;
+    }
+    const session = new LicenceBootstrapSession({
+      engine,
+      nowMs: () => Date.now(),
+      expectedNetworkBinding: manifest.canonicalNetworkId,
+      querySubmit: licenceBffQuerySubmit,
+      transactionSubmit: licenceTransactionSubmit,
+      onProgress: publishLicenceProgress
+    });
+    licenceSession = session;
+    ensureLicenceLoop(session);
+    return session;
+  };
   const executeOperation = async (request) => {
     const operation = request.operation;
     const payload = request.payload ?? {};
@@ -27567,10 +30432,22 @@ function createProductionWorkerEnvironment(params) {
         const outcome = engine.concealCandidate(candidateRef);
         return toAuthorityResult(outcomeFromSealed(outcome));
       }
+      case "discardSecretTransfers": {
+        if (typeof payload.transferOperationId !== "string" || payload.transferOperationId.length === 0) return toAuthorityResult({ outcome: "INVALID_INPUT" });
+        secretBook.discard(payload.transferOperationId);
+        return toAuthorityResult({ outcome: "OK" });
+      }
       case "destroyCandidate": {
         const candidateRef = typeof payload.candidateRef === "string" ? payload.candidateRef : "";
         const outcome = engine.destroyCandidate(candidateRef);
         return toAuthorityResult(outcomeFromSealed(outcome));
+      }
+      case "deriveRecoveryCandidates": {
+        const mnemonic = take(request.operationId, "mnemonic");
+        if (typeof mnemonic !== "string" || payload.wordCount !== 12 && payload.wordCount !== 24) {
+          return toAuthorityResult({ outcome: "INVALID_INPUT", payload: { reason: "UNSUPPORTED_INPUT" } });
+        }
+        return toAuthorityResult(outcomeFromSealed(engine.deriveRecoveryCandidates({ mnemonic, wordCount: payload.wordCount })));
       }
       case "deriveWordsCandidate": {
         const mnemonic = take(request.operationId, "mnemonic");
@@ -27588,18 +30465,32 @@ function createProductionWorkerEnvironment(params) {
         if (typeof filePassword !== "string" || typeof fileBytesValue !== "string") {
           return toAuthorityResult({ outcome: "INVALID_INPUT", payload: { reason: "missing-file-material" } });
         }
+        if (filePassword.length === 0 && payload.emptyV1Confirmed !== true) {
+          return toAuthorityResult({ outcome: "INVALID_INPUT", payload: { reason: "empty-v1-confirmation-required" } });
+        }
         const fileBytes = decodeBase64Url(fileBytesValue);
         if (fileBytes === null) {
           return toAuthorityResult({ outcome: "INVALID_INPUT", payload: { reason: "file-encoding" } });
         }
-        const outcome = await engine.importFileCandidate({ fileBytes, filePassword });
-        return toAuthorityResult(outcomeFromSealed(outcome));
+        try {
+          const outcome = await engine.importFileCandidate({ fileBytes, filePassword });
+          if (outcome.code === "WRONG_PASSWORD_OR_DAMAGED" || outcome.code === "THROTTLED") {
+            store({ operationId: request.operationId, kind: "fileBytes", value: fileBytesValue, consumed: false });
+          }
+          return toAuthorityResult(outcomeFromSealed(outcome));
+        } finally {
+          fileBytes.fill(0);
+        }
       }
       case "provisionFromValidatedBundle": {
+        const sessionOnly = payload.protectionMode === "sessionOnly";
+        if (payload.protectionMode !== void 0 && !sessionOnly && payload.protectionMode !== "devicePassword") {
+          return toAuthorityResult({ outcome: "INVALID_INPUT", payload: { reason: "unsupported-protection-mode" } });
+        }
         const devicePassword = take(request.operationId, "devicePassword");
         const candidateRef = typeof payload.candidateRef === "string" ? payload.candidateRef : "";
         emitDiagnosticBeacon({ kind: "provision-inputs", operation: request.operationId, outcome: `pw=${typeof devicePassword === "string"} ref=${candidateRef.length > 0}` });
-        if (typeof devicePassword !== "string" || candidateRef.length === 0) {
+        if (!sessionOnly && typeof devicePassword !== "string" || candidateRef.length === 0) {
           return toAuthorityResult({ outcome: "INVALID_INPUT", payload: { reason: "missing-provision-input" } });
         }
         const alias = typeof payload.alias === "string" ? payload.alias : "";
@@ -27607,15 +30498,15 @@ function createProductionWorkerEnvironment(params) {
         if (alias.length === 0 || visibility === null) {
           return toAuthorityResult({ outcome: "INVALID_INPUT", payload: { reason: "profile-input" } });
         }
-        const outcome = await engine.provision({
+        const input = {
           candidateRef,
-          devicePassword,
           alias,
           visibility,
           configurationId: manifest.configurationId,
           networkBinding: { canonicalNetworkId: manifest.canonicalNetworkId, networkMagic: manifest.networkMagic, configurationId: manifest.configurationId },
           producerId: "P-01"
-        });
+        };
+        const outcome = sessionOnly ? await engine.provisionSessionOnly(input) : await engine.provision({ ...input, devicePassword });
         return toAuthorityResult(outcomeFromSealed(outcome));
       }
       case "unlockPassword": {
@@ -27643,10 +30534,12 @@ function createProductionWorkerEnvironment(params) {
         return toAuthorityResult(outcomeFromSealed(outcome));
       }
       case "lockAll": {
+        stopLicenceSession();
         const outcome = engine.lock();
         return toAuthorityResult(outcomeFromSealed(outcome));
       }
       case "removeLocalUser": {
+        stopLicenceSession();
         emitDiagnosticBeacon({ kind: "removal-step", operation: "before-engine-removal" });
         const outcome = await engine.removeLocalUser();
         emitDiagnosticBeacon({ kind: "removal-step", operation: "after-engine-removal", outcome: outcome.code });
@@ -27685,9 +30578,67 @@ function createProductionWorkerEnvironment(params) {
         const outcome = await engine.inspectStartup();
         return toAuthorityResult(outcomeFromSealed(outcome));
       }
+      case "licenceBootstrapStart": {
+        const networkBinding = typeof payload.networkBinding === "string" ? payload.networkBinding : "";
+        if (networkBinding.length === 0 || networkBinding.length > 256 || networkBinding !== manifest.canonicalNetworkId) {
+          return toAuthorityResult({ outcome: "INVALID_INPUT", payload: { reason: "network-binding" } });
+        }
+        const session = getOrCreateLicenceSession();
+        if (session === null) {
+          return toAuthorityResult({ outcome: "INVALID_INPUT", payload: { reason: "not-authenticated" } });
+        }
+        const result = await session.start(networkBinding);
+        return toLicenceStepResult(result);
+      }
+      case "licenceBootstrapControl": {
+        const control = typeof payload.control === "string" ? payload.control : "";
+        const trigger = payload.trigger;
+        const session = licenceSession;
+        if (session === null) {
+          return toAuthorityResult({ outcome: "INVALID_INPUT", payload: { reason: "not-authenticated" } });
+        }
+        const result = await session.control(control, trigger);
+        return toLicenceStepResult(result);
+      }
+      case "licenceBootstrapEligibility": {
+        const session = licenceSession;
+        if (session === null) {
+          return toAuthorityResult({ outcome: "INVALID_INPUT", payload: { reason: "not-authenticated" } });
+        }
+        const foreground = payload.foreground;
+        const connectivity = payload.connectivity;
+        const result = await session.updateEligibility({
+          ...typeof foreground === "boolean" ? { foregrounded: foreground } : {},
+          ...typeof connectivity === "string" ? { connectivity } : {}
+        });
+        return toLicenceStepResult(result);
+      }
+      case "licenceUpgradeConfirm": {
+        const session = licenceSession;
+        if (session === null) {
+          return toAuthorityResult({ outcome: "INVALID_INPUT", payload: { reason: "not-authenticated" } });
+        }
+        const targetPlanId = typeof payload.targetPlanId === "string" ? payload.targetPlanId : "";
+        const result = await session.confirmUpgrade(targetPlanId);
+        return toLicenceStepResult(result);
+      }
+      case "licenceUpgradeAcknowledge": {
+        const session = licenceSession;
+        if (session === null) {
+          return toAuthorityResult({ outcome: "INVALID_INPUT", payload: { reason: "not-authenticated" } });
+        }
+        const result = await session.acknowledgeUpgradeOutcome();
+        return toLicenceStepResult(result);
+      }
       default:
         return { outcome: "INVALID_INPUT", retryable: false, allowedActions: [], supportCode: void 0 };
     }
+  }
+  function toLicenceStepResult(result) {
+    if (result.ok) {
+      return toAuthorityResult({ outcome: "OK", payload: { kind: "licence-bootstrap-step", ok: true, snapshot: result.snapshot } });
+    }
+    return toAuthorityResult({ outcome: "INVALID_INPUT", payload: { kind: "licence-bootstrap-step", ok: false, reason: result.reason } });
   }
   function emitDiagnosticBeacon(status) {
     try {
@@ -27707,6 +30658,12 @@ function createProductionWorkerEnvironment(params) {
       executeOperation,
       deliver: params.deliver,
       broadcast: params.broadcast,
+      shouldInvalidateOnLifecycle: (signal) => engine.isSessionOnly() && (signal === "pagehide" || signal === "disconnect"),
+      onInvalidate: () => {
+        secretBook.clear();
+        stopLicenceSession();
+        engine.wipeSecrets();
+      },
       cleanupBoundMs: 1e3,
       onForceCleanup: params.onForceCleanup
     },
@@ -27719,7 +30676,7 @@ function toAuthorityResult(outcome) {
     case "OK":
       return { outcome: "OK", retryable: false, allowedActions: [], supportCode: void 0, payload: outcome.payload };
     case "WRONG_PASSWORD_OR_DAMAGED":
-      return { outcome: "WRONG_PASSWORD_OR_DAMAGED", retryable: true, allowedActions: ["retry"], supportCode: void 0 };
+      return { outcome: "WRONG_PASSWORD_OR_DAMAGED", retryable: true, allowedActions: ["retry"], retryDeadlineMs: outcome.retryDeadlineMs, supportCode: void 0 };
     case "THROTTLED":
       return { outcome: "THROTTLED", retryable: false, allowedActions: ["retry"], retryDeadlineMs: outcome.retryDeadlineMs, supportCode: void 0 };
     case "NETWORK_MISMATCH":
@@ -27756,6 +30713,89 @@ function decodeBase64Url(value) {
   }
 }
 
+// src/lib/browser-vault/production/primitive-preflight.ts
+function currentEnvironment() {
+  const manager = globalThis.navigator?.storage;
+  return {
+    secureContext: globalThis.isSecureContext === true,
+    // This first-party entry is emitted as ESM. Reaching it in the actual
+    // SharedWorker realm proves module-worker construction/execution.
+    sharedModuleWorker: globalThis.constructor?.name === "SharedWorkerGlobalScope",
+    crypto: globalThis.crypto ?? null,
+    encode: (text) => new TextEncoder().encode(text),
+    decode: (bytes) => new TextDecoder("utf-8", { fatal: true }).decode(bytes),
+    transfer: (bytes) => structuredClone(bytes, { transfer: [bytes.buffer] }),
+    persisted: manager?.persisted ? () => manager.persisted() : void 0,
+    estimate: manager?.estimate ? () => manager.estimate() : void 0
+  };
+}
+async function advisory(read) {
+  if (!read) return null;
+  let timer;
+  try {
+    return await Promise.race([Promise.resolve().then(read), new Promise((resolve) => {
+      timer = setTimeout(() => resolve(null), 500);
+    })]);
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+async function probeWorkerPrimitives(env = currentEnvironment()) {
+  if (!env.secureContext) return { ok: false, reason: "insecure-context" };
+  if (!env.sharedModuleWorker) return { ok: false, reason: "worker-unavailable" };
+  let timer;
+  const probe = async () => {
+    try {
+      const source = new Uint8Array(env.encode("HushVoting \u2713"));
+      const expected = Array.from(source);
+      const transferred = env.transfer(source);
+      if (source.byteLength !== 0 || transferred.byteLength !== expected.length || !expected.every((value, index) => transferred[index] === value) || env.decode(transferred) !== "HushVoting \u2713") return { ok: false, reason: "transfer-unavailable" };
+    } catch {
+      return { ok: false, reason: "transfer-unavailable" };
+    }
+    const keyBytes = new Uint8Array(32), nonce = new Uint8Array(12);
+    try {
+      const provider = env.crypto;
+      if (!provider?.subtle) return { ok: false, reason: "crypto-unavailable" };
+      provider.getRandomValues(keyBytes);
+      provider.getRandomValues(nonce);
+      const hkdf2 = await provider.subtle.importKey("raw", keyBytes, "HKDF", false, ["deriveBits"]);
+      const derived = await provider.subtle.deriveBits({ name: "HKDF", hash: "SHA-256", salt: new Uint8Array(16), info: new Uint8Array([72, 86]) }, hkdf2, 256);
+      const derivedBytes = new Uint8Array(derived);
+      const correctLength = derivedBytes.byteLength === 32;
+      derivedBytes.fill(0);
+      if (!correctLength) return { ok: false, reason: "crypto-unavailable" };
+      const aes = await provider.subtle.importKey("raw", keyBytes, "AES-GCM", false, ["encrypt", "decrypt"]);
+      const plaintext = new Uint8Array([72, 86, 1]);
+      const ciphertext = await provider.subtle.encrypt({ name: "AES-GCM", iv: nonce, tagLength: 128 }, aes, plaintext);
+      const restored = new Uint8Array(await provider.subtle.decrypt({ name: "AES-GCM", iv: nonce, tagLength: 128 }, aes, ciphertext));
+      const valid = restored.length === plaintext.length && plaintext.every((value, index) => restored[index] === value);
+      restored.fill(0);
+      if (!valid) return { ok: false, reason: "crypto-unavailable" };
+    } catch {
+      return { ok: false, reason: "crypto-unavailable" };
+    } finally {
+      keyBytes.fill(0);
+      nonce.fill(0);
+    }
+    const [persisted, estimate] = await Promise.all([advisory(env.persisted), advisory(env.estimate)]);
+    return {
+      ok: true,
+      persisted: typeof persisted === "boolean" ? persisted : null,
+      estimateAvailable: typeof estimate?.quota === "number" && Number.isFinite(estimate.quota) && typeof estimate.usage === "number" && Number.isFinite(estimate.usage)
+    };
+  };
+  try {
+    return await Promise.race([probe(), new Promise((resolve) => {
+      timer = setTimeout(() => resolve({ ok: false, reason: "preflight-timeout" }), 5e3);
+    })]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // src/lib/browser-vault/production/worker-entry.ts
 var EXPECTED_RUNTIME_CONFIG = "development-localhost";
 async function bootVaultWorker(params) {
@@ -27763,6 +30803,13 @@ async function bootVaultWorker(params) {
   if (runtimeConfigId !== EXPECTED_RUNTIME_CONFIG) {
     return { ok: false, reason: "unapproved-runtime-config" };
   }
+  let preflight;
+  try {
+    preflight = await (params.probePrimitives ?? probeWorkerPrimitives)();
+  } catch {
+    return { ok: false, reason: "preflight-unavailable" };
+  }
+  if (!preflight.ok) return preflight;
   const factory = params.indexedDBFactory;
   let storageResult;
   try {
@@ -27923,6 +30970,14 @@ async function bootAndAttach(params) {
   return { ok: true, registerPort: result.registerPort };
 }
 var workerScope = typeof self !== "undefined" ? self : null;
+function rejectUnbootedPort(port) {
+  port.onmessage = () => {
+    port.postMessage({ kind: "handshake-rejected", protocolVersion: BROWSER_PROTOCOL_VERSION, reason: "unsupported-config" });
+    port.onmessage = null;
+    port.close();
+  };
+  port.start();
+}
 function emitBootBeacon(status) {
   try {
     if (workerScope?.BroadcastChannel) {
@@ -27952,17 +31007,14 @@ if (workerScope !== null) {
     emitBootBeacon({ ok: false, reason: "boot-start" });
     void bootAndAttach().then((result) => {
       emitBootBeacon(result);
-      if (result.ok) {
-        wired = result.registerPort;
-        for (const queued of pendingPorts.splice(0)) {
-          wired(queued);
-        }
+      wired = result.ok ? result.registerPort : rejectUnbootedPort;
+      for (const queued of pendingPorts.splice(0)) {
+        wired(queued);
       }
-    }).catch((error) => {
-      emitBootBeacon({ ok: false, reason: `boot-error: ${String(error)}` });
-      setTimeout(() => {
-        throw error;
-      }, 0);
+    }).catch(() => {
+      emitBootBeacon({ ok: false, reason: "boot-unavailable" });
+      wired = rejectUnbootedPort;
+      for (const queued of pendingPorts.splice(0)) wired(queued);
     });
   }
 }
@@ -27970,7 +31022,8 @@ export {
   attachProductionWorkerConnect,
   bootAndAttach,
   bootVaultWorker,
-  computeWorkerBuildDigest
+  computeWorkerBuildDigest,
+  rejectUnbootedPort
 };
 /*! Bundled license information:
 

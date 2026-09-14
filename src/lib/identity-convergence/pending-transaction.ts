@@ -112,6 +112,34 @@ export function digestOf(exactJson: string): PendingTransactionDigest {
 
 /** Bounds check (returns data, never throws). */
 export function validatePendingTransaction(record: SealedPendingTransactionV2): { readonly ok: true } | { readonly ok: false; readonly reason: string } {
+  // Persisted input is untrusted at runtime despite the caller's static type.
+  // Reject malformed/extra fields before dereferencing or hashing anything.
+  const objectWithKeys = (value: unknown, keys: readonly string[]): value is Record<string, unknown> =>
+    typeof value === 'object' && value !== null && !Array.isArray(value)
+    && Object.keys(value).length === keys.length && keys.every(key => Object.hasOwn(value, key));
+  const boundedText = (value: unknown, max: number): value is string =>
+    typeof value === 'string' && value.length > 0 && new TextEncoder().encode(value).length <= max;
+  if (!objectWithKeys(record, ['schemaVersion', 'transaction', 'transactionId', 'reviewedMetadata', 'lifecycle', 'attemptEvidence', 'epochBinding', 'networkBinding', 'rollbackState'])
+    || !objectWithKeys(record.transaction, ['exactJson', 'digest'])
+    || !boundedText(record.transaction.exactJson, PENDING_TRANSACTION_MAX_JSON_BYTES)
+    || typeof record.transaction.digest !== 'string' || !/^[0-9a-f]{64}$/.test(record.transaction.digest)
+    || !boundedText(record.transactionId, PENDING_TRANSACTION_ID_MAX_LENGTH)
+    || !objectWithKeys(record.reviewedMetadata, ['alias', 'visibility'])
+    || !boundedText(record.reviewedMetadata.alias, 256)
+    || !['private', 'public'].includes(record.reviewedMetadata.visibility)
+    || !['sealed', 'waitingAccepted', 'waitingPending', 'confirmed', 'rejectedEditable', 'discarded'].includes(record.lifecycle)
+    || !['preSeal', 'postSeal', 'postSubmit'].includes(record.rollbackState)
+    || !boundedText(record.epochBinding, 256) || !boundedText(record.networkBinding, 256)
+    || !Array.isArray(record.attemptEvidence) || record.attemptEvidence.length > PENDING_TRANSACTION_MAX_ATTEMPT_EVIDENCE) {
+    return { ok: false, reason: 'invalid pending record shape' };
+  }
+  for (const attempt of record.attemptEvidence) {
+    if (!objectWithKeys(attempt, ['at', 'outcome']) || typeof attempt.at !== 'string'
+      || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{3})?)?Z$/.test(attempt.at) || !Number.isFinite(Date.parse(attempt.at))
+      || typeof attempt.outcome !== 'string' || !['accepted', 'pending', 'alreadyExists', 'rejectedEditable', 'rejectedTerminal', 'transportUncertain'].includes(attempt.outcome)) {
+      return { ok: false, reason: 'invalid attempt evidence' };
+    }
+  }
   if (record.schemaVersion !== PENDING_TRANSACTION_SCHEMA_VERSION) {
     return { ok: false, reason: 'unsupported schema version' };
   }

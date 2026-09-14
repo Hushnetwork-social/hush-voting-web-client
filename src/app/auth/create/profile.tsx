@@ -6,8 +6,9 @@
  * user action with accessible progress after 150 ms and no secret exposure.
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { validateAlias } from '../../../lib/identity-creation/profile';
+import { GENERATION_PROGRESS_THRESHOLD_MS } from '../../../lib/identity-creation/authority';
 import { CONFIRM, GENERATE, PROFILE } from './copy';
 import { ActionButton, BackButton, FieldError, StatusRegion, SurfacePanel } from './surfaces';
 
@@ -113,6 +114,17 @@ export interface GenerateProps {
   readonly progressComplete: boolean;
 }
 
+/** Mounted only during generation; a fast completion never announces progress. */
+function GenerationProgress({ complete }: { readonly complete: boolean }) {
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    if (complete) return;
+    const timer = setTimeout(() => setReady(true), GENERATION_PROGRESS_THRESHOLD_MS);
+    return () => clearTimeout(timer);
+  }, [complete]);
+  return ready || complete ? <StatusRegion>{complete ? CONFIRM.challengeClosed : GENERATE.progress}</StatusRegion> : null;
+}
+
 /** Wireframe 2 — Generate recovery words (explicit action, no password). */
 export function GenerateScreen({ onGenerate, onBack, progressVisible, progressComplete }: GenerateProps) {
   return (
@@ -120,9 +132,7 @@ export function GenerateScreen({ onGenerate, onBack, progressVisible, progressCo
       <p className="text-sm text-[var(--text-muted)]">{GENERATE.detail}</p>
       <p className="mt-2 text-sm font-medium text-[var(--text)]">{GENERATE.noPassword}</p>
       <p className="mt-1 text-sm text-[var(--warning)]">{GENERATE.warning}</p>
-      {progressVisible ? (
-        <StatusRegion>{progressComplete ? CONFIRM.challengeClosed : GENERATE.progress}</StatusRegion>
-      ) : null}
+      {progressVisible ? <GenerationProgress complete={progressComplete} /> : null}
       <div className="mt-4 flex items-center gap-3">
         <BackButton onClick={onBack} />
         <ActionButton onClick={onGenerate} disabled={progressVisible && !progressComplete} busy={progressVisible && !progressComplete}>

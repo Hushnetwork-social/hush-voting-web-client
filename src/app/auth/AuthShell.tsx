@@ -14,6 +14,7 @@
 import Image from 'next/image';
 import { useEffect } from 'react';
 import type { ReactNode } from 'react';
+import { SafeAlias } from './SafeAlias';
 import { documentTitleForState } from '../../lib/auth/ui/copy';
 import type { AuthRenderProjection } from '../../lib/auth/react/adapter';
 
@@ -63,7 +64,7 @@ export function AuthShell({ projection, children, onBack }: AuthShellProps) {
 
           {authState !== 'initializing' && safeIdentity !== null && (
             <p className="auth-identity" aria-label="Local identity">
-              <span>{safeIdentity.alias}</span>
+              <SafeAlias alias={safeIdentity.alias} />
               <span className="auth-address" aria-label="Abbreviated address">
                 {safeIdentity.abbreviatedSigningAddress}
               </span>
@@ -113,7 +114,7 @@ function headingForProjection(projection: AuthRenderProjection): string {
     case 'noLocalUser':
       return 'Welcome to HushVoting!';
     case 'locked':
-      return 'Unlock HushVoting!';
+      return projection.safeIdentity?.pendingSetup ? 'Finish setting up your identity' : 'Unlock HushVoting!';
     case 'unlocking':
       return 'Unlocking…';
     case 'verifyingIdentityOnline':

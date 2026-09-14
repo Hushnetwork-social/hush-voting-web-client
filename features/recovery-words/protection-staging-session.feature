@@ -2,18 +2,6 @@
 Feature: Recovery words — protection-staging-session
   Covers HV-RW-PASSWORD, HV-RW-PASSKEY, HV-RW-NATIVE-PASSWORDLESS, HV-RW-SESSION, HV-RW-STAGE.
 
-  @FEAT-008 @AC-008-036 @HV-RW-PASSWORD-001
-  Scenario: AC-008-036 — HV-RW-PASSWORD
-    Given the protection screen
-    When the user chooses protection
-    Then Device-password is checked by default and secrets enter the authority directly
-
-  @FEAT-008 @AC-008-037 @HV-RW-STAGE-001
-  Scenario: AC-008-037 — HV-RW-STAGE
-    Given selected keys and a protection mode
-    When encrypted staging runs
-    Then selected keys stage atomically with read-back verification before mnemonic destruction
-
   @FEAT-008 @AC-008-038 @HV-RW-SESSION-001
   Scenario: AC-008-038 — HV-RW-SESSION
     Given explicit session-only selection
@@ -22,12 +10,6 @@ Feature: Recovery words — protection-staging-session
 
   @FEAT-008 @AC-008-040 @HV-RW-PASSWORD-002
   Scenario: AC-008-040 — HV-RW-PASSWORD
-    Given the protection screen
-    When the user chooses protection
-    Then Device-password is checked by default and secrets enter the authority directly
-
-  @FEAT-008 @AC-008-041 @HV-RW-PASSWORD-003
-  Scenario: AC-008-041 — HV-RW-PASSWORD
     Given the protection screen
     When the user chooses protection
     Then Device-password is checked by default and secrets enter the authority directly
@@ -91,24 +73,6 @@ Feature: Recovery words — protection-staging-session
     Given explicit session-only selection
     When the session authority is issued
     Then nothing persists and recovery is required after authority loss
-
-  @FEAT-008 @AC-008-053 @HV-RW-STAGE-002
-  Scenario: AC-008-053 — HV-RW-STAGE
-    Given selected keys and a protection mode
-    When encrypted staging runs
-    Then selected keys stage atomically with read-back verification before mnemonic destruction
-
-  @FEAT-008 @AC-008-054 @HV-RW-STAGE-003
-  Scenario: AC-008-054 — HV-RW-STAGE
-    Given selected keys and a protection mode
-    When encrypted staging runs
-    Then selected keys stage atomically with read-back verification before mnemonic destruction
-
-  @FEAT-008 @AC-008-055 @HV-RW-STAGE-004
-  Scenario: AC-008-055 — HV-RW-STAGE
-    Given selected keys and a protection mode
-    When encrypted staging runs
-    Then selected keys stage atomically with read-back verification before mnemonic destruction
 
   @FEAT-008 @AC-008-060 @HV-RW-SESSION-003
   Scenario: AC-008-060 — HV-RW-SESSION

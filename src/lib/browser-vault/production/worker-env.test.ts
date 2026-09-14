@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { classifyWorkerException, createSecretTransferBook, createWorkerBffIdentityLookup } from './worker-env';
 
 describe('worker BFF identity lookup', () => {
+  it.each([{}, { reply: null }, { reply: {} }, { reply: { successfull: true } }])('never turns a malformed response into authoritative absence', async payload => {
+    const lookup = createWorkerBffIdentityLookup(async () => new Response(JSON.stringify(payload), { status: 200 }));
+    await expect(lookup('public-test-signing-address')).resolves.toEqual({ kind: 'unavailable' });
+  });
   it('treats an explicit unsuccessful reply as authoritative absence', async () => {
     const lookup = createWorkerBffIdentityLookup(async () => new Response(JSON.stringify({
       reply: {
@@ -26,6 +30,26 @@ describe('worker exception diagnostics', () => {
 });
 
 describe('worker secret transfer book', () => {
+  it('discards only the abandoned file snapshot without invalidating other operations', () => {
+    const book = createSecretTransferBook();
+    const bytes = new Uint8Array([1, 2]);
+    book.store({ operationId: 'old', kind: 'fileBytes', value: bytes, consumed: false });
+    book.store({ operationId: 'next', kind: 'fileBytes', value: 'new', consumed: false });
+    book.discard('old');
+    expect(bytes).toEqual(new Uint8Array(2));
+    expect(book.take('old', 'fileBytes')).toBeNull();
+    expect(book.take('next', 'fileBytes')).toBe('new');
+  });
+  it('destroys unconsumed transfers on authority invalidation', () => {
+    const book = createSecretTransferBook();
+    const bytes = new Uint8Array([1, 2, 3]);
+    book.store({ operationId: 'abandoned', kind: 'fileBytes', value: bytes, consumed: false });
+    book.store({ operationId: 'abandoned', kind: 'filePassword', value: 'test-password', consumed: false });
+    book.clear();
+    expect(bytes).toEqual(new Uint8Array(3));
+    expect(book.take('abandoned', 'fileBytes')).toBeNull();
+    expect(book.take('abandoned', 'filePassword')).toBeNull();
+  });
   it('retains file bytes and password independently for one import operation', () => {
     const book = createSecretTransferBook();
     const fileBytes = 'SFVTSC1wdWJsaWMtdGVzdA';

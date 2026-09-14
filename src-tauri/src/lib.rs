@@ -15,6 +15,15 @@ pub mod android_vault;
 /// FEAT-010 trusted runtime-target descriptor (Rust-owned startup command).
 pub mod target_descriptor;
 
+/// FEAT-016 purpose-bound pending licence transaction record/codec (shared by
+/// the Ubuntu and Android vault journals; wired into native storage in Phase 6).
+pub mod licensing_record;
+
+/// FEAT-016 native licence authority operations (Tasks 6.5/6.6): closed
+/// query/construction/sealing/journal operations shared by the Ubuntu and
+/// Android vault authorities; custody is injected; no Browser/BFF fallback.
+pub mod licence_vault;
+
 use ubuntu_vault::commands::{hush_vault_handshake, hush_vault_submit_secret, VaultState};
 use ubuntu_vault::lifecycle::ownership::VaultOwnership;
 

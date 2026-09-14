@@ -1,0 +1,245 @@
+#!/usr/bin/env node
+/**
+ * FEAT-017 seeded-defect self-tests (Phase 6 task 6.6).
+ *
+ * Proves each focused gate is RED-effective: a seeded defect in the gate's
+ * own input surface MUST fail the gate with a non-zero exit. Cases:
+ *  1. secret-scan finds a private-key marker in a seeded file;
+ *  2. property-scan finds a forbidden FEAT-017 property (page polling);
+ *  3. artifact-scan finds a raw secret in a seeded artifact log;
+ *  4. coverage validator fails on a required suite (zero discovery);
+ *  5. wiring validator fails on a missing integration anchor.
+ * All seeded material lives in a temporary directory created and removed by
+ * this script; production source is never modified.
+ *
+ * Usage: node scripts/licence-upgrade/selftest.mjs
+ */
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+const SCRIPT_DIR = import.meta.dirname;
+const REPO_ROOT = join(SCRIPT_DIR, '..', '..');
+
+function expectRed(label, command, args, env) {
+  let exit = null;
+  try {
+    execFileSync(command, args, {
+      cwd: REPO_ROOT,
+      stdio: 'pipe',
+      encoding: 'utf8',
+      timeout: 120_000,
+      env: { ...process.env, ...env },
+    });
+  } catch (error) {
+    exit = error.status ?? 1;
+  }
+  if (exit === null) {
+    console.error(`SELF-TEST FAIL: ${label} did not fail (gate passed on a seeded defect)`);
+    return false;
+  }
+  console.log(`  \u2713 ${label}: gate failed non-zero as required (exit ${exit})`);
+  return true;
+}
+
+function expectGreen(label, command, args, env) {
+  try {
+    execFileSync(command, args, {
+      cwd: REPO_ROOT,
+      stdio: 'pipe',
+      encoding: 'utf8',
+      timeout: 120_000,
+      env: { ...process.env, ...env },
+    });
+  } catch (error) {
+    console.error(`SELF-TEST FAIL: ${label} failed unexpectedly (exit ${error.status ?? 1})`);
+    return false;
+  }
+  console.log(`  \u2713 ${label}: gate passed as required`);
+  return true;
+}
+
+const root = mkdtempSync(join(tmpdir(), 'feat017-seed-'));
+const results = [];
+try {
+  // 1. secret-scan red-effectiveness.
+  const secretRoot = join(root, 'secret-seed');
+  mkdirSync(secretRoot, { recursive: true });
+  const pemHeader = '-----BEGIN ' + 'EC PRIVATE KEY' + '-----';
+  writeFileSync(join(secretRoot, 'seeded-secret.ts'), `const material = "${pemHeader}\\nseeded";\n`);
+  results.push(
+    expectRed('secret-scan', process.execPath, [join(SCRIPT_DIR, 'secret-scan.mjs')], {
+      FEAT017_SCAN_ROOTS: secretRoot,
+    }),
+  );
+
+  // 2. property-scan red-effectiveness (page polling loop). The seed sits on
+  // a licence page/UI path so the page-scoped polling property applies.
+  const propertyRoot = join(root, 'property-seed');
+  const seededUiDir = join(propertyRoot, 'src', 'app', 'auth', 'licence');
+  mkdirSync(seededUiDir, { recursive: true });
+  writeFileSync(
+    join(seededUiDir, 'seeded-prop.tsx'),
+    'export function poll(): void { setInterval(() => undefined, 3000); }\n',
+  );
+  results.push(
+    expectRed('property-scan', process.execPath, [join(SCRIPT_DIR, 'property-scan.mjs')], {
+      FEAT017_SCAN_ROOTS: propertyRoot,
+    }),
+  );
+
+  // 3. artifact-scan red-effectiveness.
+  const artifactRoot = join(root, 'artifact-seed');
+  mkdirSync(artifactRoot, { recursive: true });
+  const pemMarker = '-----BEGIN ' + 'RSA PRIVATE KEY' + '-----';
+  writeFileSync(join(artifactRoot, 'seeded.log'), `trace: ${pemMarker} leaked-into-artifact\n`);
+  results.push(
+    expectRed('artifact-scan', process.execPath, [join(SCRIPT_DIR, 'artifact-scan.mjs')], {
+      FEAT017_SCAN_ROOTS: artifactRoot,
+    }),
+  );
+
+  // 4. coverage red-effectiveness: force a required suite that does not exist.
+  results.push(
+    expectRed('coverage', process.execPath, [join(SCRIPT_DIR, 'coverage.mjs')], {
+      FEAT017_COVERAGE_REQUIRED_JSON: JSON.stringify([
+        { file: 'src/app/auth/licence/does-not-exist.test.tsx', note: 'seeded missing suite' },
+      ]),
+      FEAT017_COVERAGE_SEARCH_JSON: JSON.stringify([]),
+    }),
+  );
+
+  // 5. wiring red-effectiveness (missing anchor seam).
+  results.push(
+    expectRed('wiring', process.execPath, [join(SCRIPT_DIR, 'wiring.mjs')], {
+      FEAT017_WIRING_ANCHORS_JSON: JSON.stringify([
+        { file: 'src/app/auth/licence/does-not-exist.tsx', anchor: 'never-present' },
+      ]),
+    }),
+  );
+
+  // 6. journey-wiring red-effectiveness: an owned canonical id missing from a
+  // seeded FEAT-017 features dir must fail the BDD journey wiring validator.
+  const journeyFeaturesSeed = join(root, 'journey-features-seed');
+  mkdirSync(journeyFeaturesSeed, { recursive: true });
+  writeFileSync(
+    join(journeyFeaturesSeed, 'incomplete.feature'),
+    [
+      '@FEAT-017',
+      'Feature: incomplete journey seed',
+      '  @AT-LIC-004',
+      '  Scenario: The full-width licence page reflects the exact server catalogue in server order',
+      '    Given Alice has completed exact EPIC-001 identity authentication',
+    ].join('\n'),
+  );
+  results.push(
+    expectRed('journey-wiring', process.execPath, [join(SCRIPT_DIR, 'journey-wiring.mjs')], {
+      FEAT017_WIRING_FEATURES: journeyFeaturesSeed,
+      FEAT017_WIRING_SKIP_LIST: '1',
+    }),
+  );
+
+  // The migrated gate must reject missing C# bindings and duplicate IDs.
+  const emptySteps = join(root, 'empty-steps');
+  mkdirSync(emptySteps);
+  results.push(expectRed('journey-wiring missing bindings', process.execPath,
+    [join(SCRIPT_DIR, 'journey-wiring.mjs')], {
+      FEAT017_WIRING_STEPS: emptySteps, FEAT017_WIRING_SKIP_LIST: '1',
+    }));
+  const duplicateFeatures = join(root, 'duplicate-features');
+  mkdirSync(duplicateFeatures);
+  const netFeatures = join(REPO_ROOT, '..', 'hush-server-node', 'Node',
+    'HushNode.IntegrationTests', 'HushVoting', 'Features', 'licence-upgrade');
+  for (const file of ['account-licence-summary.feature', 'upgrade-activation-progress.feature']) {
+    writeFileSync(join(duplicateFeatures, file), readFileSync(join(netFeatures, file)));
+  }
+  writeFileSync(join(duplicateFeatures, 'duplicate.feature'),
+    readFileSync(join(netFeatures, 'account-licence-summary.feature')));
+  results.push(expectRed('journey-wiring duplicate IDs', process.execPath,
+    [join(SCRIPT_DIR, 'journey-wiring.mjs')], {
+      FEAT017_WIRING_FEATURES: duplicateFeatures, FEAT017_WIRING_SKIP_LIST: '1',
+    }));
+
+  // The inherited FEAT-016 regression catalogue tags several scenarios with
+  // the same EPIC-002 acceptance criterion (a many:1 mapping). That is valid
+  // and must stay GREEN; a missing criterion is still RED.
+  const netRegressionFeatures = join(REPO_ROOT, '..', 'hush-server-node', 'Node',
+    'HushNode.IntegrationTests', 'HushVoting', 'Features', 'licence-entitlements');
+  const sharedCriterionFeatures = join(root, 'shared-criterion-features');
+  mkdirSync(sharedCriterionFeatures);
+  for (const file of ['compatibility-transport-faults.feature', 'direct-free-bootstrap.feature', 'failure-recovery.feature', 'gate-safety-accessibility.feature']) {
+    writeFileSync(join(sharedCriterionFeatures, file), readFileSync(join(netRegressionFeatures, file)));
+  }
+  results.push(expectGreen('journey-wiring shared regression criterion tags', process.execPath,
+    [join(SCRIPT_DIR, 'journey-wiring.mjs')], {
+      FEAT017_WIRING_REGRESSION_FEATURES: sharedCriterionFeatures, FEAT017_WIRING_SKIP_LIST: '1',
+    }));
+  const missingCriterionFeatures = join(root, 'missing-criterion-features');
+  mkdirSync(missingCriterionFeatures);
+  for (const file of ['compatibility-transport-faults.feature', 'direct-free-bootstrap.feature', 'gate-safety-accessibility.feature']) {
+    writeFileSync(join(missingCriterionFeatures, file), readFileSync(join(netRegressionFeatures, file)));
+  }
+  results.push(expectRed('journey-wiring missing regression criterion', process.execPath,
+    [join(SCRIPT_DIR, 'journey-wiring.mjs')], {
+      FEAT017_WIRING_REGRESSION_FEATURES: missingCriterionFeatures, FEAT017_WIRING_SKIP_LIST: '1',
+    }));
+
+  // 7. evidence red-effectiveness: a pairing ledger missing a twin-paired row
+  // must fail the evidence admission validator.
+  const realLedger = JSON.parse(readFileSync(join(SCRIPT_DIR, 'pairing-ledger.json'), 'utf8'));
+  const seededLedgerPath = join(root, 'pairing-seeded.json');
+  const seededLedger = {
+    ...realLedger,
+    entries: realLedger.entries.filter((entry) => entry.scenarioId !== 'AT-LIC-001'),
+  };
+  writeFileSync(seededLedgerPath, JSON.stringify(seededLedger, null, 2));
+  results.push(
+    expectRed('evidence', process.execPath, [join(SCRIPT_DIR, 'evidence.mjs')], {
+      FEAT017_PAIRING_LEDGER: seededLedgerPath,
+    }),
+  );
+
+  // 8. obligations red-effectiveness: a seeded obligations doc with the wrong
+  // task link must fail the obligations validator.
+  const seededObligationsPath = join(root, 'obligations-seeded.json');
+  writeFileSync(
+    seededObligationsPath,
+    JSON.stringify(
+      {
+        schemaVersion: 'hepha-manual-test-obligations/v1',
+        featureId: 'FEAT-017',
+        obligations: [
+          {
+            id: 'MT-QUAL-ANDROID-017-001',
+            title: 'broken',
+            reason: 'This test cannot be automated and the user needs to test it manually.',
+            phaseNumber: 7,
+            taskId: 'phase-7-task-7-9', // wrong durable link
+            preconditions: ['a'],
+            steps: ['b'],
+            expectedResult: 'c',
+            evidenceRequirements: ['d'],
+            status: 'PENDING',
+          },
+        ],
+      },
+      null,
+      2,
+    ),
+  );
+  results.push(
+    expectRed('obligations', process.execPath, [join(SCRIPT_DIR, 'obligations.mjs')], {
+      OBLIGATIONS_PATH: seededObligationsPath,
+    }),
+  );
+} finally {
+  rmSync(root, { recursive: true, force: true });
+}
+
+const red = results.filter((ok) => !ok).length;
+if (red > 0) {
+  console.error(`SELF-TEST FAILED (${red}/${results.length} seeded defects not detected)`);
+  process.exit(1);
+}
+console.log(`SELF-TEST OK (${results.length}/${results.length} gates proven red-effective)`);

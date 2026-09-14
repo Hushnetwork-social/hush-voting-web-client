@@ -1,0 +1,11 @@
+{
+  "schema": "feat016-external-blockers-v1",
+  "entries": [
+    {
+      "id": "EXT-016-001",
+      "owner": "hush-server-node pinned fixture + hush-voting-web-client composition",
+      "state": "NOT_SUPPLIED",
+      "releaseImpact": "Full production-composition run of the 13 canonical entitlement journeys (AT-LIC-002/003/007/010/011/012 + AT-LIC-016-001..007) against the controlled real HushServerNode fixture with test-owned identities/network. Journey wiring is non-zero discovered and all behavior is evidenced by same-ID TwinTests plus real client component/statechart/authority suites; the fixture full run remains an external release dependency per repo precedent (FEAT-008 EXT-008-002, FEAT-009 EXT-009-003, FEAT-010 EXT-010-001/002)."
+    }
+  ]
+}

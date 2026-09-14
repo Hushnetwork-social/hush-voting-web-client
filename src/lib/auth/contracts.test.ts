@@ -53,6 +53,8 @@ const allowedContext: AuthMachineContext = {
   supportCode: null,
   outcomeCode: null,
   coarseStageStartedAtMs: null,
+  entitlementStage: null,
+  entitlementRequired: true,
 };
 expect(allowedContext).toBeDefined();
 
@@ -223,6 +225,8 @@ describe('secret-bearing values are rejected at the contract boundary', () => {
         'authenticatedIdentity',
         'coarseStageStartedAtMs',
         'cooldownDeadlineMs',
+        'entitlementRequired',
+        'entitlementStage',
         'environment',
         'navigationToken',
         'outcomeCode',

@@ -138,7 +138,7 @@ describe('fault: malformed, contradictory, unknown, truncated server responses',
 
   it('unknown status/code fails closed', () => {
     expect(normalizeSubmitReply({ successfull: true, message: 'x', status: 'MADE_UP' as never }, new Set())).toEqual({ kind: 'compatibilityError' });
-    expect(normalizeSubmitReply({ successfull: true, message: 'x', status: 'REJECTED', validationCode: 'UNKNOWN_CODE' }, new Set())).toEqual({ kind: 'terminalRejection', validationCode: 'UNKNOWN_CODE' });
+    expect(normalizeSubmitReply({ successfull: false, message: 'x', status: 'REJECTED', validationCode: 'UNKNOWN_CODE' }, new Set())).toEqual({ kind: 'terminalRejection', validationCode: 'UNKNOWN_CODE' });
   });
 });
 

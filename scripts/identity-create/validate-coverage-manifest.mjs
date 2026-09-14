@@ -4,7 +4,7 @@
  *
  * Machine-checks the acceptance-coverage manifest produced in Phase 1
  * (memory bank) AND the executable Gherkin catalog
- * (`features/identity-create/*.feature`): every AC-007-NNN has exactly the
+ * (the sibling server's isolated HushVoting .NET catalogue): every AC-007-NNN has exactly the
  * manifest scenario ID in the catalog, every scenario ID is unique, every
  * scenario references a known criterion, and every criterion references one
  * of the 17 mandatory families. Unknown or missing mappings fail CI before
@@ -19,7 +19,7 @@ import { fileURLToPath } from 'node:url';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(SCRIPT_DIR, '..', '..');
-const FEATURES_DIR = join(REPO_ROOT, 'features', 'identity-create');
+const FEATURES_DIR = join(REPO_ROOT, '..', 'hush-server-node', 'Node', 'HushNode.IntegrationTests', 'HushVoting', 'Features', 'identity-create');
 
 const FAMILIES = new Set([
   'HV-ID-CREATE-ENTRY', 'HV-ID-CREATE-PROFILE', 'HV-ID-CREATE-GENERATE',
@@ -104,7 +104,7 @@ function main() {
     for (const e of errors) console.error(`  - ${e}`);
     process.exit(1);
   }
-  console.log(`COVERAGE MANIFEST OK (${knownCriteria.length}/76 criteria, ${seenScenarioIds.size} scenario ids, ${FAMILIES.size} families, ${catalog.size} catalog scenarios)`);
+  console.log(`COVERAGE MANIFEST OK (${knownCriteria.length}/76 criteria, ${seenScenarioIds.size} scenario ids, ${FAMILIES.size} families, ${catalog.size} criterion mappings; .NET catalogue presence only, runtime/acceptance completion is separate)`);
 }
 
 /** Parse .feature files into AC -> scenario IDs. */

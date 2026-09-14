@@ -17,13 +17,22 @@ import { AuthShell } from './AuthShell';
 import { RemovalConfirmation } from './RemovalConfirmation';
 import { ErrorSurface, RecoveryNavigation, TemporaryMode } from './ErrorSurfaces';
 import { errorCopyForOutcome, documentTitleForState } from '../../lib/auth/ui/copy';
-import type { AuthRenderProjection } from '../../lib/auth/react/adapter';
+import { createAuthAdapter, type AuthRenderProjection } from '../../lib/auth/react/adapter';
+import { buildEmptyActors } from '../../lib/auth/composition';
+import { completeAllPendingOperations, createLocalUserAuthorityTestActor, createOnboardingTestActor, createIdentityVerificationTestActor, createRemovalTestActor } from '../../lib/auth/testing/actors';
+import type { AuthIntent } from '../../lib/auth/types';
+import { createWebLocalUserAuthority } from '../../lib/auth/web/web-actors';
+import type { BrowserVaultClient } from '../../lib/browser-vault/production/client';
 
 function projection(overrides: Partial<AuthRenderProjection>): AuthRenderProjection {
   return {
     authState: 'locked',
     connectivity: 'online',
     protectedAccess: false,
+    entitlementStage: null,
+    entitlementReady: false,
+    sessionEpoch: 1,
+    entitlementRequired: true,
     safeIdentity: { alias: 'Ada', abbreviatedSigningAddress: 'NVh…1a2b' },
     authenticatedIdentity: null,
     outcomeCode: null,
@@ -66,6 +75,23 @@ describe('first-run entry', () => {
 });
 
 describe('locked-user surface and secret transfer', () => {
+  // FEAT-030 approved legacy heading; FEAT-010 AC-010-025 / FEAT-007 AC-007-052.
+  it.each(['staged', 'lockedVault'])('projects the %s startup classification without guessing its origin', async surface => {
+    const actors = buildEmptyActors();
+    const client = { isConnected: () => true, cancel: vi.fn(), dispatch: vi.fn(async () => ({
+      outcome: 'OK', payload: { surface, safeIdentity: { alias: 'Ada', abbreviatedSigningAddress: 'NVh…1a2b' } },
+    })) } as unknown as BrowserVaultClient;
+    actors.localUserAuthority = createWebLocalUserAuthority(client);
+    const adapter = createAuthAdapter({ actors, registeredCapabilities: new Set(), safeCoordination: true });
+    try {
+      await vi.waitFor(() => expect(adapter.snapshot().authState).toBe('locked'));
+      render(<AuthShell projection={adapter.snapshot()}><LockedUser onSubmitSecret={() => undefined} onRemoveLocalUser={() => undefined} /></AuthShell>);
+      expect(screen.getByRole('heading', { name: surface === 'staged' ? 'Finish setting up your identity' : 'Unlock HushVoting!' })).toBeInTheDocument();
+      expect(screen.getByLabelText('Device password')).toBeInTheDocument();
+      expect(adapter.snapshot().protectedAccess).toBe(false);
+    } finally { adapter.stop(); }
+  });
+
   it('transfers the secret directly and clears the input immediately', async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
@@ -99,6 +125,83 @@ describe('locked-user surface and secret transfer', () => {
 });
 
 describe('removal confirmation', () => {
+  // EPIC-001 -> FEAT-008 AC-008-070 -> Phase 3 Tasks 3.9/3.10,
+  // Phase 7 Tasks 7.1/7.2; FEAT-002 Phase 3 Tasks 3.1/3.2.
+  // Drive real authority projections. Startup-marker consent remains FEAT-022.
+  it('retains the verified preview for fresh confirmed removal after live cleanup fails', async () => {
+    const user = userEvent.setup();
+    const actors = buildEmptyActors();
+    actors.localUserAuthority = createLocalUserAuthorityTestActor([{ code: 'INIT_NO_LOCAL_USER' }]);
+    actors.onboarding.restoreRecoveryWords = createOnboardingTestActor([{ code: 'ONBOARDING_COMPLETED', localUserRef: 'restored-local-user' }]);
+    const signingKey = '02' + 'ab'.repeat(32);
+    actors.identityVerification = createIdentityVerificationTestActor([{ code: 'VERIFY_SUCCESS', identity: {
+      alias: 'Restored Alice', publicSigningKey: signingKey, publicEncryptionKey: '03' + 'cd'.repeat(32),
+    } }]);
+    actors.removal = createRemovalTestActor([{ code: 'UNKNOWN_FAILURE', supportCode: 'cleanup-test' }, { code: 'REMOVAL_COMPLETE' }]);
+    const adapter = createAuthAdapter({ actors, registeredCapabilities: new Set(), safeCoordination: true });
+    const settleAt = async (state: string) => vi.waitFor(() => {
+      completeAllPendingOperations();
+      expect(adapter.snapshot().authState).toBe(state);
+    });
+    try {
+      await settleAt('noLocalUser');
+      adapter.send({ type: 'INTENT.RESTORE_RECOVERY_WORDS' });
+      await settleAt('authenticated');
+      adapter.send({ type: 'INTENT.LOCK' });
+      await settleAt('locked');
+      const handlers = { dispatch: vi.fn((intent: AuthIntent) => adapter.send(intent)), submitSecret: vi.fn() };
+      const { rerender } = render(<AuthGate projection={adapter.snapshot()} handlers={handlers} />);
+      expect(adapter.snapshot().safeIdentity).toEqual({ alias: 'Restored Alice', abbreviatedSigningAddress: '02ababab…ababab' });
+      expect(adapter.snapshot().authenticatedIdentity).toBeNull();
+      expect(screen.queryByText(signingKey)).toBeNull();
+      await user.click(screen.getByRole('button', { name: /^remove local user$/i }));
+      await user.type(screen.getByLabelText(/type REMOVE/i), 'REMOVE');
+      await user.click(screen.getByRole('checkbox'));
+      await user.click(screen.getByRole('button', { name: /^remove local user$/i }));
+      await settleAt('recoverableError');
+      rerender(<AuthGate projection={adapter.snapshot()} handlers={handlers} />);
+      expect(screen.queryByRole('button', { name: /restore recovery words/i })).toBeNull();
+      expect(handlers.dispatch).toHaveBeenCalledTimes(1);
+      await user.click(screen.getByRole('button', { name: /^remove local user$/i }));
+      expect(screen.getByLabelText(/type REMOVE/i)).toHaveValue('');
+      expect(screen.getByRole('checkbox')).not.toBeChecked();
+      expect(handlers.dispatch).toHaveBeenCalledTimes(1);
+      await user.type(screen.getByLabelText(/type REMOVE/i), 'REMOVE');
+      await user.click(screen.getByRole('checkbox'));
+      await user.click(screen.getByRole('button', { name: /^remove local user$/i }));
+      await settleAt('noLocalUser');
+      expect(adapter.snapshot().safeIdentity).toBeNull();
+      expect(handlers.dispatch).toHaveBeenCalledTimes(2);
+    } finally { adapter.stop(); completeAllPendingOperations(); }
+  });
+
+  it('the real locked gate requires confirmation before dispatching removal', async () => {
+    const user = userEvent.setup();
+    const dispatch = vi.fn();
+    render(<AuthGate projection={projection({})} handlers={{ dispatch, submitSecret: vi.fn() }} />);
+    await user.click(screen.getByRole('button', { name: /^remove local user$/i }));
+    expect(dispatch).not.toHaveBeenCalled();
+    await user.type(screen.getByLabelText(/type REMOVE/i), 'REMOVE');
+    await user.click(screen.getByRole('checkbox'));
+    await user.click(screen.getByRole('button', { name: /^remove local user$/i }));
+    expect(dispatch).toHaveBeenCalledExactlyOnceWith({ type: 'INTENT.REMOVE_LOCAL_USER' });
+  });
+
+  it('cancels removal and never carries confirmation into another authority epoch', async () => {
+    const user = userEvent.setup();
+    const dispatch = vi.fn();
+    const handlers = { dispatch, submitSecret: vi.fn() };
+    const { rerender } = render(<AuthGate projection={projection({})} handlers={handlers} />);
+    await user.click(screen.getByRole('button', { name: /^remove local user$/i }));
+    await user.click(screen.getByRole('button', { name: /^cancel$/i }));
+    expect(screen.getByRole('button', { name: /unlock hushvoting/i })).toBeInTheDocument();
+    expect(dispatch).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: /^remove local user$/i }));
+    rerender(<AuthGate projection={projection({ sessionEpoch: 2 })} handlers={handlers} />);
+    expect(screen.queryByLabelText(/type REMOVE/i)).not.toBeInTheDocument();
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
   it('requires the exact phrase REMOVE and a final confirmation', async () => {
     const user = userEvent.setup();
     const onConfirm = vi.fn();

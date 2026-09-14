@@ -1,12 +1,11 @@
 /**
  * FEAT-007 playwright-bdd configuration (Task 7.1/7.2).
  *
- * Executable Gherkin for the platform-neutral acceptance catalog. Full
- * production-composition execution requires the controlled pinned
- * HushServerNode fixture (external release gate) and is RED until that
- * artifact is available — no mock or local reservation substitutes.
- * The coverage-manifest validator (`npm run identity-create:coverage`) is the
- * machine-checked gate that runs in CI regardless.
+ * Remaining legacy requirements, including incomplete step bindings.
+ * Validated browser/server replacements run through the dedicated
+ * test:identity-*:bdd commands in HushVoting's isolated .NET infrastructure.
+ * All original mappings remain in the .NET catalogue and are checked by
+ * identity-create:coverage. Discovery is separate from acceptance readiness.
  */
 import { defineConfig } from '@playwright/test';
 import { defineBddConfig } from 'playwright-bdd';

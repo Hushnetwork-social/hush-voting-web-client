@@ -15,13 +15,14 @@
 import type { AuthRenderProjection } from '../../lib/auth/react/adapter';
 import type { AuthIntent } from '../../lib/auth/types';
 import { AuthShell } from './AuthShell';
+import { EntitlementGate } from './EntitlementGate';
 import { FirstRun } from './FirstRun';
 import { LockedUser } from './LockedUser';
 import { RemovalConfirmation } from './RemovalConfirmation';
 import { ErrorSurface, TemporaryMode } from './ErrorSurfaces';
 import { OnboardingHost } from './onboarding/OnboardingHost';
 import { resolveOnboardingChild, subscribeChildViews } from './onboarding/onboarding-registry';
-import { useState, useSyncExternalStore } from 'react';
+import { useState, useSyncExternalStore, type ReactNode } from 'react';
 
 /** Map the locked-state outcome to the exact privacy-safe user copy. */
 function lockedOutcomeError(outcomeCode: string | null): string | null {
@@ -59,6 +60,26 @@ function PendingSurface({ label }: { label: string }) {
   );
 }
 
+/** Presentation-only confirmation; the machine owns deletion after confirmation.
+ * Keyed by state and authority epoch so consent cannot carry into another session.
+ */
+function ConfirmLocalRemoval({ children, onConfirm }: {
+  readonly children: (requestRemoval: () => void) => ReactNode;
+  readonly onConfirm: () => void;
+}) {
+  const [requested, setRequested] = useState(false);
+  return requested ? (
+    <RemovalConfirmation
+      removing={false}
+      onCancel={() => setRequested(false)}
+      onConfirmRemoval={() => {
+        setRequested(false);
+        onConfirm();
+      }}
+    />
+  ) : children(() => setRequested(true));
+}
+
 export function AuthGate({ projection, handlers }: AuthGateProps) {
   const { authState } = projection;
   const [showTemporary, setShowTemporary] = useState(false);
@@ -68,6 +89,11 @@ export function AuthGate({ projection, handlers }: AuthGateProps) {
   // Surface selection is purely a projection of machine state.
   let surface: React.ReactNode;
   switch (authState) {
+    case 'authenticated':
+      // FEAT-016: identity is authenticated but entitlement is not ready —
+      // the blocking gate renders; protected workspace never mounts here.
+      surface = <EntitlementGate projection={projection} handlers={handlers} />;
+      break;
     case 'initializing':
       surface = <PendingSurface label="Preparing…" />;
       break;
@@ -102,11 +128,18 @@ export function AuthGate({ projection, handlers }: AuthGateProps) {
       break;
     case 'locked':
       surface = (
-        <LockedUser
-          onSubmitSecret={handlers.submitSecret}
-          onRemoveLocalUser={() => handlers.dispatch({ type: 'INTENT.REMOVE_LOCAL_USER' })}
-          outcomeError={lockedOutcomeError(projection.outcomeCode)}
-        />
+        <ConfirmLocalRemoval
+          key={`${authState}:${projection.sessionEpoch}`}
+          onConfirm={() => handlers.dispatch({ type: 'INTENT.REMOVE_LOCAL_USER' })}
+        >
+          {(requestRemoval) => (
+            <LockedUser
+              onSubmitSecret={handlers.submitSecret}
+              onRemoveLocalUser={requestRemoval}
+              outcomeError={lockedOutcomeError(projection.outcomeCode)}
+            />
+          )}
+        </ConfirmLocalRemoval>
       );
       break;
     case 'unlocking':
@@ -129,7 +162,7 @@ export function AuthGate({ projection, handlers }: AuthGateProps) {
           <button
             type="button"
             className="link-button"
-            onClick={() => handlers.dispatch({ type: 'INTENT.BACK_FROM_ONBOARDING' })}
+            onClick={() => handlers.dispatch({ type: 'INTENT.LOCK' })}
           >
             Back
           </button>
@@ -139,12 +172,19 @@ export function AuthGate({ projection, handlers }: AuthGateProps) {
     case 'recoverableError':
     case 'blockedError':
       surface = (
-        <ErrorSurface
-          projection={projection}
-          onRetry={() => handlers.dispatch({ type: 'INTENT.RETRY' })}
-          onLock={() => handlers.dispatch({ type: 'INTENT.LOCK' })}
-          onRemoveLocalUser={() => handlers.dispatch({ type: 'INTENT.REMOVE_LOCAL_USER' })}
-        />
+        <ConfirmLocalRemoval
+          key={`${authState}:${projection.sessionEpoch}`}
+          onConfirm={() => handlers.dispatch({ type: 'INTENT.REMOVE_LOCAL_USER' })}
+        >
+          {(requestRemoval) => (
+            <ErrorSurface
+              projection={projection}
+              onRetry={() => handlers.dispatch({ type: 'INTENT.RETRY' })}
+              onLock={() => handlers.dispatch({ type: 'INTENT.LOCK' })}
+              onRemoveLocalUser={requestRemoval}
+            />
+          )}
+        </ConfirmLocalRemoval>
       );
       break;
     case 'removingLocalUser':

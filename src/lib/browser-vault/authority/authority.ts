@@ -54,6 +54,10 @@ export interface AuthorityEnvironment {
     readonly purpose: 'devicePassword' | 'mnemonic' | 'filePassword' | 'fileBytes';
     readonly value: string;
   }) => void;
+  /** Drop queued secret transfers synchronously whenever the epoch changes. */
+  readonly onInvalidate?: () => void;
+  /** Volatile credentials must end on page/process lifecycle loss. */
+  readonly shouldInvalidateOnLifecycle?: (signal: 'pagehide' | 'visibility-hidden' | 'disconnect' | 'heartbeat') => boolean;
   /** Bounded cleanup acknowledgement deadline (ms). */
   readonly cleanupBoundMs?: number;
   /** Forced cleanup of the owning worker when the bound cannot be proven. */
@@ -201,6 +205,16 @@ export class WorkerAuthority {
     if (!this.isKnownChannel(request.clientChannel)) {
       return { accepted: false, outcome: 'OPERATION_UNKNOWN_CHANNEL' };
     }
+    if (request.operation === 'lockAll') {
+      // Lock revokes any in-flight result immediately. The engine wipe runs
+      // before acknowledgement and global invalidation are delivered.
+      this.epoch += 1;
+      this.freshCapabilities.clear();
+      this.env.onInvalidate?.();
+      this.activeOperationId = request.operationId;
+      void this.runOperation(request);
+      return { accepted: true, outcome: 'OPERATION_STARTED' };
+    }
     if (this.activeOperationId !== null) {
       this.deliverOperationRejection(request, 'AUTHORITY_BUSY');
       return { accepted: false, outcome: 'OPERATION_BUSY' };
@@ -254,6 +268,12 @@ export class WorkerAuthority {
         ...(result.supportCode !== undefined ? { supportCode: result.supportCode } : {}),
         ...(result.payload !== undefined ? { payload: result.payload } : {}),
       });
+      if (request.operation === 'lockAll') {
+        this.phase = 'locked';
+        this.acceptedChannels.clear();
+        this.env.broadcast({ kind: 'global-invalidation', authorityEpoch: this.epoch,
+          reason: result.outcome === 'OK' || result.outcome === 'SUCCESS' ? 'lock' : 'cleanup-failed' });
+      }
     } finally {
       if (this.activeOperationId === request.operationId) {
         this.activeOperationId = null;
@@ -272,6 +292,10 @@ export class WorkerAuthority {
   private handleLifecycle(request: Extract<BrowserClientMessage, { kind: 'lifecycle' }>): { readonly accepted: boolean; readonly outcome: string } {
     if (!this.isKnownChannel(request.clientChannel) || request.authorityEpoch !== this.epoch) {
       return { accepted: false, outcome: 'LIFECYCLE_REJECTED' };
+    }
+    if (this.env.shouldInvalidateOnLifecycle?.(request.signal)) {
+      this.invalidate('authority-loss');
+      return { accepted: true, outcome: 'LIFECYCLE_ACCEPTED' };
     }
     if (request.signal === 'disconnect') {
       this.acceptedChannels.delete(request.clientChannel);
@@ -306,6 +330,7 @@ export class WorkerAuthority {
     this.activeOperationId = null;
     this.freshCapabilities.clear();
     this.acceptedChannels.clear();
+    this.env.onInvalidate?.();
     this.env.broadcast({ kind: 'global-invalidation', authorityEpoch: this.epoch, reason });
   }
 

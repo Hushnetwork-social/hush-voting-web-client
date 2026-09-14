@@ -22,6 +22,7 @@ export type CandidateRef = string & { readonly __candidateRef: unique symbol };
 
 /** Preflight outcome of the active platform security/persistence check. */
 export type PreflightOutcome =
+  | { readonly kind: 'checking' }
   | { readonly kind: 'passed' }
   | { readonly kind: 'unsupported'; readonly code: 'UNSUPPORTED_PLATFORM' | 'UNSAFE_CAPABILITY' }
   | { readonly kind: 'temporaryUnavailable' }

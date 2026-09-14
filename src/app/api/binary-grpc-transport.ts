@@ -1,3 +1,4 @@
+import { hasBoundedHistoricalName, IDENTITY_RESPONSE_MAX_BYTES } from '../../lib/identity-compatibility/historical-profile';
 /**
  * FEAT-011 Task 6.1 — server-only binary gRPC transport for the unchanged
  * HushServerNode identity RPCs (GetIdentity / SubmitSignedTransaction).
@@ -10,7 +11,7 @@
  * map to closed outcomes — never absence, never fabricated success.
  */
 
-import { credentials, loadPackageDefinition, Metadata, type ChannelCredentials } from '@grpc/grpc-js';
+import { credentials, loadPackageDefinition, Metadata, type ChannelCredentials, type ChannelOptions } from '@grpc/grpc-js';
 import { loadSync } from '@grpc/proto-loader';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -23,6 +24,10 @@ import type { GetIdentityReply, SubmitSignedTransactionReply } from '../../lib/i
 export const PINNED_PROTO_DIGESTS = {
   'hushIdentity.proto': 'df3a2d9b128335dc3c92f0ef2b246655ed4c95f53f7ce058d438d945724f8ffa',
   'hushBlockchain.proto': 'e0625d52e4227ed77b6eb0e7d74b2990b7a8d3e8ecd77bd308371797275dc04b',
+  // FEAT-016 Task 6.1 — pinned FEAT-015 additive licence query service.
+  // The FEAT-015 server never changes its wire contract; this copy is the
+  // sole client-side authority and is digest-verified at load.
+  'hushVotingLicence.proto': 'ee004152c5dd24f15e9ebf88db577e3c854f93712d9499ded95dafa8f762eca8',
 } as const;
 
 export const PROTO_DIR = path.join(process.cwd(), 'src', 'app', 'api', 'protos');
@@ -43,7 +48,7 @@ export interface PinnedGrpcSurface {
 
 interface RpcHushPackage {
   rpcHush: {
-    HushIdentity: new (address: string, creds: ChannelCredentials) => unknown;
+    HushIdentity: new (address: string, creds: ChannelCredentials, options?: ChannelOptions) => unknown;
     HushBlockchain: new (address: string, creds: ChannelCredentials) => unknown;
   };
 }
@@ -64,7 +69,7 @@ export function loadPinnedGrpcSurface(endpoint: string, protoDir: string = PROTO
   const definition = loadSync([path.join(protoDir, 'hushIdentity.proto'), path.join(protoDir, 'hushBlockchain.proto')], LOADER_OPTIONS);
   const pkg = loadPackageDefinition(definition) as unknown as RpcHushPackage;
   return {
-    HushIdentity: new pkg.rpcHush.HushIdentity(endpoint, credentials.createInsecure()),
+    HushIdentity: new pkg.rpcHush.HushIdentity(endpoint, credentials.createInsecure(), { 'grpc.max_receive_message_length': IDENTITY_RESPONSE_MAX_BYTES }),
     HushBlockchain: new pkg.rpcHush.HushBlockchain(endpoint, credentials.createInsecure()),
   };
 }
@@ -112,7 +117,9 @@ export class BinaryGrpcTransport implements HushServerTransportPort {
   async lookupIdentity(request: { readonly publicSigningAddress: string }): Promise<LookupTransportResult> {
     try {
       const reply = await unaryCall<unknown>(this.surface.HushIdentity, 'GetIdentity', { PublicSigningAddress: request.publicSigningAddress }, RPC_TIMEOUT_MS);
-      return { ok: true, reply: normalizeGetIdentityReply(reply) };
+      const normalized = normalizeGetIdentityReply(reply);
+      if (normalized.successfull && !hasBoundedHistoricalName(normalized.profileName)) return { ok: false, failure: { kind: 'malformed' } };
+      return { ok: true, reply: normalized };
     } catch (error) {
       return { ok: false, failure: grpcErrorToFailure(error) };
     }

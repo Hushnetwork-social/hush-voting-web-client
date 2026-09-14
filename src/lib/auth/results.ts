@@ -188,7 +188,7 @@ export type VerificationResult =
 export type OnboardingResult =
   | { readonly code: 'ONBOARDING_COMPLETED'; readonly localUserRef: string }
   | { readonly code: 'ONBOARDING_BACK' }
-  | { readonly code: 'ONBOARDING_CLEANUP_COMPLETE' }
+  | { readonly code: 'ONBOARDING_CLEANUP_COMPLETE'; readonly next?: 'credentialFilePicker' }
   | { readonly code: 'UNKNOWN_FAILURE'; readonly supportCode: string };
 
 /** Local-user removal actor result. */
