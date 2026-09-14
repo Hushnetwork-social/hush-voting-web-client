@@ -16,6 +16,7 @@
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { hasNativeBrowserFallback } from './source-policy.mjs';
 
 const REPO_ROOT = join(import.meta.dirname, '..', '..');
 const findings = [];
@@ -88,11 +89,8 @@ for (const file of walk(join(REPO_ROOT, 'src'))) {
 // --- 6. Native → Browser fallback seams in ordinary composition ---
 for (const file of walk(join(REPO_ROOT, 'src', 'lib', 'auth'))) {
   const content = readFileSync(file, 'utf8');
-  if (content.includes('fallback') && content.includes('browser') && !file.includes('.test.')) {
-    // Only flag explicit native->browser fallback claims, not the word alone.
-    if (/native[^]*fallback|fallback[^]*native/i.test(content)) {
-      findings.push(`${relative(file)}: native→browser fallback seam present`);
-    }
+  if (!file.includes('.test.') && hasNativeBrowserFallback(content)) {
+    findings.push(`${relative(file)}: native→browser fallback seam present`);
   }
 }
 

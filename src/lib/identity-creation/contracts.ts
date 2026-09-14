@@ -43,7 +43,8 @@ export type CreationStage =
   | 'preflight' // platform security/persistence preflight
   | 'profile' // alias + initial visibility
   | 'generating' // explicit P-01 generation (progress after 150 ms)
-  | 'recovery' // transient 24-word reveal + six-position confirmation
+  | 'recovery' // transient 24-word reveal
+  | 'confirmRecovery' // six-position confirmation without revealed words
   | 'protect' // separate Device-password step
   | 'review' // safe final review before signing
   | 'provisionalResume' // Finish creating your identity

@@ -18,8 +18,22 @@
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { wordlists } from 'bip39';
 
 const REPO_ROOT = join(import.meta.dirname, '..', '..');
+
+const englishWords = new Set(wordlists.english);
+
+/**
+ * A run of lowercase words is only a mnemonic when every word belongs to the
+ * BIP39 English list. Vitest/Gherkin titles contain long lowercase phrases
+ * (for example "...retains the verified preview for fresh confirmed removal")
+ * that a bare word-run regex would misreport as secret material.
+ */
+export function isMnemonicRun(value) {
+  const words = value.trim().split(/\s+/);
+  return words.length >= 12 && words.length <= 24 && words.every(word => englishWords.has(word.toLowerCase()));
+}
 
 const DEFAULT_ROOTS = ['.next-web', '.next-static', '.next-tauri', 'out', 'test-results', 'playwright-report', '.features-gen-entitlement-bootstrap', 'coverage'];
 
@@ -32,7 +46,7 @@ const MAX_BYTES = 4 * 1024 * 1024;
 const PROHIBITED = [
   { label: 'declared journey credential value', re: /Entitlement-fixture-password-42/ },
   { label: 'declared journey identity alias', re: /BDD Entitlement Alice/ },
-  { label: 'mnemonic phrase', re: /(?:"|')((?:[a-z]{3,12}\s){11,23}[a-z]{3,12})(?:"|')/ },
+  { label: 'mnemonic phrase', re: /(?:"|')((?:[a-z]{3,12}\s){11,23}[a-z]{3,12})(?:"|')/, validate: isMnemonicRun },
   { label: 'private key PEM header', re: /-----BEGIN (?:RSA |EC )?PRIVATE KEY-----/ },
   { label: 'raw signature material', re: /signature["']?\s*[:=]\s*["']?[0-9a-fA-F]{128,}["']?/ },
   { label: 'vault handle', re: /keyAlias["']?\s*[:=]\s*["'][^"']+["']/ },
@@ -75,13 +89,23 @@ for (const file of files) {
   } catch {
     continue;
   }
-  for (const { label, re } of PROHIBITED) {
+  for (const label of findProhibitedArtifactContent(content)) {
+    findings.push(`${file}: ${label}`);
+  }
+}
+
+/** Return the prohibited-content labels present in one artifact's text. */
+export function findProhibitedArtifactContent(content) {
+  const labels = [];
+  for (const { label, re, validate } of PROHIBITED) {
     const globalRe = new RegExp(re.source, re.flags.includes('g') ? re.flags : `${re.flags}g`);
-    for (const _match of content.matchAll(globalRe)) {
-      findings.push(`${file}: ${label}`);
+    for (const match of content.matchAll(globalRe)) {
+      if (validate !== undefined && !validate(match[1] ?? match[0])) continue;
+      labels.push(label);
       break;
     }
   }
+  return labels;
 }
 
 if (findings.length > 0) {

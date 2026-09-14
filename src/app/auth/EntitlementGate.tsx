@@ -22,6 +22,7 @@ import { useEffect, useRef } from 'react';
 import type { AuthRenderProjection } from '../../lib/auth/react/adapter';
 import { entitlementGatePresentation, safeRedactedSupportCode } from '../../lib/auth/presentation/entitlement-presentation';
 import type { AuthIntent } from '../../lib/auth/types';
+import { SafeAlias } from './SafeAlias';
 
 export interface EntitlementGateHandlers {
   readonly dispatch: (intent: AuthIntent) => void;
@@ -67,7 +68,7 @@ export function EntitlementGate({ projection, handlers }: EntitlementGateProps) 
 
       {projection.safeIdentity !== null && (
         <p className="entitlement-gate-meta">
-          <span className="auth-safe-alias">{projection.safeIdentity.alias}</span>
+          <span className="auth-safe-alias"><SafeAlias alias={projection.safeIdentity.alias} /></span>
           <span className="auth-network-state" data-testid="gate-network-state">
             {projection.connectivity === 'offline'
               ? 'Offline'

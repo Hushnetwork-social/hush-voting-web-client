@@ -1,31 +1,17 @@
 #!/usr/bin/env node
-/**
- * FEAT-016 BDD wiring / canonical-ID discovery validator (Phase 7 task 7.2).
- *
- * Machine-checks that the canonical production-composition journeys are
- * fully wired and non-zero discovered:
- *  1. every canonical scenario ID (13) appears as a scenario tag in exactly
- *     one `features/licence-entitlements/*.feature` scenario;
- *  2. no unknown or duplicated AT-LIC/AT-LIC-016 ID is introduced;
- *  3. every scenario step phrase used by the features has a matching step
- *     definition in `browser/licence-entitlements/steps/*.ts`;
- *  4. playwright-bdd compiles the catalog and DISCOVERS every canonical
- *     scenario (zero discovery or a missing/duplicate canonical ID is RED).
- *
- * Discovery runs `playwright test --list` against
- * `playwright.entitlement-bootstrap.config.ts`; the config only starts the
- * production web server when FEAT016_RUN_WEB=1, so listing never launches a
- * server.
- *
- * Usage: node scripts/entitlement-bootstrap/wiring.mjs
+/** FEAT-016 Phase 7 Tasks 7.2/7.6: all 13 originals are owned by .NET.
+ * Retired source must stay absent; unresolved/unrecorded retirements are red.
+ * Discovery never substitutes for runtime or full acceptance evidence.
  */
 import { execFileSync } from 'node:child_process';
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const REPO_ROOT = join(import.meta.dirname, '..', '..');
 const FEATURES_DIR = process.env.FEAT016_WIRING_FEATURES ?? join(REPO_ROOT, 'features', 'licence-entitlements');
 const CANONICAL_PATH = process.env.FEAT016_CANONICAL_PATH ?? join(import.meta.dirname, 'canonical-ids.json');
+const SERVER_ROOT = join(REPO_ROOT, '..', 'hush-server-node');
+const DOTNET_AREA = join(SERVER_ROOT, 'Node', 'HushNode.IntegrationTests', 'HushVoting');
 
 const canonical = JSON.parse(readFileSync(CANONICAL_PATH, 'utf8'));
 const CANONICAL_IDS = new Set(canonical.scenarioIds.map((entry) => entry.id));
@@ -37,11 +23,26 @@ function fail(message) {
   process.exitCode = 1;
 }
 
-const features = readdirSync(FEATURES_DIR)
-  .filter((name) => name.endsWith('.feature'))
-  .map((name) => join(FEATURES_DIR, name));
+const features = (existsSync(FEATURES_DIR) ? readdirSync(FEATURES_DIR) : [])
+  .filter(name => name.endsWith('.feature')).map(name => join(FEATURES_DIR, name));
+const dotnetFeatures = new Set();
+if (!process.env.FEAT016_WIRING_FEATURES) {
+  const manifest = JSON.parse(readFileSync(process.env.FEAT016_WIRING_MIGRATION_MANIFEST ?? join(DOTNET_AREA, 'migration-manifest.json'), 'utf8'));
+  for (const entry of manifest.files.filter(file => file.group === 'licence-entitlements')) {
+    if (entry.retirement?.state !== 'typescript-source-retired'
+      || !entry.scenarios?.length || entry.scenarios.some(scenario => scenario.status !== 'passed')) {
+      fail(`unresolved or unrecorded retirement: ${entry.source}`);
+      continue;
+    }
+    if (existsSync(join(REPO_ROOT, entry.source))) fail(`retired TypeScript source still exists: ${entry.source}`);
+    const path = join(DOTNET_AREA, entry.destination);
+    if (!existsSync(path)) { fail(`missing .NET replacement: ${entry.destination}`); continue; }
+    features.push(path); dotnetFeatures.add(path);
+  }
+}
 
 const scenarioIdOwners = new Map();
+const dotnetIds = new Set();
 const featureLines = [];
 for (const feature of features) {
   const lines = readFileSync(feature, 'utf8').split('\n');
@@ -60,6 +61,7 @@ for (const feature of features) {
           continue;
         }
         scenarioIdOwners.set(id, `${feature} -> ${line}`);
+        if (dotnetFeatures.has(feature)) dotnetIds.add(id);
       }
       pendingTags = [];
       continue;
@@ -82,8 +84,7 @@ for (const id of scenarioIdOwners.keys()) {
   }
 }
 
-// 3+4. bddgen compiles features+steps and fails non-zero on missing step
-// definitions; then playwright-bdd discovery lists every generated scenario.
+// Discover the verified .NET assembly; no TypeScript runner remains.
 if (process.env.FEAT016_WIRING_SKIP_LIST === '1') {
   if (process.exitCode === undefined) {
     console.log(
@@ -95,36 +96,14 @@ if (process.env.FEAT016_WIRING_SKIP_LIST === '1') {
   process.exit(process.exitCode ?? 0);
 }
 
-try {
-  execFileSync('npx', ['bddgen', '--config', 'playwright.entitlement-bootstrap.config.ts'], {
-    cwd: REPO_ROOT,
-    encoding: 'utf8',
-    stdio: 'pipe',
-    timeout: 120_000,
-  });
-} catch (error) {
-  const output = typeof error.stdout === 'string' ? error.stdout : '';
-  fail(`bddgen failed (missing step definitions or generation error): ${output.slice(0, 600) || error.message}`);
-}
-
-let listed = '';
-try {
-  listed = execFileSync(
-    'npx',
-    ['playwright', 'test', '--config', 'playwright.entitlement-bootstrap.config.ts', '--list'],
-    { cwd: REPO_ROOT, encoding: 'utf8', stdio: 'pipe', timeout: 120_000 },
-  );
-} catch (error) {
-  const output = typeof error.stdout === 'string' ? error.stdout : '';
-  fail(`playwright --list failed: ${output.slice(0, 800) || error.message}`);
-}
-
-const discoveredTitles = listed
-  .split('\n')
-  .map((line) => line.trim())
-  .filter((line) => line.length > 0 && !line.startsWith('Using') && !line.startsWith('Running') && !line.startsWith('npx'));
-if (discoveredTitles.length === 0) {
-  fail('zero BDD discovery (playwright --list found no scenarios)');
+let dotnetTitles = [];
+if (dotnetIds.size > 0) {
+  try {
+    dotnetTitles = execFileSync('bash', [join(SERVER_ROOT, 'scripts', 'run-hushvoting-e2e.sh'), '--list'],
+      { cwd: SERVER_ROOT, encoding: 'utf8', stdio: 'pipe', timeout: 90_000 }).split('\n').map(line => line.trim());
+  } catch {
+    fail('.NET discovery/provenance failed; build the retired group with npm run test:licence-direct-free:bdd');
+  }
 }
 
 const TITLE_BY_ID = {
@@ -143,13 +122,14 @@ const TITLE_BY_ID = {
   'AT-LIC-016-007': 'Entitlement recovery is accessible',
 };
 for (const [id, title] of Object.entries(TITLE_BY_ID)) {
-  if (!discoveredTitles.some((line) => line.includes(title))) {
-    fail(`canonical scenario ${id} ("${title}") was not discovered by playwright-bdd`);
+  const found = dotnetIds.has(id) && dotnetTitles.filter(line => line === title).length === 1;
+  if (!found) {
+    fail(`canonical scenario ${id} ("${title}") was not discovered by its owning runner`);
   }
 }
 
 if (process.exitCode === undefined) {
   console.log(
-    `WIRING OK (${features.length} feature files, ${CANONICAL_IDS.size}/13 canonical scenario ids discovered and unique, all step phrases defined)`,
+    `DISCOVERY OK (${CANONICAL_IDS.size}/13 unique canonical IDs: ${dotnetIds.size} .NET, ${CANONICAL_IDS.size - dotnetIds.size} remaining TypeScript; runtime and acceptance execution are separate)`,
   );
 }

@@ -157,3 +157,17 @@ describe('confirmation consequences and forbidden paths', () => {
     expect(actionText).not.toMatch(/pay|price|renew|downgrade|cancel|contact provider|request/i);
   });
 });
+
+describe('term text and governance ordering boundaries', () => {
+  it('formats multi-year terms without locale grouping surprises', () => {
+    expect(multiYearTermText(2)).toBe('2-year term');
+    expect(multiYearTermText(10)).toBe('10-year term');
+  });
+
+  it('governance joins preserve first-seen order and drop unknown-only lists', () => {
+    expect(
+      governanceLabels(['trustees-3of5', 'no-customer-trustees', 'trustees-3of5', 'unknown-x']),
+    ).toEqual(['3-of-5 trustees', 'No customer trustees']);
+    expect(governanceLabels(['unknown-x', 'veritas-admin'])).toEqual([]);
+  });
+});

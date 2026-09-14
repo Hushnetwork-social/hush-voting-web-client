@@ -119,10 +119,10 @@ export function createWebLocalUserAuthority(client: BrowserVaultClient): LocalUs
             if (payload?.surface === 'verifiedAbsent') {
               return { code: 'INIT_NO_LOCAL_USER' } as InitializationResult;
             }
-            if (payload?.surface === 'lockedVault') {
+            if (payload?.surface === 'lockedVault' || payload?.surface === 'staged') {
               const safeIdentity = safeIdentityFromPayload(outcome.payload);
               if (safeIdentity) {
-                return { code: 'INIT_LOCKED_USER', safeIdentity } as InitializationResult;
+                return { code: 'INIT_LOCKED_USER', safeIdentity: payload.surface === 'staged' ? { ...safeIdentity, pendingSetup: true } : safeIdentity } as InitializationResult;
               }
               return { code: 'INIT_CORRUPT_VAULT' } as InitializationResult;
             }
@@ -225,9 +225,20 @@ export function createWebIdentityVerification(client: BrowserVaultClient): Ident
         if (!connected) {
           return { code: 'VERIFY_NETWORK_UNAVAILABLE' } as VerificationResult;
         }
-        return client.dispatch('verifyOnlineIdentity').then((outcome) => {
+        return client.dispatch('verifyOnlineIdentity').then(async (outcome) => {
         switch (outcome.outcome) {
           case 'OK': {
+            // A returning unlock of protected pending keys must finish the same
+            // durable activation used by uninterrupted onboarding before access.
+            const payload = outcome.payload;
+            if (payload !== null && typeof payload === 'object' && 'requiresPromotion' in payload && payload.requiresPromotion === true) {
+              try {
+                const promoted = await client.dispatch('promoteLifecycle', { status: 'Active' });
+                if (promoted.outcome !== 'OK') return { code: 'UNKNOWN_FAILURE', supportCode: 'RESUME_PROMOTION_FAILED' } as VerificationResult;
+              } catch {
+                return { code: 'UNKNOWN_FAILURE', supportCode: 'RESUME_PROMOTION_FAILED' } as VerificationResult;
+              }
+            }
             // The worker's typed OK is the authentication proof. Public menu
             // metadata is additive presentation data: an older live worker
             // may omit it during a development hot update and must not turn a

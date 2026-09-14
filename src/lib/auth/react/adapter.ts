@@ -53,11 +53,13 @@ export interface AuthRenderProjection {
   readonly sessionEpoch: number;
   /** True when the strict entitlement gate applies (false only in auth harness). */
   readonly entitlementRequired: boolean;
-  readonly safeIdentity: { alias: string; abbreviatedSigningAddress: string } | null;
+  readonly safeIdentity: { alias: string; abbreviatedSigningAddress: string; pendingSetup?: true } | null;
   readonly authenticatedIdentity: AuthenticatedIdentityMetadata | null;
   readonly outcomeCode: string | null;
   readonly supportCode: string | null;
   readonly onboardingKind: string | null;
+  readonly completedRestorationEpoch?: number | null;
+  readonly completedRestorationKind?: 'restoreCredentialFile' | 'restoreRecoveryWords' | null;
 }
 
 function authStateFromValue(value: unknown): AuthStateCode {
@@ -103,11 +105,13 @@ function projectSnapshot(snapshot: AuthSnapshot): AuthRenderProjection {
   const connectivity = connectivityFromValue(value);
   const entitlementStage = authState === 'authenticated' ? entitlementStageFromValue(value) : null;
   const context = (snapshot.context ?? {}) as {
-    safeIdentity?: { alias: string; abbreviatedSigningAddress: string } | null;
+    safeIdentity?: { alias: string; abbreviatedSigningAddress: string; pendingSetup?: true } | null;
     authenticatedIdentity?: AuthenticatedIdentityMetadata | null;
     outcomeCode?: string | null;
     supportCode?: string | null;
     onboardingKind?: string | null;
+    completedRestorationEpoch?: number | null;
+    completedRestorationKind?: 'restoreCredentialFile' | 'restoreRecoveryWords' | null;
     entitlementRequired?: boolean;
     sessionEpoch?: number;
   };
@@ -134,6 +138,8 @@ function projectSnapshot(snapshot: AuthSnapshot): AuthRenderProjection {
     outcomeCode: context.outcomeCode ?? null,
     supportCode: context.supportCode ?? null,
     onboardingKind: context.onboardingKind ?? null,
+    completedRestorationEpoch: context.completedRestorationEpoch ?? null,
+    completedRestorationKind: context.completedRestorationKind ?? null,
   };
 }
 

@@ -34,6 +34,18 @@ export const LICENCE_QUERY_HEADERS = [
 /** Accepted content types (empty body or minimal JSON). */
 const ACCEPTED_CONTENT_TYPES: readonly string[] = ['', 'application/json'];
 
+/** Browser/HTTP proxy envelope fields; never forwarded as gRPC metadata.
+ * The frozen three-header rule applies to signed application metadata, not
+ * Host, Content-Type, Fetch Metadata, or Next.js's transport forwarding fields.
+ */
+const HTTP_TRANSPORT_HEADERS: ReadonlySet<string> = new Set([
+  'accept', 'accept-encoding', 'accept-language', 'cache-control', 'connection',
+  'content-length', 'content-type', 'host', 'origin', 'pragma', 'priority', 'referer',
+  'user-agent', 'sec-fetch-dest', 'sec-fetch-mode', 'sec-fetch-site', 'sec-fetch-user',
+  'sec-ch-ua', 'sec-ch-ua-mobile', 'sec-ch-ua-platform',
+  'x-forwarded-for', 'x-forwarded-host', 'x-forwarded-port', 'x-forwarded-proto',
+]);
+
 export type LicenceBffRequestValidation =
   | { readonly ok: true; readonly headers: { readonly signatory: string; readonly signedAt: string; readonly signature: string } }
   | { readonly ok: false; readonly code: 'NOT_CONFIGURED' | 'TOO_LARGE' | 'MALFORMED_REQUEST' };
@@ -66,7 +78,7 @@ export function validateLicenceBffRequest(input: LicenceBffRequestInput): Licenc
     }
   }
   for (const header of input.headerNames) {
-    if (!(LICENCE_QUERY_HEADERS as readonly string[]).includes(header)) {
+    if (!(LICENCE_QUERY_HEADERS as readonly string[]).includes(header) && !HTTP_TRANSPORT_HEADERS.has(header)) {
       return { ok: false, code: 'MALFORMED_REQUEST' };
     }
   }

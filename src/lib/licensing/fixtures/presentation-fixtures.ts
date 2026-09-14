@@ -153,7 +153,7 @@ export function upgradeOperationOf(
   status: LicenceUpgradeOperationStatus,
   overrides: {
     readonly targetPlanId?: string;
-    readonly targetPlanDisplayName?: string;
+    readonly targetPlanDisplayName?: string | null;
     readonly currentPlanId?: string | null;
     readonly currentPlanDisplayName?: string | null;
     readonly reason?: LicenceUpgradeStaleReason;
@@ -161,7 +161,13 @@ export function upgradeOperationOf(
   } = {},
 ): LicenceUpgradeSafeOperation {
   const targetPlanId = overrides.targetPlanId ?? VERITAS_2000_PLAN;
-  const targetPlanDisplayName = overrides.targetPlanDisplayName ?? 'HushVoting! Veritas 2k';
+  // Explicit null is preserved so tests can pin the "authority has not
+  // resolved the display name yet" defensive arms (presentation must never
+  // invent copy for an unresolved operation identity).
+  const targetPlanDisplayName =
+    overrides.targetPlanDisplayName === undefined
+      ? 'HushVoting! Veritas 2k'
+      : overrides.targetPlanDisplayName;
   const sealed =
     overrides.sealed ??
     (status === 'pending' || status === 'delayed' || status === 'local-success');

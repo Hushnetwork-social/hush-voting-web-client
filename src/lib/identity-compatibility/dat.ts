@@ -58,7 +58,10 @@ export function inspectDatEnvelope(envelope: Uint8Array): CompatibilityResult<{ 
 }
 
 async function deriveDatKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
-  const keyMaterial = await subtle().importKey('raw', ENCODER.encode(password), 'PBKDF2', false, ['deriveKey']);
+  const passwordBytes = ENCODER.encode(password);
+  let keyMaterial: CryptoKey;
+  try { keyMaterial = await subtle().importKey('raw', passwordBytes, 'PBKDF2', false, ['deriveKey']); }
+  finally { passwordBytes.fill(0); }
   const saltBuffer = salt.buffer.slice(salt.byteOffset, salt.byteOffset + salt.byteLength) as ArrayBuffer;
   return subtle().deriveKey(
     { name: 'PBKDF2', salt: saltBuffer, iterations: DAT_PBKDF2_ITERATIONS, hash: 'SHA-256' },
@@ -79,7 +82,8 @@ export async function decryptDatV1(envelope: Uint8Array, password: string): Prom
   try {
     const key = await deriveDatKey(password, salt);
     const plaintext = await subtle().decrypt({ name: 'AES-GCM', iv: nonce, tagLength: 128 }, key, ciphertext);
-    return { ok: true, value: new TextDecoder().decode(plaintext) };
+    try { return { ok: true, value: new TextDecoder().decode(plaintext) }; }
+    finally { new Uint8Array(plaintext).fill(0); }
   } catch {
     return failure('DAT_WRONG_PASSWORD', 'AES-GCM authentication failed');
   }
@@ -87,8 +91,16 @@ export async function decryptDatV1(envelope: Uint8Array, password: string): Prom
 
 /** Detect duplicate object keys in a JSON text (strict parser requirement). */
 function hasDuplicateKeys(jsonText: string): boolean {
-  const keys = [...jsonText.matchAll(/"((?:[^"\\]|\\.)*)"\s*:/g)].map((m) => m[1]);
-  return new Set(keys).size !== keys.length;
+  // Consume complete JSON string tokens so escaped quotes in a value cannot
+  // masquerade as properties. Compare decoded names, including Unicode escapes.
+  const keys = new Set<string>();
+  for (const match of jsonText.matchAll(/"(?:[^"\\]|\\[\s\S])*"/g)) {
+    if (!/^\s*:/.test(jsonText.slice(match.index! + match[0].length))) continue;
+    const key = JSON.parse(match[0]) as string;
+    if (keys.has(key)) return true;
+    keys.add(key);
+  }
+  return false;
 }
 
 const ALLOWED_FIELDS = new Set(['ProfileName', 'PublicSigningAddress', 'PrivateSigningKey', 'PublicEncryptAddress', 'PrivateEncryptKey', 'IsPublic', 'Mnemonic']);
@@ -110,15 +122,17 @@ function isWellFormedJson(jsonText: string): boolean {
 export function parsePortableCredentialsStrict(jsonText: string): CompatibilityResult<PortableCredentialsRecord> {
   if (!isWellFormedJson(jsonText)) return failure('DAT_MALFORMED', 'decrypted payload is not valid JSON');
   if (hasDuplicateKeys(jsonText)) return failure('DAT_DUPLICATE_FIELD', 'duplicate property in portable credentials');
-  const parsed = JSON.parse(jsonText) as Record<string, unknown>;
-  for (const key of Object.keys(parsed)) {
+  const parsed = JSON.parse(jsonText) as unknown;
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return failure('DAT_INVALID_FIELD', 'credential payload must be an object');
+  const record = parsed as Record<string, unknown>;
+  for (const key of Object.keys(record)) {
     if (!ALLOWED_FIELDS.has(key)) return failure('DAT_UNKNOWN_FIELD', `unknown property: ${key}`);
   }
   for (const key of ALLOWED_FIELDS) {
-    if (!(key in parsed)) return failure('DAT_MISSING_FIELD', `missing required property: ${key}`);
+    if (!(key in record)) return failure('DAT_MISSING_FIELD', `missing required property: ${key}`);
   }
   const s = (key: string): string => {
-    const v = parsed[key];
+    const v = record[key];
     if (typeof v !== 'string') return '';
     return v;
   };
@@ -127,8 +141,8 @@ export function parsePortableCredentialsStrict(jsonText: string): CompatibilityR
   const signingPrivate = s('PrivateSigningKey');
   const encryptAddress = s('PublicEncryptAddress');
   const encryptPrivate = s('PrivateEncryptKey');
-  const mnemonic = parsed.Mnemonic;
-  const isPublic = parsed.IsPublic;
+  const mnemonic = record.Mnemonic;
+  const isPublic = record.IsPublic;
   if (profileName.length === 0 || profileName.length > PROFILE_NAME_MAX_LENGTH || /[\u0000-\u001f\u007f]/.test(profileName)) {
     return failure('DAT_INVALID_FIELD', 'ProfileName violates compatibility bounds');
   }

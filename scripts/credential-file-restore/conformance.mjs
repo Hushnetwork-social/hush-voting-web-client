@@ -1,97 +1,91 @@
 #!/usr/bin/env node
-/**
- * FEAT-009 public v1 restore conformance runner (Task 6.9).
- *
- * Deterministic public-vector runner: decodes every pinned FEAT-001 public
- * `.dat` vector class and reports typed outcomes against the immutable
- * expected catalog. Public fixtures only — controlled external files are
- * NEVER consumed here (see the local qualification harness). Reports are
- * secret-safe: fixture ids + pins only.
- *
- * Usage: node scripts/credential-file-restore/conformance.mjs
- */
+/** FEAT-009 AC-009-073, Phase 6 Tasks 6.9/6.10: execute both real FEAT-001 runtimes. */
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { spawn } from 'node:child_process';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = join(SCRIPT_DIR, '..', '..');
+const repo = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+const server = resolve(repo, '../hush-server-node');
+const corpus = join(repo, 'conformance/identity/v1');
+const output = join(repo, 'conformance/reports/credential-file-restore');
+const summaryPath = join(output, 'summary.json');
+const project = join(server, 'Tools/HushIdentityCompatibilityConformance/HushIdentityCompatibilityConformance.csproj');
+const assembly = join(dirname(project), 'bin/Debug/net10.0/HushIdentityCompatibilityConformance.dll');
+const digest = path => createHash('sha256').update(readFileSync(path)).digest('hex');
+let child;
+let interrupted = false;
+let built = false;
+function killOwned() {
+  if (child?.pid) {
+    try { process.kill(-child.pid, 'SIGKILL'); } catch (error) { if (error.code !== 'ESRCH') throw error; }
+  }
+}
+function interrupt() { interrupted = true; killOwned(); }
+process.on('SIGINT', interrupt);
+process.on('SIGTERM', interrupt);
 
-const VECTORS = join(REPO_ROOT, 'conformance', 'identity', 'v1', 'vectors', 'dat-vectors.json');
-const MANIFEST = join(REPO_ROOT, 'conformance', 'identity', 'v1', 'manifest.json');
-
-let vectors;
+async function run(label, command, args, cwd, timeoutMs) {
+  if (interrupted) throw new Error('Conformance interrupted');
+  console.log(label);
+  await new Promise((resolveRun, reject) => {
+    child = spawn(command, args, { cwd, detached: true, stdio: 'ignore' });
+    const timer = setTimeout(killOwned, timeoutMs);
+    child.once('error', error => { clearTimeout(timer); reject(new Error(`${label}: ${error.code ?? 'startup failed'}`)); });
+    child.once('close', (code, signal) => {
+      clearTimeout(timer);
+      killOwned(); // No child/build process may outlive this bounded stage.
+      child = undefined;
+      if (code !== 0 || signal || interrupted) reject(new Error(`${label}: failed (exit ${code}, signal ${signal ?? 'none'})`));
+      else resolveRun();
+    });
+  });
+}
+function admitted(path, runtime) {
+  const report = JSON.parse(readFileSync(path, 'utf8'));
+  if (report.runtime !== runtime || report.result !== 'PASS' || report.contractVersion !== '1.0.0'
+      || report.schemaVersion !== '1.0.0' || !Number.isSafeInteger(report.summary?.total) || report.summary.total <= 0
+      || report.summary.failed !== 0 || report.summary.passed !== report.summary.total
+      || !Array.isArray(report.records) || report.records.length !== 0) throw new Error(`${runtime}: incomplete or failing conformance evidence`);
+  return report;
+}
 try {
-  vectors = JSON.parse(readFileSync(VECTORS, 'utf8'));
+  mkdirSync(output, { recursive: true });
+  // A failed later invocation must never leave the previous PASS as current.
+  writeFileSync(summaryPath, JSON.stringify({ schema: 'hushvoting-public-dat-conformance-v1', result: 'RUNNING' }) + '\n');
+  const manifestDigest = digest(join(corpus, 'manifest.json'));
+  const vectorDigest = digest(join(corpus, 'vectors/dat-vectors.json'));
+  const vectorCount = JSON.parse(readFileSync(join(corpus, 'vectors/dat-vectors.json'), 'utf8')).vectors.length;
+  if (vectorCount !== 15) throw new Error('Public v1 DAT inventory requires explicit review');
+  await run('Executing TypeScript production conformance', 'npm', ['run', 'identity:conformance'], repo, 90_000);
+  const tsPath = join(repo, 'conformance/reports/typescript-identity-report.json');
+  const ts = admitted(tsPath, 'typescript');
+  writeFileSync(join(output, 'typescript.json'), readFileSync(tsPath));
+  built = true;
+  await run('Building the .NET conformance adapter', 'dotnet', ['build', project, '--no-restore', '--disable-build-servers', '--verbosity', 'quiet', '-warnaserror', '-p:UseSharedCompilation=false', '-nodeReuse:false'], server, 120_000);
+  const netPath = join(output, 'dotnet.json');
+  await run('Executing .NET conformance', 'dotnet', [assembly, '--corpus', corpus, '--manifest-digest', manifestDigest, '--report', netPath], server, 60_000);
+  const net = admitted(netPath, 'dotnet');
+  if (ts.summary.total !== net.summary.total || manifestDigest !== digest(join(corpus, 'manifest.json'))
+      || vectorDigest !== digest(join(corpus, 'vectors/dat-vectors.json'))) throw new Error('Runtime inventory or corpus changed during execution');
+  const evidence = { schema: 'hushvoting-public-dat-conformance-v1', result: 'PASS', publicDatVectors: vectorCount,
+    fullCorpusChecksPerRuntime: ts.summary.total, manifestDigest, vectorDigest,
+    scope: 'isolated public compatibility conformance; not browser/server or external qualification evidence' };
+  writeFileSync(summaryPath, JSON.stringify(evidence, null, 2) + '\n');
+  console.log(`FEAT-009: ${vectorCount} public DAT vectors executed in both runtimes; ${ts.summary.total} full-corpus checks each passed.`);
+  console.log('Reports: conformance/reports/credential-file-restore/');
 } catch (error) {
-  console.error(`FAIL: cannot read public vectors: ${error.message}`);
-  process.exit(1);
-}
-
-const manifest = JSON.parse(readFileSync(MANIFEST, 'utf8'));
-
-// Deterministic typed outcome for each public vector class (pure function of
-// the fixture metadata; no secrets, no external files).
-function typedOutcome(vector) {
-  switch (vector.operation) {
-    case 'DECRYPT':
-      return vector.expected === 'OK' ? 'decrypt-ok' : 'decrypt-rejected';
-    case 'PARSE':
-      return vector.expected === 'OK' ? 'parse-ok' : 'parse-rejected';
-    case 'KEY_CONSISTENCY':
-      return vector.expected === 'OK' ? 'keys-consistent' : 'keys-inconsistent';
-    case 'OVERSIZED':
-      return 'oversized-rejected';
-    default:
-      return 'unknown-operation';
+  try { writeFileSync(summaryPath, JSON.stringify({ schema: 'hushvoting-public-dat-conformance-v1', result: 'FAIL' }) + '\n'); } catch { /* preserve original failure */ }
+  console.error(error.message);
+  process.exitCode = 1;
+} finally {
+  killOwned();
+  if (built && !interrupted) {
+    try { await run('Shutting down .NET build servers', 'dotnet', ['build-server', 'shutdown'], server, 30_000); }
+    catch {
+      writeFileSync(summaryPath, JSON.stringify({ schema: 'hushvoting-public-dat-conformance-v1', result: 'FAIL' }) + '\n');
+      process.exitCode = 1;
+    }
   }
 }
-
-function expectedOutcome(vector) {
-  if (vector.operation === 'OVERSIZED') return 'oversized-rejected';
-  if (vector.expected === 'OK') {
-    return `${vector.operation.toLowerCase().replace(/_/g, '-')}-ok`;
-  }
-  // Negative vectors are rejected deterministically (never 'failed' as an
-  // outcome class — rejection is the typed outcome).
-  switch (vector.operation) {
-    case 'DECRYPT':
-      return 'decrypt-rejected';
-    case 'PARSE':
-      return 'parse-rejected';
-    case 'KEY_CONSISTENCY':
-      return 'keys-inconsistent';
-    default:
-      return 'rejected';
-  }
-}
-
-let pass = 0;
-let fail = 0;
-const failures = [];
-
-for (const vector of vectors.vectors ?? []) {
-  const outcome = typedOutcome(vector);
-  const expected = expectedOutcome(vector);
-  // OVERSIZED is always rejected; other classes must match expected.
-  const ok = vector.operation === 'OVERSIZED' ? outcome === 'oversized-rejected' : outcome === expected;
-  if (ok) {
-    pass += 1;
-  } else {
-    fail += 1;
-    failures.push(`${vector.id}: expected ${expected}, typed ${outcome}`);
-  }
-}
-
-console.log(`FEAT-009 public conformance: ${pass} passed, ${fail} failed (manifest ${manifest.contractVersion}, ${manifest.files.length} pinned files)`);
-if (failures.length > 0) {
-  for (const failure of failures.slice(0, 10)) console.error(`  - ${failure}`);
-  process.exit(1);
-}
-
-// Source-preservation check for public fixtures: byte-for-byte equality of
-// the pinned vectors file (public digest equality is legitimate).
-const publicDigest = createHash('sha256').update(readFileSync(VECTORS)).digest('hex');
-console.log(`Public fixture digest: ${publicDigest} (immutable pin)`);
-process.exit(0);

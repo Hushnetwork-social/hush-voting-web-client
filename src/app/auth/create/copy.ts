@@ -64,7 +64,7 @@ export const RECOVERY = {
   title: 'Create user · Save recovery words',
   detail: 'These 24 words are the only portable way to recover this identity.',
   copy: 'Copy words',
-  copyWarning: 'Clipboard contents may remain visible to other applications. Browser screenshots cannot be prevented.',
+  copyWarning: 'Copying exposes these words to other applications. We attempt to clear the clipboard after 30 seconds or when words are hidden. Cleanup is best effort, may overwrite newer clipboard content, and never reads your clipboard. Browser screenshots and clipboard history cannot be prevented.',
   copyDone: 'Words copied. Clipboard will be cleared shortly.',
   regenerate: 'Regenerate',
   regenerateConfirmTitle: 'Regenerate recovery words?',
@@ -107,15 +107,23 @@ export const REVIEW = {
   alias: 'Alias',
   visibility: 'Visibility',
   signingAddress: 'Signing address',
+  encryptionAddress: 'Encryption address',
   recovery: 'Recovery',
   recoveryConfirmed: '24 words confirmed',
+  recoveryUnconfirmed: 'Recovery confirmation required',
   deviceProtection: 'Device protection',
   deviceProtectionReady: 'Ready',
+  deviceProtectionRequired: 'Device protection required',
   action: 'Create HushNetwork identity',
   submitting: 'Submitting…',
 };
 
 export const STATUS = {
+  localSaveFailure: {
+    title: 'Could not save your identity',
+    detail: 'Your identity is confirmed, but this device could not save it. Retry saving or lock this device. Your protected identity is preserved.',
+    retry: 'Retry',
+  },
   finishCreating: {
     title: 'Finish creating your identity',
     detail: 'You were in the middle of creating your HushNetwork identity. Unlock this device to continue safely.',
@@ -139,7 +147,7 @@ export const STATUS = {
   },
   connection: {
     title: 'Waiting for connection',
-    detail: 'HushVoting! could not reach the network. Your exact transaction remains encrypted on this device.',
+    detail: 'HushVoting! could not reach the network. Your identity remains protected on this device.',
     retry: 'Try again',
     lock: 'Lock',
   },

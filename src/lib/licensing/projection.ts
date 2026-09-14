@@ -38,6 +38,7 @@
  * §6.2.
  */
 
+import { KNOWN_LICENCE_PLAN_IDS, KNOWN_GOVERNANCE_OPTION_IDS } from './contracts';
 import type {
   LicenceActorBinding,
   LicenceActiveEntitlementTransportView,
@@ -111,6 +112,8 @@ export type ProjectionRejectionReason =
   | 'identity-mismatch'
   | 'network-mismatch'
   | 'unknown-plan-family'
+  | 'unknown-plan-id'
+  | 'unknown-governance-option'
   | 'incompatible-catalogue-version'
   | 'malformed-required-field'
   | 'unbounded-value';
@@ -276,6 +279,9 @@ export function buildLicenceSafeProjection(
   if (active.AssignedCatalogueVersion !== 'hushvoting-licence-catalogue/v1.0.0') {
     return { ok: false, reason: 'incompatible-catalogue-version' };
   }
+  if (!KNOWN_LICENCE_PLAN_IDS.includes(active.PlanId)) {
+    return { ok: false, reason: 'unknown-plan-id' };
+  }
   if (!isBoundedText(active.DisplayName)) {
     return { ok: false, reason: 'malformed-required-field' };
   }
@@ -326,6 +332,9 @@ export function buildLicenceSafeProjection(
   if (active.HigherOptions.length > 0 && typeof active.HigherOptions[0] === 'string') {
     // Defensive: higher options must be records, never raw strings.
     return { ok: false, reason: 'malformed-required-field' };
+  }
+  if (!active.AllowedGovernanceOptionIds.every(option => KNOWN_GOVERNANCE_OPTION_IDS.includes(option))) {
+    return { ok: false, reason: 'unknown-governance-option' };
   }
   if (active.HigherOptions.some((option) => !isRecordValue(option) || !isStructurallyValidOption(option))) {
     return { ok: false, reason: 'malformed-required-field' };

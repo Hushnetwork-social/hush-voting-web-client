@@ -18,7 +18,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 
 const SCRIPT_DIR = import.meta.dirname;
 const REPO_ROOT = join(SCRIPT_DIR, '..', '..');
@@ -60,10 +60,12 @@ try {
     }),
   );
 
-  // 2. property-scan red-effectiveness.
+  // 2. property-scan red-effectiveness. The seeded file sits on a FEAT-016
+  // entitlement authority path so the entitlement-scoped property applies.
   const propertyRoot = join(root, 'property-seed');
-  mkdirSync(propertyRoot, { recursive: true });
-  writeFileSync(join(propertyRoot, 'seeded-prop.ts'), 'export function online(): boolean { return navigator.onLine; }\n');
+  const seededEntitlementDir = join(propertyRoot, 'src', 'lib', 'licensing');
+  mkdirSync(seededEntitlementDir, { recursive: true });
+  writeFileSync(join(seededEntitlementDir, 'seeded-prop.ts'), 'export function online(): boolean { return navigator.onLine; }\n');
   results.push(
     expectRed('property-scan', process.execPath, [join(SCRIPT_DIR, 'property-scan.mjs')], {
       FEAT016_SCAN_ROOTS: propertyRoot,
@@ -122,6 +124,38 @@ try {
       FEAT016_WIRING_SKIP_LIST: '1',
     }),
   );
+  // Positive control: later seeded failures must not pass merely because the
+  // unmodified catalogue already fails. Listing is separately validated.
+  execFileSync(process.execPath, [join(SCRIPT_DIR, 'wiring.mjs')], {
+    cwd: REPO_ROOT, stdio: 'pipe', encoding: 'utf8', timeout: 30_000,
+    env: { ...process.env, FEAT016_WIRING_SKIP_LIST: '1' },
+  });
+  // Retired .NET journeys cannot hide pending work or coexist with old source.
+  const migration = JSON.parse(readFileSync(join(REPO_ROOT, '..', 'hush-server-node', 'Node', 'HushNode.IntegrationTests', 'HushVoting', 'migration-manifest.json'), 'utf8'));
+  for (const defect of ['unresolved-retirement', 'retired-source-still-present']) {
+    const seeded = structuredClone(migration);
+    const entry = seeded.files.find(file => file.source === 'features/licence-entitlements/direct-free-bootstrap.feature');
+    if (!entry?.retirement) throw new Error('Expected recorded Direct Free retirement');
+    if (defect === 'unresolved-retirement') entry.scenarios[0].status = 'pending-implementation';
+    else entry.source = relative(REPO_ROOT, join(featuresSeed, 'dup.feature'));
+    const path = join(root, `${defect}.json`);
+    writeFileSync(path, JSON.stringify(seeded));
+    results.push(expectRed(defect, process.execPath, [join(SCRIPT_DIR, 'wiring.mjs')], {
+      FEAT016_WIRING_MIGRATION_MANIFEST: path, FEAT016_WIRING_SKIP_LIST: '1',
+    }));
+  }
+  for (const defect of ['unrecorded-retirement', 'missing-replacement']) {
+    const seeded = structuredClone(migration);
+    const entry = seeded.files.find(file => file.source === 'features/licence-entitlements/gate-safety-accessibility.feature');
+    if (defect === 'unrecorded-retirement') delete entry.retirement;
+    else entry.destination = 'Features/licence-entitlements/absent-replacement.feature';
+    const path = join(root, `${defect}.json`);
+    writeFileSync(path, JSON.stringify(seeded));
+    results.push(expectRed(defect, process.execPath, [join(SCRIPT_DIR, 'wiring.mjs')], {
+      FEAT016_WIRING_MIGRATION_MANIFEST: path, FEAT016_WIRING_SKIP_LIST: '1',
+    }));
+  }
+
 } finally {
   rmSync(root, { recursive: true, force: true });
 }

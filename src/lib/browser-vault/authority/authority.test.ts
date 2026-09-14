@@ -51,6 +51,13 @@ function validOperation(channel: string, epoch: number, operation: string = 'unl
 }
 
 describe('worker authority — handshake', () => {
+  it('drops queued secret transfers before broadcasting cancellation', () => {
+    const events: string[] = [];
+    const authority = new WorkerAuthority(makeEnv({ onInvalidate: () => { events.push('cleared'); }, broadcast: () => { events.push('broadcast'); } }), 'locked', 1);
+    authority.handle(validHandshake());
+    authority.handle({ kind: 'cancel', operationId: 'queued-import', clientChannel: 'chan-1', authorityEpoch: 1 });
+    expect(events).toEqual(['cleared', 'broadcast']);
+  });
   it('accepts a compatible handshake and delivers a safe session projection', () => {
     const events: Array<{ channel: string; event: { kind: string; authorityEpoch: number; session: { state: string } } }> = [];
     const env = makeEnv({
@@ -166,12 +173,42 @@ describe('worker authority — fresh capabilities', () => {
 });
 
 describe('worker authority — invalidation and lifecycle', () => {
-  it('Lock/cancel increments the epoch and broadcasts global invalidation', () => {
+  it('Lock preempts a pending operation, wipes first, and rejects its late result across all tabs', async () => {
+    let release!: () => void;
+    const pending = new Promise<void>(resolve => { release = resolve; });
+    const events: Array<{ kind: string; operationId?: string; reason?: string }> = [];
+    let wiped = false;
+    const authority = new WorkerAuthority(makeEnv({
+      executeOperation: async request => {
+        if (request.operation === 'lockAll') wiped = true;
+        else await pending;
+        return { outcome: 'OK', retryable: false, allowedActions: [] };
+      },
+      deliver: (_, event) => { if (event.kind === 'operation-outcome') events.push(event); },
+      broadcast: event => { expect(wiped).toBe(true); events.push(event); },
+    }), 'authenticated', 1);
+    authority.handle(validHandshake());
+    authority.handle(validHandshake('chan-2'));
+    authority.handle(validOperation('chan-1', 1, 'inspectStartup', 'query'));
+    expect(authority.handle(validOperation('chan-2', 1, 'lockAll', 'lock')).accepted).toBe(true);
+    await Promise.resolve();
+    expect(wiped).toBe(true);
+    expect(authority.snapshot()).toMatchObject({ epoch: 2, phase: 'locked', acceptedChannels: [] });
+    expect(events).toEqual([
+      expect.objectContaining({ kind: 'operation-outcome', operationId: 'lock' }),
+      expect.objectContaining({ kind: 'global-invalidation', reason: 'lock' }),
+    ]);
+    release();
+    await Promise.resolve();
+    expect(events.some(event => event.operationId === 'query')).toBe(false);
+  });
+
+  it('Lock increments the epoch and broadcasts global invalidation without a separate caller invalidation', async () => {
     const env = makeEnv();
     const authority = new WorkerAuthority(env, 'authenticated', 1);
     authority.handle(validHandshake());
     authority.handle(validOperation('chan-1', 1, 'lockAll', 'op-1'));
-    authority.invalidate('lock');
+    await Promise.resolve();
     expect(authority.snapshot().epoch).toBe(2);
     expect(authority.snapshot().acceptedChannels).toEqual([]);
   });

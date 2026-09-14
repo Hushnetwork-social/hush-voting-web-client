@@ -19,7 +19,7 @@
  */
 import { canonicalizeJsonBytes } from './jcs';
 import type { ParameterSuiteV1 } from '../contracts/suite';
-import type { VaultPreviewV1 } from '../contracts/preview';
+import type { VaultPreviewV1, VaultPreviewV2 } from '../contracts/preview';
 import type { AdapterBinding } from '../contracts/versions';
 
 /** AAD binding inputs — every field is authenticated. */
@@ -37,7 +37,7 @@ export interface AadInputs {
   };
   /** Adapter/platform binding ('logical' for corpus fixtures). */
   readonly adapterBinding: AdapterBinding;
-  readonly preview: VaultPreviewV1;
+  readonly preview: VaultPreviewV1 | VaultPreviewV2;
   readonly vaultGeneration: number;
   readonly recordGeneration: number;
   readonly recordPurpose: 'ordinary' | 'mnemonic';

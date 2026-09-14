@@ -45,6 +45,9 @@ describe('protocol v2 — operation payload validation', () => {
     expect(validateClientMessage(base({ operation: 'createCandidate' }))).not.toBeNull();
     expect(validateClientMessage(base({ operation: 'revealCandidateWords', payload: { candidateRef: 'cand-1' } }))).not.toBeNull();
     expect(validateClientMessage(base({ operation: 'deriveWordsCandidate', payload: { producerId: 'P-01', wordCount: 24 } }))).not.toBeNull();
+    expect(validateClientMessage(base({ operation: 'deriveRecoveryCandidates', payload: { wordCount: 24 } }))).not.toBeNull();
+    expect(validateClientMessage(base({ operation: 'deriveRecoveryCandidates', payload: { wordCount: 24, producerId: 'P-01' } }))).toBeNull();
+    expect(validateClientMessage(base({ operation: 'deriveRecoveryCandidates', payload: { wordCount: 24, mnemonic: 'abandon' } }))).toBeNull();
     expect(validateClientMessage(base({ operation: 'promoteLifecycle', payload: { status: 'Active' } }))).not.toBeNull();
     expect(validateClientMessage(base({ operation: 'submitIdentityTransaction', payload: { alias: 'Alice', visibility: 'private' } }))).not.toBeNull();
   });
@@ -57,6 +60,13 @@ describe('protocol v2 — operation payload validation', () => {
 });
 
 describe('protocol v2 — secret transfer', () => {
+  it('permits the legacy empty backup password only for its dedicated purpose and bounds UTF-8 bytes', () => {
+    const message = { kind: 'secret-transfer', operationId: 'import-1', clientChannel: 'chan-1', authorityEpoch: 1, purpose: 'filePassword', value: '' };
+    expect(validateClientMessage(message)).not.toBeNull();
+    expect(validateClientMessage({ ...message, purpose: 'devicePassword' })).toBeNull();
+    expect(validateClientMessage({ ...message, value: '🔑'.repeat(1024) })).not.toBeNull();
+    expect(validateClientMessage({ ...message, value: '🔑'.repeat(1025) })).toBeNull();
+  });
   it('accepts bounded secret transfers per purpose', () => {
     const message = validateClientMessage({ kind: 'secret-transfer', operationId: 'op-1', clientChannel: 'chan-1', authorityEpoch: 1, purpose: 'devicePassword', value: 'secret-value' });
     expect(message).not.toBeNull();

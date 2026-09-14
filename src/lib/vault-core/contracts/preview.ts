@@ -35,6 +35,9 @@ export interface VaultPreviewV1 {
   readonly recordSchemaVersion: 1;
 }
 
+/** FEAT-011 additive encrypted record schema; the preview field allowlist is unchanged. */
+export type VaultPreviewV2 = Omit<VaultPreviewV1, 'recordSchemaVersion'> & { readonly recordSchemaVersion: 2 };
+
 /** Deterministic validation of the identity-only preview allowlist. */
 export type PreviewValidation =
   | { readonly ok: true; readonly preview: VaultPreviewV1 }

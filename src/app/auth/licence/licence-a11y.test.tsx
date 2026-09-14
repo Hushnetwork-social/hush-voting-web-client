@@ -7,7 +7,8 @@
  * placement on meaningful view entry (never per poll), quiet polling live
  * region, role/name assertions for every control, no colour-only status
  * meaning, keyboard reachability of actions, and visual-token/source checks
- * for the 44 px target and reduced-motion CSS contract.
+ * for the 44 px target, WCAG 2.2 AA contrast states, 2 px focus outline and
+ * reduced-motion CSS contract.
  */
 
 import { describe, expect, it, vi } from 'vitest';
@@ -15,6 +16,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import fs from 'node:fs';
 import path from 'node:path';
+import postcss from 'postcss';
 import { LicenceWorkspace } from './licence-workspace';
 import type { LicenceWorkspaceActionHandlers } from './workspace-handlers';
 import { presentationInput, upgradeOperationOf, veritas2000ActiveProjection, workspaceFacts, VERITAS_2000_PLAN } from './fixtures';
@@ -76,6 +78,41 @@ describe('one heading and deterministic focus per step', () => {
     expect(headings).toHaveLength(1);
     expect(headings[0]).toHaveTextContent('Licence activated');
   });
+
+  it('confirmation/progress/delayed/result: the step H1 is the deterministic entry-focus target', () => {
+    // Task 5.5/5.6 contract: every committing/terminal step has exactly one
+    // heading and it receives focus on entry (deterministic, not per poll).
+    const builds = [
+      () => workspaceFacts(presentationInput(), 'confirmation', VERITAS_2000_PLAN),
+      () => workspaceFacts(presentationInput({ upgradeOperation: upgradeOperationOf('pending') }), 'progress'),
+      () => workspaceFacts(presentationInput({ upgradeOperation: upgradeOperationOf('delayed') }), 'delayed'),
+      () =>
+        workspaceFacts(
+          presentationInput({ projection: veritas2000ActiveProjection(), upgradeOperation: upgradeOperationOf('local-success') }),
+          'result',
+        ),
+    ];
+    for (const build of builds) {
+      const view = renderView(build());
+      const headings = screen.getAllByRole('heading', { level: 1 });
+      expect(headings).toHaveLength(1);
+      expect(headings[0]).toHaveFocus();
+      view.unmount();
+    }
+  });
+
+  it('stale: the notice heading is the deterministic focus target, never the page H1', () => {
+    const input = presentationInput({ upgradeOperation: upgradeOperationOf('stale', { reason: 'current-changed' }) });
+    const view = renderView(workspaceFacts(input, 'stale'));
+    const headings = screen.getAllByRole('heading', { level: 1 });
+    expect(headings).toHaveLength(1);
+    // Focus must land on the change notice itself (S0 focus target), leaving
+    // the generic page heading out of the tab/focus order for that entry.
+    const notice = screen.getByTestId('stale-notice');
+    expect(notice).toHaveFocus();
+    expect(headings[0]).not.toHaveFocus();
+    view.unmount();
+  });
 });
 
 describe('role/name coverage of every interactive control', () => {
@@ -110,6 +147,58 @@ describe('announcement policy: meaningful once, polls silent', () => {
     expect(region.getAttribute('role')).toBe('status');
     expect(region.getAttribute('aria-live')).toBe('polite');
     expect(region.textContent).toBe('Your licence or available plans have changed. Please review the updated options.');
+  });
+
+  it('delayed/result cold entries announce their exact copy once; same-view polls never duplicate it', () => {
+    // Delayed cold entry announces its heading copy once.
+    const delayed = renderView(
+      workspaceFacts(presentationInput({ upgradeOperation: upgradeOperationOf('delayed') }), 'delayed'),
+    );
+    expect(screen.getByTestId('licence-live-region').textContent).toBe(
+      'Licence activation is taking longer than expected.',
+    );
+    delayed.rerender(
+      <LicenceWorkspace
+        facts={nonNull(
+          workspaceFacts(presentationInput({ upgradeOperation: upgradeOperationOf('delayed') }), 'delayed'),
+        )}
+        handlers={noopHandlers()}
+      />,
+    );
+    // A three-second same-surface poll re-render keeps the identical region
+    // content (no re-announcement, no duplication).
+    expect(screen.getByTestId('licence-live-region').textContent).toBe(
+      'Licence activation is taking longer than expected.',
+    );
+    delayed.unmount();
+
+    // Result cold entry announces the exact local-success line once.
+    const result = renderView(
+      workspaceFacts(
+        presentationInput({ projection: veritas2000ActiveProjection(), upgradeOperation: upgradeOperationOf('local-success') }),
+        'result',
+      ),
+    );
+    expect(screen.getByTestId('licence-live-region').textContent).toBe('HushVoting! Veritas 2k is now active.');
+    result.rerender(
+      <LicenceWorkspace
+        facts={nonNull(
+          workspaceFacts(
+            presentationInput({ projection: veritas2000ActiveProjection(), upgradeOperation: upgradeOperationOf('local-success') }),
+            'result',
+          ),
+        )}
+        handlers={noopHandlers()}
+      />,
+    );
+    expect(screen.getByTestId('licence-live-region').textContent).toBe('HushVoting! Veritas 2k is now active.');
+    result.unmount();
+  });
+
+  it('confirmation cold entry stays silent (user-initiated step; no announcement)', () => {
+    const view = renderView(workspaceFacts(presentationInput(), 'confirmation', VERITAS_2000_PLAN));
+    expect(screen.getByTestId('licence-live-region').textContent).toBe('');
+    view.unmount();
   });
 });
 
@@ -162,5 +251,127 @@ describe('responsive/reflow CSS contract (320 px + 200% zoom + no clipping)', ()
     expect(css).toMatch(/\.licence-reference-full,[\s\S]*?overflow-wrap:\s*anywhere/);
     // Full-width host region exists (data-view host) with fluid layout.
     expect(css).toMatch(/\.licence-workspace-host/);
+  });
+});
+
+describe('WCAG 2.2 AA contrast contract for licence token states', () => {
+  // FeatureDescription §Accessibility and Verification Matrix ("Layout and
+  // motion") requires WCAG 2.2 AA contrast for normal, muted, active, selected,
+  // pending, warning, error, disabled and focus states. The delivered licence
+  // surface renders no error state and no disabled control (the no-higher state
+  // is informational and is never a disabled upgrade), so the assertions below
+  // cover every licence state that actually exists. Every value is resolved
+  // from the real theme tokens in globals.css, so a token regression fails here.
+  const stylesheet = postcss.parse(fs.readFileSync(path.resolve(process.cwd(), 'src/app/globals.css'), 'utf8'));
+
+  type Rgba = [number, number, number, number];
+
+  function declaration(selector: string, property: string): string {
+    let value: string | undefined;
+    stylesheet.walkRules(rule => {
+      if (rule.selectors.some(candidate => candidate.trim() === selector)) {
+        rule.walkDecls(property, entry => { value = entry.value; });
+      }
+    });
+    if (value === undefined) throw new Error(`Missing style contract: ${selector}/${property}`);
+    return value;
+  }
+
+  function color(value: string, backdrop: Rgba): Rgba {
+    const trimmed = value.trim();
+    const hex = /^#([a-f\d]{6})$/i.exec(trimmed);
+    if (hex) {
+      const numeric = parseInt(hex[1], 16);
+      return [(numeric >> 16) & 255, (numeric >> 8) & 255, numeric & 255, 1];
+    }
+    const rgb = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([\d.]+))?\s*\)$/.exec(trimmed);
+    if (rgb) {
+      const alpha = rgb[4] === undefined ? 1 : Number(rgb[4]);
+      return [
+        Math.round(Number(rgb[1]) * alpha + backdrop[0] * (1 - alpha)),
+        Math.round(Number(rgb[2]) * alpha + backdrop[1] * (1 - alpha)),
+        Math.round(Number(rgb[3]) * alpha + backdrop[2] * (1 - alpha)),
+        1,
+      ];
+    }
+    const alias = /^var\((--[a-z0-9-]+)\)$/i.exec(trimmed);
+    if (alias) return color(declaration(':root', alias[1]), backdrop);
+    throw new Error(`Unsupported licence colour contract: ${value}`);
+  }
+
+  function luminance(channels: Rgba): number {
+    return [0.2126, 0.7152, 0.0722].reduce((sum, weight, index) => {
+      const scaled = channels[index] / 255;
+      const linear = scaled <= 0.04045 ? scaled / 12.92 : ((scaled + 0.055) / 1.055) ** 2.4;
+      return sum + weight * linear;
+    }, 0);
+  }
+
+  function contrast(foreground: Rgba, background: Rgba): number {
+    const [lighter, darker] = [luminance(foreground), luminance(background)].sort((a, b) => b - a);
+    return (lighter + 0.05) / (darker + 0.05);
+  }
+
+  // Resolve the container surface each licence component actually paints on.
+  const canvas = color(declaration(':root', '--canvas'), [0, 0, 0, 1]);
+  const accountSurface = color(declaration('.licence-account-summary', 'background'), canvas);
+  const currentSurface = color(declaration('.licence-current-detail', 'background'), canvas);
+  const optionSurface = color(declaration('.licence-option', 'background'), canvas);
+  const noticeSurface = color(declaration('.licence-change-notice', 'background'), canvas);
+  const notificationSurface = color(declaration('.licence-activation-notification', 'background'), canvas);
+
+  function textContrast(selector: string, backdrop: Rgba): number {
+    const foreground = color(declaration(selector, 'color'), backdrop);
+    let background = backdrop;
+    try {
+      background = color(declaration(selector, 'background'), backdrop);
+    } catch {
+      // The element paints no background of its own and inherits its container surface.
+    }
+    return contrast(foreground, background);
+  }
+
+  it('keeps every delivered licence text state at WCAG 2.2 AA 4.5:1', () => {
+    const states: ReadonlyArray<{ label: string; selector: string; surface: Rgba }> = [
+      { label: 'normal text on the Account summary', selector: '.licence-account-plan', surface: accountSurface },
+      { label: 'normal text in the current detail', selector: '.licence-current-name', surface: currentSurface },
+      { label: 'normal text in an option card', selector: '.licence-option-name', surface: optionSurface },
+      { label: 'muted text on the Account summary', selector: '.licence-account-fact-row dt', surface: accountSurface },
+      { label: 'muted text in an option card', selector: '.licence-option-desc', surface: optionSurface },
+      { label: 'active status chip', selector: '.licence-status-active', surface: accountSurface },
+      { label: 'selected option chip', selector: '.licence-option-selected-chip', surface: optionSurface },
+      { label: 'pending status chip', selector: '.licence-status-pending', surface: accountSurface },
+      { label: 'warning change-notice title', selector: '.licence-change-notice-title', surface: noticeSurface },
+      { label: 'warning Enterprise tag', selector: '.licence-enterprise-tag', surface: currentSurface },
+      { label: 'pending indicator (N0)', selector: '.licence-pending-indicator', surface: canvas },
+      { label: 'success activation notification', selector: '.licence-notification-message', surface: notificationSurface },
+      { label: 'primary action label', selector: '.licence-primary-action', surface: canvas },
+      { label: 'full public reference', selector: '.licence-reference-full', surface: currentSurface },
+    ];
+    for (const { label, selector, surface } of states) {
+      expect(textContrast(selector, surface), label).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it('keeps the visible focus indicator at 2 px and >=3:1 non-text contrast in every licence state', () => {
+    const focusVisibleSelectors = [
+      '.licence-account-action:focus-visible',
+      '.licence-copy-button:focus-visible',
+      '.licence-review-button:focus-visible',
+      '.licence-primary-action:focus-visible',
+      '.licence-secondary-action:focus-visible',
+      '.licence-pending-indicator:focus-visible',
+      '.licence-notification-link:focus-visible',
+      '.licence-notification-dismiss:focus-visible',
+      '.licence-workspace-title:focus-visible',
+      '.licence-change-notice-title:focus-visible',
+    ];
+    for (const selector of focusVisibleSelectors) {
+      expect(declaration(selector, 'outline'), selector).toBe('2px solid var(--focus)');
+    }
+    const focus = color(declaration(':root', '--focus'), canvas);
+    for (const surface of [canvas, accountSurface, currentSurface, optionSurface, noticeSurface, notificationSurface]) {
+      expect(contrast(focus, surface)).toBeGreaterThanOrEqual(3);
+    }
   });
 });

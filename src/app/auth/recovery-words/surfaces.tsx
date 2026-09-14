@@ -6,7 +6,7 @@
  * A11y-first: semantic headings/roles, visible focus, live regions, 44×44 px
  * minimum interactive targets, 320 px reflow.
  */
-import { useId } from 'react';
+import { useId, useState } from 'react';
 import { useInlineOnboardingBack } from '../onboarding/back-context';
 
 /** Shared complementary surface panel (never heavy-card-in-card). */
@@ -110,13 +110,16 @@ export function WordInput({
   onValue: (value: string) => void;
   onPaste?: (event: React.ClipboardEvent<HTMLInputElement>) => void;
 }) {
+  const [focused, setFocused] = useState(false);
   return (
     <label htmlFor={id} className="flex flex-col gap-1 text-xs font-medium text-[var(--text-muted)]">
       {label}
       <input
         id={id}
         ref={inputRef}
-        type={concealed ? 'password' : 'text'}
+        type={concealed && !focused ? 'password' : 'text'}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
         autoComplete="off"
         autoCorrect="off"
         autoCapitalize="off"

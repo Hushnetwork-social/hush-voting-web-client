@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
+import { vi } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import AuthRoot from './auth/AuthRoot';
 import { createDevelopmentComposition } from '../lib/auth/testing/composition.dev';
@@ -33,6 +34,72 @@ async function strictHarnessMachineInput(): Promise<AuthMachineInput> {
 }
 
 describe('HomePage (auth-gated root)', () => {
+  it('announces a completed credential restoration from the actual root', async () => {
+    render(<AuthRoot machineInputProvider={harnessMachineInput} />);
+    await userEvent.setup().click(await screen.findByRole('button', { name: /restore credential file/i }));
+    await screen.findByTestId('authenticated-shell');
+    expect(screen.getByTestId('restoration-announcement')).toHaveTextContent('Identity restored');
+    expect(screen.getByTestId('backup-preservation-notice')).toHaveTextContent('HushVoting did not retain any recovery words');
+  });
+  it('Back from onboarding awaits child cleanup without rebuilding the authority', async () => {
+    const base = await harnessMachineInput();
+    const cleanup = vi.fn(() => ({
+      operationId: 'cleanup-test' as never,
+      result: Promise.resolve({ code: 'ONBOARDING_CLEANUP_COMPLETE' as const }),
+      cancel: () => undefined,
+    }));
+    let inspection = 0;
+    const initialize = vi.fn(() => ({ operationId: `inspect-empty-${++inspection}` as never,
+      result: Promise.resolve({ code: 'INIT_NO_LOCAL_USER' as const }), cancel: () => undefined }));
+    const provider = vi.fn(async () => ({ ...base, actors: { ...base.actors,
+      localUserAuthority: { ...base.actors.localUserAuthority!, initialize }, onboarding: {
+      ...base.actors.onboarding,
+      createUser: { ...base.actors.onboarding.createUser!,
+        start: () => ({ operationId: 'onboarding-test' as never, result: new Promise<never>(() => undefined), cancel: () => undefined }),
+        cleanup,
+      },
+    } } }));
+    const user = userEvent.setup();
+    render(<AuthRoot machineInputProvider={provider} />);
+    const create = await screen.findByRole('button', { name: /create user/i });
+    const entryState: unknown = window.history.state;
+    await user.click(create);
+    await act(async () => window.dispatchEvent(new PopStateEvent('popstate', { state: entryState })));
+    expect(cleanup).toHaveBeenCalledTimes(1);
+    expect(provider).toHaveBeenCalledTimes(1);
+    expect(await screen.findByRole('button', { name: /create user/i })).toBeVisible();
+    expect(initialize).toHaveBeenCalledTimes(2);
+  });
+
+  it('preserves router-owned history fields through entry, onboarding and authentication', async () => {
+    const routerState = { __NA: true, __PRIVATE_NEXTJS_INTERNALS_TREE: { segment: 'root' } };
+    window.history.replaceState(routerState, '', '/');
+    const user = userEvent.setup();
+    render(<AuthRoot machineInputProvider={harnessMachineInput} />);
+    const create = await screen.findByRole('button', { name: /create user/i });
+    expect(window.history.state).toMatchObject(routerState);
+    await user.click(create);
+    await screen.findByTestId('authenticated-shell');
+    expect(window.history.state).toMatchObject(routerState);
+    await act(async () => window.dispatchEvent(new PopStateEvent('popstate', { state: routerState })));
+    expect(window.history.state).toMatchObject(routerState);
+    expect(screen.getByTestId('authenticated-shell')).toBeVisible();
+  });
+
+  it('Back keeps an authenticated entitlement gate and does not rebuild its authority', async () => {
+    const provider = vi.fn(strictHarnessMachineInput);
+    const user = userEvent.setup();
+    render(<AuthRoot machineInputProvider={provider} />);
+    const create = await screen.findByRole('button', { name: /create user/i });
+    const entryState: unknown = window.history.state;
+    await user.click(create);
+    await screen.findByTestId('entitlement-gate');
+    await act(async () => window.dispatchEvent(new PopStateEvent('popstate', { state: entryState })));
+    expect(provider).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('entitlement-gate')).toBeVisible();
+    expect(screen.queryByTestId('authenticated-shell')).toBeNull();
+  });
+
   it('never mounts protected/authenticated content before authentication', async () => {
     render(<AuthRoot machineInputProvider={harnessMachineInput} />);
 

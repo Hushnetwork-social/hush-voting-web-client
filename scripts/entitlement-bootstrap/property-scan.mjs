@@ -6,7 +6,7 @@
  * Each forbidden property, if present in a NON-TEST production source file,
  * fails the gate (warnings are RED). Patterns reflect the FeatureTasks
  * "Patterns to Avoid" and the FeatureDescription authority boundaries:
- *   - no `navigator.onLine` connectivity authority;
+ *   - no `navigator.onLine` connectivity authority over entitlement state;
  *   - no entitlement/licence projection persistence in general browser or
  *     native preference storage;
  *   - no wall-clock 30-second delayed-confirmation timing in production;
@@ -15,6 +15,16 @@
  *   - no account/plan/upgrade (FEAT-017) or enforcement (FEAT-018) surfaces
  *     inside FEAT-016 gate modules;
  *   - no synthetic production providers reachable from the real composition.
+ *
+ * The connectivity and delayed-confirmation properties are entitlement
+ * authority guards, not a blanket ban on browser timers or connectivity
+ * checks. The scan roots also cover shared lifecycle modules
+ * (`src/lib/auth`, `src/app/auth`): the EPIC-001 identity create/recovery
+ * bridge legitimately gates an authentication submission on
+ * `navigator.onLine`, and the FEAT-009 recovery screen legitimately clears
+ * recovery-word clipboard custody with a 30-second timer. Neither decides
+ * entitlement state, so both properties are scoped to the modules that own
+ * entitlement/licence authority (`ENTITLEMENT_SURFACE`).
  *
  * Test files (`*.test.*`), conformance fixtures, and generated artifacts are
  * excluded: they are covered by their own dedicated tests and by the
@@ -56,10 +66,30 @@ const SKIP_DIRS = new Set([
   'fixtures',
 ]);
 
+/**
+ * Modules that own FEAT-016 entitlement/licence authority. The two
+ * entitlement-specific properties below apply here; other lifecycle modules
+ * in the same roots are out of their authority scope.
+ */
+const ENTITLEMENT_SURFACE = new RegExp([
+  'src/lib/licensing/',
+  'src/lib/browser-vault/production/',
+  'src/lib/runtime/',
+  'src/app/api/',
+  'src/app/auth/licence/',
+  'src/lib/auth/web/entitlement-bridge\\.ts$',
+  'src/lib/auth/web/licence-workspace\\.ts$',
+  'src/lib/auth/web/use-licence-root\\.ts$',
+  'src/app/auth/EntitlementGate\\.tsx$',
+  'src/app/auth/AuthenticatedLicenceRoot\\.tsx$',
+  'src-tauri/src/',
+].join('|'));
+
 /** Forbidden property → detection regex (production, non-test source). */
 const PROPERTIES = [
   {
-    label: 'navigator.onLine as connectivity authority',
+    label: 'navigator.onLine as entitlement/connectivity authority',
+    file: ENTITLEMENT_SURFACE,
     re: /\bnavigator\.onLine\b/,
   },
   {
@@ -75,7 +105,8 @@ const PROPERTIES = [
     re: /preferences?\.set\s*\([^)]*(?:entitlement|licence)/i,
   },
   {
-    label: 'wall-clock 30-second delayed-confirmation timing',
+    label: 'wall-clock 30-second entitlement delayed-confirmation timing',
+    file: ENTITLEMENT_SURFACE,
     re: /set(?:Timeout|Interval)\s*\(\s*(?:[^,]*,\s*)?(?:30_?000|30_?0_?0_?0_?0)\s*\)/,
   },
   {
@@ -134,10 +165,10 @@ function collectRoots() {
 const files = [];
 for (const root of collectRoots()) walk(root, files);
 
-const findings = [];
-for (const file of files) {
-  const content = readFileSync(file, 'utf8');
-  for (const { label, re, file: fileMatcher } of PROPERTIES) {
+/** Return the forbidden-property findings for one source file and content. */
+export function findForbiddenProperties(file, content, properties = PROPERTIES) {
+  const findings = [];
+  for (const { label, re, file: fileMatcher } of properties) {
     if (fileMatcher !== undefined && !fileMatcher.test(file)) continue;
     const globalRe = new RegExp(re.source, re.flags.includes('g') ? re.flags : `${re.flags}g`);
     for (const match of content.matchAll(globalRe)) {
@@ -146,6 +177,12 @@ for (const file of files) {
       break;
     }
   }
+  return findings;
+}
+
+const findings = [];
+for (const file of files) {
+  findings.push(...findForbiddenProperties(file, readFileSync(file, 'utf8')));
 }
 
 if (findings.length > 0) {

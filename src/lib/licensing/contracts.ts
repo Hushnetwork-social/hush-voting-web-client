@@ -62,6 +62,15 @@ export const LICENCE_TRANSITION_INTENT_CONFIRMED_UPGRADE = 'confirmed_upgrade' a
 export const KNOWN_LICENCE_PLAN_FAMILIES = ['direct', 'veritas', 'enterprise'] as const;
 export type LicencePlanFamily = (typeof KNOWN_LICENCE_PLAN_FAMILIES)[number];
 
+/** Recognized v1 wire vocabulary, not activation availability, ranks or terms. */
+export const KNOWN_LICENCE_PLAN_IDS: readonly string[] = [
+  LICENCE_PLAN_DIRECT_FREE, 'hushvoting.veritas.500', 'hushvoting.veritas.2000',
+  'hushvoting.veritas.10000', 'hushvoting.enterprise',
+];
+export const KNOWN_GOVERNANCE_OPTION_IDS: readonly string[] = [
+  'no-customer-trustees', 'trustees-3of5', 'trustees-7of10', 'trustees-8of13',
+];
+
 /** Hard bounds (defense in depth; the parser and coordinator enforce them). */
 export const LICENCE_MAX_SAFE_TEXT_LENGTH = 512 as const;
 export const LICENCE_MAX_OPTION_COUNT = 64 as const;

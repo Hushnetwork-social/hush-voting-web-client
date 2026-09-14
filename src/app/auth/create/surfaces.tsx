@@ -44,7 +44,7 @@ export function ActionButton({
   const styles = {
     primary: 'button-default',
     secondary: 'rounded-[0.85rem] bg-[var(--surface-stronger)] text-[var(--text)] hover:bg-[var(--surface-highest)]',
-    danger: 'rounded-[0.85rem] bg-[var(--danger)] text-white hover:bg-[var(--danger-strong)]',
+    danger: 'rounded-[0.85rem] bg-[var(--danger-strong)] text-white hover:bg-[var(--danger-strong)]',
   };
   return (
     <button

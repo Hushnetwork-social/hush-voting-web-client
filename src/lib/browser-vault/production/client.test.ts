@@ -171,6 +171,31 @@ describe('BrowserVaultClient', () => {
     expect(transfer?.value).toBe('hunter2-supersecret');
   });
 
+  it('acknowledges Lock only after its global epoch invalidation has arrived', async () => {
+    await primeClient(client, port);
+    let completed = false;
+    const locked = client.dispatch('lockAll').then(result => { completed = true; return result; });
+    const operation = await waitForOperation(port);
+    port.push({ kind: 'operation-outcome', operationId: operation?.operationId, clientChannel: sentChannel(port), outcome: 'OK', retryable: false, allowedActions: [] });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(completed).toBe(false);
+    port.push({ kind: 'global-invalidation', authorityEpoch: 2, reason: 'lock' });
+    expect((await locked).outcome).toBe('OK');
+    expect(client.isConnected()).toBe(false);
+    expect(client.epoch()).toBe(2);
+  });
+
+  it('delivers an authority revocation once even if old ports repeat the same broadcast', async () => {
+    await primeClient(client, port);
+    const reasons: string[] = [];
+    client.onInvalidation(reason => reasons.push(reason));
+    port.push({ kind: 'global-invalidation', authorityEpoch: 2, reason: 'lock' });
+    port.push({ kind: 'global-invalidation', authorityEpoch: 2, reason: 'lock' });
+    port.push({ kind: 'global-invalidation', authorityEpoch: 1, reason: 'lock' });
+    expect(reasons).toEqual(['lock']);
+    expect(client.epoch()).toBe(2);
+  });
+
   it('resolves pending operations with AUTHORITY_INVALIDATED on global invalidation', async () => {
     await primeClient(client, port);
     const promise = client.dispatch('verifyOnlineIdentity');

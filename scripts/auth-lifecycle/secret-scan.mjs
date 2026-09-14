@@ -14,6 +14,7 @@
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { isMnemonicLiteral } from './source-policy.mjs';
 
 const REPO_ROOT = join(import.meta.dirname, '..', '..');
 
@@ -101,6 +102,7 @@ for (const file of files) {
     const globalRe = new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g');
     for (const match of content.matchAll(globalRe)) {
       const value = match[0];
+      if (label === 'mnemonic phrase' && !isMnemonicLiteral(value)) continue;
       if (isAllowed(content, value)) continue;
       findings.push(`${file}: ${label}`);
       break;

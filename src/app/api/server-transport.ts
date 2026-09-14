@@ -1,3 +1,4 @@
+import { hasBoundedHistoricalName, readIdentityResponse } from '../../lib/identity-compatibility/historical-profile';
 /**
  * FEAT-010 BFF server transport — real bounded HushServerNode calls
  * (Task 6.3).
@@ -127,6 +128,7 @@ export class ManifestBoundHttpTransport implements HushServerTransportPort {
     if (encoded.length > 65_536) {
       return { ok: false, failure: { kind: 'malformed' } };
     }
+    const signal = AbortSignal.timeout(RPC_TIMEOUT_MS);
     try {
       const response = await fetch(`${this.baseUrl}${path}`, {
         method: 'POST',
@@ -135,18 +137,23 @@ export class ManifestBoundHttpTransport implements HushServerTransportPort {
           'x-hush-protocol': 'identity-v1',
         },
         body: encoded,
-        signal: AbortSignal.timeout(RPC_TIMEOUT_MS),
+        signal,
         cache: 'no-store',
       });
       if (!response.ok) {
         return { ok: false, failure: { kind: 'unavailable' } };
       }
-      const parsed = parse(await response.json());
+      const raw = path === LOOKUP_PATH ? await readIdentityResponse(response, signal) : await response.json();
+      const parsed = parse(raw);
       if ('error' in parsed) {
         return { ok: false, failure: bffErrorToFailure(parsed.error.code) };
       }
       if (parsed.reply === undefined) {
         return { ok: false, failure: { kind: 'malformed' } };
+      }
+      if (path === LOOKUP_PATH) {
+        const reply = parsed.reply as GetIdentityReply;
+        if (reply.successfull && !hasBoundedHistoricalName(reply.profileName)) return { ok: false, failure: { kind: 'malformed' } };
       }
       return success(parsed.reply);
     } catch (error) {

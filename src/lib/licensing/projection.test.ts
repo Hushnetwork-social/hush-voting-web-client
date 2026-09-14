@@ -34,7 +34,7 @@ function activeView(overrides: Partial<LicenceActiveEntitlementTransportView> = 
     EffectiveFromUtc: '2026-01-01T00:00:00.000Z',
     ExpiresAtUtc: '2027-01-01T00:00:00.000Z',
     AssignedCatalogueVersion: CATALOGUE_V1,
-    AllowedGovernanceOptionIds: ['gov-trustees-7-of-10'],
+    AllowedGovernanceOptionIds: ['trustees-7of10'],
     HigherOptions: [],
     ...overrides,
   };
@@ -57,7 +57,7 @@ describe('buildLicenceSafeProjection', () => {
     expect(result.projection.licenceReference).toBe('5f2d9e11-3c44-4a80-b8e7-6b2f1a0c9d3e');
     expect(result.projection.planFamily).toBe('veritas');
     expect(result.projection.provenance).toBe('indexed-query');
-    expect(result.projection.allowedGovernanceOptionIds).toEqual(['gov-trustees-7-of-10']);
+    expect(result.projection.allowedGovernanceOptionIds).toEqual(['trustees-7of10']);
   });
 
   it('accepts active direct-free and enterprise families without coercion', () => {
@@ -187,7 +187,7 @@ describe('FEAT-017 safe-option boundary (higher options, Enterprise, catalogue)'
       safeDescription: 'Contact provider — not yet available',
     });
     // Governance ids of the current licence remain presentation facts.
-    expect(p.allowedGovernanceOptionIds).toEqual(['gov-trustees-7-of-10']);
+    expect(p.allowedGovernanceOptionIds).toEqual(['trustees-7of10']);
   });
 
 

@@ -234,3 +234,30 @@ describe('pre-index term labels (no committed dates)', () => {
     expect(licenceTermLabel('term', 2)).toBe('2-year term');
   });
 });
+
+describe('boundary determinism (offsets, years, seconds, leap centuries)', () => {
+  it('formats fractional and negative fractional offsets canonically', () => {
+    expect(canonicalUtcOffsetText(-345)).toBe('UTC-05:45');
+    expect(canonicalUtcOffsetText(30)).toBe('UTC+00:30');
+    expect(canonicalUtcOffsetText(75)).toBe('UTC+01:15');
+    expect(canonicalUtcOffsetText(-330)).toBe('UTC-05:30');
+  });
+
+  it('rejects years 0000-0099 that Date.UTC would silently map to 1900+', () => {
+    expect(parseLicenceUtcInstant('0000-01-01T00:00:00Z')).toEqual({
+      ok: false,
+      reason: 'invalid-utc-instant',
+    });
+    expect(parseLicenceUtcInstant('0099-12-31T23:59:59Z').ok).toBe(false);
+    expect(parseLicenceUtcInstant('9999-12-31T23:59:59Z').ok).toBe(true);
+  });
+
+  it('rejects the non-leap century boundary and keeps seconds out of the display', () => {
+    expect(parseLicenceUtcInstant('2100-02-29T00:00:00Z').ok).toBe(false);
+    const facts = localDateTimeFacts('2026-09-06T20:35:59Z', 'UTC');
+    expect(facts?.timeText).toBe('20:35');
+    expect(formatLicenceLocalDateTime('2026-09-06T20:35:59.999Z', LISBON)).toBe(
+      '6 September 2026, 21:35 UTC+01:00',
+    );
+  });
+});

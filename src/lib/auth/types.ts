@@ -114,6 +114,8 @@ export interface AuthenticatedIdentityMetadata {
 
 /** Bounded safe public identity metadata shown while locked. */
 export interface SafeIdentityMetadata {
+  /** Display-only pending lifecycle hint; never authorizes resume or a write. */
+  readonly pendingSetup?: true;
   readonly alias: string;
   /** Abbreviated signing address (bounded; no full-address copy while locked). */
   readonly abbreviatedSigningAddress: string;

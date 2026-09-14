@@ -10,10 +10,13 @@
  * unknown words fill and mark numbered positions. Focused word visible,
  * completed unfocused words concealed; lifecycle events conceal all.
  */
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { wordlists } from 'bip39';
 import type { WordGridProjection } from '../../../lib/recovery-words/contracts/projection';
 import { RecoveryActionButton, RecoveryBackButton, RecoveryFieldError, RecoveryPanel, RecoveryStatusRegion, WordInput } from './surfaces';
 import { BACK, WORD_ENTRY } from './copy';
+
+const ENGLISH_WORDS: ReadonlySet<string> = new Set(wordlists.english);
 
 export interface WordEntryProps {
   readonly grid: WordGridProjection;
@@ -59,11 +62,45 @@ export function decidePaste(pasted: string, selectedCount: '12' | '24' | null, a
 
 export function WordEntryScreen({ grid, onSelectCount, onPastePhrase, onConfirmPasteReplacement, onClearAll, onVerify, onBack }: WordEntryProps) {
   const [filledPositions, setFilledPositions] = useState<ReadonlySet<number>>(() => new Set());
-  const [concealed, setConcealed] = useState(grid.allConcealed);
+  const [concealed, setConcealed] = useState(true);
   const [replacementPrompt, setReplacementPrompt] = useState(false);
-  const pendingPasteRef = useRef<{ phrase: string; count: number } | null>(null);
+  const [pasteError, setPasteError] = useState<'WRONG_COUNT' | null>(null);
+  const [unknownPositions, setUnknownPositions] = useState<readonly number[]>([]);
+  // The permitted input boundary owns pending paste text too. React retains
+  // only this DOM reference, never a phrase-bearing ref value or projection.
+  const pendingPasteRef = useRef<HTMLInputElement | null>(null);
   const inputElementsRef = useRef(new Map<number, HTMLInputElement>());
+  const errorSummaryRef = useRef<HTMLDivElement | null>(null);
+  const previousErrorsRef = useRef<{ codes: string; positions: readonly number[] }>({ codes: '', positions: [] });
+  const requestErrorFocusRef = useRef(false);
   const count = grid.selectedWordCount ?? '24';
+
+  useLayoutEffect(() => {
+    const inputElements = inputElementsRef.current;
+    const pendingPaste = pendingPasteRef.current;
+    return () => {
+      // Clear while controls are still attached, before React releases refs.
+      // Invalid validation results keep this component mounted for correction.
+      for (const input of inputElements.values()) input.value = '';
+      if (pendingPaste) pendingPaste.value = '';
+    };
+  }, []);
+
+  useEffect(() => {
+    const concealAll = () => {
+      setConcealed(true);
+      for (const input of inputElementsRef.current.values()) input.blur();
+    };
+    const visibilityChanged = () => { if (document.visibilityState !== 'visible') concealAll(); };
+    document.addEventListener('visibilitychange', visibilityChanged);
+    window.addEventListener('pagehide', concealAll);
+    window.addEventListener('blur', concealAll);
+    return () => {
+      document.removeEventListener('visibilitychange', visibilityChanged);
+      window.removeEventListener('pagehide', concealAll);
+      window.removeEventListener('blur', concealAll);
+    };
+  }, []);
 
   const inputs = useMemo(() => {
     const size = count === '12' ? 12 : 24;
@@ -83,33 +120,48 @@ export function WordEntryScreen({ grid, onSelectCount, onPastePhrase, onConfirmP
       if (input) input.value = word;
     });
     setFilledPositions(new Set(words.map((_, index) => index + 1)));
+    const unknown = words.flatMap((word, index) => ENGLISH_WORDS.has(word) ? [] : [index + 1]);
+    setUnknownPositions(unknown);
+    requestErrorFocusRef.current = unknown.length > 0;
+    setPasteError(null);
     onPastePhrase(phrase);
-    setConcealed(false);
+    setConcealed(true);
   };
 
   const clearGrid = () => {
     for (const input of inputElementsRef.current.values()) input.value = '';
     setFilledPositions(new Set());
-    setConcealed(grid.allConcealed);
+    setUnknownPositions([]);
+    setPasteError(null);
+    if (pendingPasteRef.current) pendingPasteRef.current.value = '';
+    setReplacementPrompt(false);
+    setConcealed(true);
     onClearAll();
   };
 
   const handlePaste = (pastedText: string) => {
+    if (grid.busy) return;
     const decision = decidePaste(pastedText, count, anyFieldFilled);
     if (decision.kind === 'fillGrid') {
       fillGrid(decision.phrase);
     } else if (decision.kind === 'replacementRequired') {
       // Existing values remain untouched until explicit whole-grid replacement.
-      pendingPasteRef.current = { phrase: decision.phrase, count: decision.count };
+      if (!pendingPasteRef.current) return;
+      pendingPasteRef.current.value = decision.phrase;
       setReplacementPrompt(true);
+      setPasteError(null);
+    } else if (decision.kind === 'countMismatch') {
+      requestErrorFocusRef.current = true;
+      setPasteError('WRONG_COUNT');
     }
     // countMismatch/emptyPaste: reject entirely; existing fields preserved.
   };
 
   const confirmReplacement = (confirm: boolean) => {
     const pending = pendingPasteRef.current;
-    if (pending && confirm) fillGrid(pending.phrase);
-    pendingPasteRef.current = null;
+    const phrase = pending?.value ?? '';
+    if (pending) pending.value = '';
+    if (phrase && confirm) fillGrid(phrase);
     setReplacementPrompt(false);
     onConfirmPasteReplacement(confirm);
   };
@@ -119,13 +171,39 @@ export function WordEntryScreen({ grid, onSelectCount, onPastePhrase, onConfirmP
     onSelectCount(selected);
   };
 
-  const invalidPositions = new Set(grid.invalidPositions);
+  const invalidPositions = new Set([...grid.invalidPositions, ...unknownPositions]);
+  const linkedPositions = [...invalidPositions].filter(position => Number.isInteger(position)
+    && position >= 1 && position <= inputs.length).sort((a, b) => a - b);
+  const errorCodes = grid.busy ? '' : [
+    ...grid.errorSummary.map(error => error.code),
+    ...(pasteError ? ['PASTE_COUNT'] : []),
+    ...(unknownPositions.length > 0 ? ['PASTE_UNKNOWN'] : []),
+    ...(grid.checksumState === 'failed' ? ['CHECKSUM'] : []),
+  ].join('|');
+
+  // Numbered errors target the first affected input; phrase-wide errors target
+  // the safe summary. Equivalent projections and ordinary correction must not
+  // repeatedly steal focus. Only codes/positions are retained, never word values.
+  useLayoutEffect(() => {
+    const previous = previousErrorsRef.current;
+    previousErrorsRef.current = { codes: errorCodes, positions: linkedPositions };
+    if (!errorCodes) return;
+    const requested = requestErrorFocusRef.current;
+    requestErrorFocusRef.current = false;
+    if (!requested && previous.codes === errorCodes
+      && linkedPositions.every(position => previous.positions.includes(position))) return;
+    const firstInvalid = inputElementsRef.current.get(linkedPositions[0]);
+    (firstInvalid ?? errorSummaryRef.current)?.focus();
+  });
 
   return (
     <RecoveryPanel title={WORD_ENTRY.title}>
+      {/* Uncontrolled, inaccessible and excluded from form submission/autofill.
+          Cleared on either decision, Clear all, count change and unmount. */}
+      <input ref={pendingPasteRef} type="password" hidden disabled autoComplete="off" />
       <p className="mb-4 text-sm text-[var(--text-muted)]">{WORD_ENTRY.intro}</p>
 
-      <fieldset className="mb-4">
+      <fieldset className="mb-4" disabled={grid.busy}>
         <legend className="mb-2 text-sm font-medium text-[var(--text)]">Word count</legend>
         <div className="flex flex-wrap gap-3">
           {(['12', '24'] as const).map((option) => (
@@ -147,13 +225,14 @@ export function WordEntryScreen({ grid, onSelectCount, onPastePhrase, onConfirmP
                   <WordInput
                     id={input.id}
                     label={input.label}
-                    concealed={concealed && filled && !invalid}
+                    concealed={concealed && filled}
                     invalid={invalid}
                     inputRef={(element) => {
                       if (element) inputElementsRef.current.set(input.position, element);
                       else inputElementsRef.current.delete(input.position);
                     }}
                     onValue={(value) => {
+                      setUnknownPositions((positions) => positions.filter(position => position !== input.position));
                       setFilledPositions((current) => {
                         const next = new Set(current);
                         if (value.trim().length > 0) next.add(input.position);
@@ -196,8 +275,15 @@ export function WordEntryScreen({ grid, onSelectCount, onPastePhrase, onConfirmP
         </div>
       )}
 
-      {grid.errorSummary.length > 0 && (
-        <div role="alert" className="mt-4">
+      {errorCodes && (
+        <div ref={errorSummaryRef} role="region" aria-label={WORD_ENTRY.errorSummary} tabIndex={-1}
+          className="mt-4 rounded-[0.85rem] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]">
+          {pasteError !== null && (
+            <RecoveryFieldError id="rw-paste-error">{WORD_ENTRY.wrongCountStatic}</RecoveryFieldError>
+          )}
+          {unknownPositions.length > 0 && grid.errorSummary.every(error => error.code !== 'UNKNOWN_WORD') && (
+            <RecoveryFieldError id="rw-paste-unknown">{WORD_ENTRY.unknownWords}</RecoveryFieldError>
+          )}
           {grid.errorSummary.map((error) => (
             <RecoveryFieldError key={error.code} id={`rw-error-${error.code}`}>
               {error.code === 'WRONG_COUNT'
@@ -207,6 +293,20 @@ export function WordEntryScreen({ grid, onSelectCount, onPastePhrase, onConfirmP
                   : WORD_ENTRY.unsupportedInput}
             </RecoveryFieldError>
           ))}
+          {grid.checksumState === 'failed' && (
+            <RecoveryFieldError id="rw-error-checksum">{WORD_ENTRY.checksumFailed}</RecoveryFieldError>
+          )}
+          {linkedPositions.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {linkedPositions.map(position => (
+                <a key={position} href={`#rw-${position}`}
+                  onClick={event => { event.preventDefault(); inputElementsRef.current.get(position)?.focus(); }}
+                  className="inline-flex min-h-11 items-center rounded-[0.85rem] px-4 text-sm font-medium text-[var(--text)] underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]">
+                  {WORD_ENTRY.reviewWord(position)}
+                </a>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -221,7 +321,9 @@ export function WordEntryScreen({ grid, onSelectCount, onPastePhrase, onConfirmP
           disabled={!allFieldsFilled || !grid.canVerify || grid.busy}
           busy={grid.busy}
           onClick={() => {
-            const phrase = inputs.map((input) => inputElementsRef.current.get(input.position)?.value.trim() ?? '').join(' ');
+            setConcealed(true);
+            for (const input of inputElementsRef.current.values()) input.blur();
+            const phrase = normalizePastedPhrase(inputs.map((input) => inputElementsRef.current.get(input.position)?.value ?? '').join(' '));
             if (phrase.trim().length > 0) onVerify(phrase);
           }}
         >

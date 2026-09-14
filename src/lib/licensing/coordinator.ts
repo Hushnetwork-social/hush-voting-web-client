@@ -155,6 +155,8 @@ export interface LicenceCoordinatorPorts {
 }
 
 export class LicenceEntitlementCoordinator {
+  /** Conservative retry after a due expiry query still returns active (FEAT-016 annual expiry). */
+  private static readonly EXPIRY_RECHECK_INTERVAL_MS = 60_000;
   private phase: EntitlementPhase = 'resolving';
   private projection: LicenceSafeProjection | null = null;
   private pendingTransactionId: string | null = null;
@@ -169,6 +171,9 @@ export class LicenceEntitlementCoordinator {
   private lastReachableAtMs: number | null = null;
   private confirmationStartedReachableMs: number | null = null;
   private lastOutcomeCode: string | null = null;
+  /** Deduplicate a due boundary and rate-limit clock-skew rechecks. */
+  private lastExpiryWakeup: string | null = null;
+  private nextExpiryRecheckAtMs = 0;
   /** FEAT-017: one-shot local-success notification eligibility (Task 3.3). */
   private upgradeNotificationEligible = false;
   /**
@@ -204,6 +209,8 @@ export class LicenceEntitlementCoordinator {
   /** Query-first start: restart, after-auth, and explicit bootstrap recovery. */
   async start(): Promise<CoordinatorSnapshot> {
     this.cancelled = false;
+    this.lastExpiryWakeup = null;
+    this.nextExpiryRecheckAtMs = 0;
     this.attemptCount = 0;
     this.consecutiveUnauthenticated = 0;
     this.projection = null;
@@ -234,6 +241,19 @@ export class LicenceEntitlementCoordinator {
       this.inFlight
     ) {
       return this.snapshot();
+    }
+    // FEAT-016 AC-016-016/017: local time only triggers a fresh authority query.
+    // A still-active server reply gets a conservative recheck, not the normal
+    // three-second pending poll. A new assignment/boundary can wake immediately.
+    if (this.phase === 'entitlementReady' && this.projection?.expiresAtUtc) {
+      const boundary = this.projection.expiresAtUtc;
+      const wakeup = `${this.projection.licenceReference}:${boundary}`;
+      const nowMs = this.ports.nowMs();
+      if (nowMs >= Date.parse(boundary) && (this.lastExpiryWakeup !== wakeup || nowMs >= this.nextExpiryRecheckAtMs)) {
+        this.lastExpiryWakeup = wakeup;
+        this.nextExpiryRecheckAtMs = nowMs + LicenceEntitlementCoordinator.EXPIRY_RECHECK_INTERVAL_MS;
+        return this.revalidate('expiry');
+      }
     }
     if (
       this.phase !== 'awaitingIndex' &&
@@ -328,6 +348,7 @@ export class LicenceEntitlementCoordinator {
    * account entry, authoritative rejection): gate first, then fresh query.
    */
   async revalidate(trigger: string): Promise<CoordinatorSnapshot> {
+    this.phase = 'resolving';
     this.projection = null;
     this.lastOutcomeCode = `revalidate:${trigger}`;
     await this.runFreshQuery(trigger);
@@ -566,7 +587,9 @@ export class LicenceEntitlementCoordinator {
           outcome.outcome === 'unsupported'
             ? outcome.reason === 'unknown-plan-family'
               ? 'plan-family-unknown'
-              : 'catalogue-incompatible'
+              : outcome.reason === 'incompatible-catalogue-version'
+                ? 'catalogue-incompatible'
+                : 'unsupported'
             : 'unsupported';
         return;
       case 'authenticationFailure':

@@ -248,6 +248,21 @@ describe('licence BFF same-origin HTTP contract', () => {
     expect(foreign.ok).toBe(false);
   });
 
+  it('accepts browser and Next.js HTTP headers while returning only the three signed metadata values', () => {
+    const result = validateLicenceBffRequest({
+      configured: true,
+      contentLength: 2,
+      contentType: 'application/json',
+      headerNames: [...headerNames, 'content-type', 'content-length', 'host', 'origin',
+        'accept', 'accept-encoding', 'accept-language', 'cache-control', 'pragma',
+        'connection', 'referer', 'user-agent', 'sec-fetch-site', 'sec-fetch-mode',
+        'sec-fetch-dest', 'sec-ch-ua', 'sec-ch-ua-mobile', 'sec-ch-ua-platform',
+        'x-forwarded-for', 'x-forwarded-host', 'x-forwarded-port', 'x-forwarded-proto'],
+      headers: goodHeaders(),
+    });
+    expect(result).toEqual({ ok: true, headers: goodHeaders() });
+  });
+
   it('rejects oversized bodies, foreign content types, and missing config', () => {
     const oversized = validateLicenceBffRequest({
       configured: true,

@@ -43,6 +43,23 @@ function expectRed(label, command, args, env) {
   return true;
 }
 
+function expectGreen(label, command, args, env) {
+  try {
+    execFileSync(command, args, {
+      cwd: REPO_ROOT,
+      stdio: 'pipe',
+      encoding: 'utf8',
+      timeout: 120_000,
+      env: { ...process.env, ...env },
+    });
+  } catch (error) {
+    console.error(`SELF-TEST FAIL: ${label} failed unexpectedly (exit ${error.status ?? 1})`);
+    return false;
+  }
+  console.log(`  \u2713 ${label}: gate passed as required`);
+  return true;
+}
+
 const root = mkdtempSync(join(tmpdir(), 'feat017-seed-'));
 const results = [];
 try {
@@ -57,11 +74,13 @@ try {
     }),
   );
 
-  // 2. property-scan red-effectiveness (page polling loop).
+  // 2. property-scan red-effectiveness (page polling loop). The seed sits on
+  // a licence page/UI path so the page-scoped polling property applies.
   const propertyRoot = join(root, 'property-seed');
-  mkdirSync(propertyRoot, { recursive: true });
+  const seededUiDir = join(propertyRoot, 'src', 'app', 'auth', 'licence');
+  mkdirSync(seededUiDir, { recursive: true });
   writeFileSync(
-    join(propertyRoot, 'seeded-prop.ts'),
+    join(seededUiDir, 'seeded-prop.tsx'),
     'export function poll(): void { setInterval(() => undefined, 3000); }\n',
   );
   results.push(
@@ -120,6 +139,51 @@ try {
       FEAT017_WIRING_SKIP_LIST: '1',
     }),
   );
+
+  // The migrated gate must reject missing C# bindings and duplicate IDs.
+  const emptySteps = join(root, 'empty-steps');
+  mkdirSync(emptySteps);
+  results.push(expectRed('journey-wiring missing bindings', process.execPath,
+    [join(SCRIPT_DIR, 'journey-wiring.mjs')], {
+      FEAT017_WIRING_STEPS: emptySteps, FEAT017_WIRING_SKIP_LIST: '1',
+    }));
+  const duplicateFeatures = join(root, 'duplicate-features');
+  mkdirSync(duplicateFeatures);
+  const netFeatures = join(REPO_ROOT, '..', 'hush-server-node', 'Node',
+    'HushNode.IntegrationTests', 'HushVoting', 'Features', 'licence-upgrade');
+  for (const file of ['account-licence-summary.feature', 'upgrade-activation-progress.feature']) {
+    writeFileSync(join(duplicateFeatures, file), readFileSync(join(netFeatures, file)));
+  }
+  writeFileSync(join(duplicateFeatures, 'duplicate.feature'),
+    readFileSync(join(netFeatures, 'account-licence-summary.feature')));
+  results.push(expectRed('journey-wiring duplicate IDs', process.execPath,
+    [join(SCRIPT_DIR, 'journey-wiring.mjs')], {
+      FEAT017_WIRING_FEATURES: duplicateFeatures, FEAT017_WIRING_SKIP_LIST: '1',
+    }));
+
+  // The inherited FEAT-016 regression catalogue tags several scenarios with
+  // the same EPIC-002 acceptance criterion (a many:1 mapping). That is valid
+  // and must stay GREEN; a missing criterion is still RED.
+  const netRegressionFeatures = join(REPO_ROOT, '..', 'hush-server-node', 'Node',
+    'HushNode.IntegrationTests', 'HushVoting', 'Features', 'licence-entitlements');
+  const sharedCriterionFeatures = join(root, 'shared-criterion-features');
+  mkdirSync(sharedCriterionFeatures);
+  for (const file of ['compatibility-transport-faults.feature', 'direct-free-bootstrap.feature', 'failure-recovery.feature', 'gate-safety-accessibility.feature']) {
+    writeFileSync(join(sharedCriterionFeatures, file), readFileSync(join(netRegressionFeatures, file)));
+  }
+  results.push(expectGreen('journey-wiring shared regression criterion tags', process.execPath,
+    [join(SCRIPT_DIR, 'journey-wiring.mjs')], {
+      FEAT017_WIRING_REGRESSION_FEATURES: sharedCriterionFeatures, FEAT017_WIRING_SKIP_LIST: '1',
+    }));
+  const missingCriterionFeatures = join(root, 'missing-criterion-features');
+  mkdirSync(missingCriterionFeatures);
+  for (const file of ['compatibility-transport-faults.feature', 'direct-free-bootstrap.feature', 'gate-safety-accessibility.feature']) {
+    writeFileSync(join(missingCriterionFeatures, file), readFileSync(join(netRegressionFeatures, file)));
+  }
+  results.push(expectRed('journey-wiring missing regression criterion', process.execPath,
+    [join(SCRIPT_DIR, 'journey-wiring.mjs')], {
+      FEAT017_WIRING_REGRESSION_FEATURES: missingCriterionFeatures, FEAT017_WIRING_SKIP_LIST: '1',
+    }));
 
   // 7. evidence red-effectiveness: a pairing ledger missing a twin-paired row
   // must fail the evidence admission validator.

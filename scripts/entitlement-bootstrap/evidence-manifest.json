@@ -1,8 +1,8 @@
 {
   "schema": "feat016-evidence-manifest-v1",
   "feature": "FEAT-016",
-  "generatedAt": "2026-09-07",
-  "notes": "Executed 2026-09-07 (continue-implementation, Phase 7). Client revision 63ade2b (branch feat/FEAT-016-post-login-entitlement-bootstrap); server revision b472626 (branch feat/FEAT-016-post-login-entitlement-bootstrap). EXECUTABLE_ROOT rows record the browser journey wiring state; the full production-composition run requires the controlled real HushServerNode fixture (EXT-016-001, NOT_SUPPLIED) and is release-readiness evidence, never implementation-failure authority.",
+  "generatedAt": "2026-09-11",
+  "notes": "Executed 2026-09-07 (continue-implementation, Phase 7). Client revision 63ade2b (branch feat/FEAT-016-post-login-entitlement-bootstrap); server revision b472626 (branch feat/FEAT-016-post-login-entitlement-bootstrap). EXECUTABLE_ROOT rows record the browser journey wiring state; the full production-composition run requires the controlled real HushServerNode fixture (EXT-016-001, NOT_SUPPLIED) and is release-readiness evidence, never implementation-failure authority. AUD-067: AT-LIC-010 now has actual .NET Web/server and PostgreSQL Twin receipts. Its metadata was refreshed after the post-retirement browser run; original run provenance remains authoritative. Other historical rows are not requalified by this change.",
   "rows": [
     {
       "stableId": "AT-LIC-002",
@@ -15,9 +15,14 @@
     {
       "stableId": "AT-LIC-002",
       "evidenceClass": "EXECUTABLE_ROOT",
-      "state": "NOT_EXECUTED",
-      "note": "full production-composition journey requires the controlled real HushServerNode fixture (EXT-016-001)",
-      "captureDisabled": true
+      "state": "PASS",
+      "note": "Observed browser/server runtime result only; full criterion review and external qualification remain separate",
+      "captureDisabled": true,
+      "counts": "4/4 focused .NET browser/server scenarios; zero failures or skips",
+      "command": "bash hush-server-node/scripts/run-hushvoting-e2e.sh --build --group HV-LIC-DIRECT-FREE",
+      "revision": "Uncommitted workspace; exact source and artifact digests retained in the referenced run provenance",
+      "resultArtifact": "../hush-server-node/TestResults/HushVoting/9b2dcc65-d92f-42a5-839b-40f40d456038/HV-LIC-DIRECT-FREE.trx",
+      "provenanceArtifact": "../hush-server-node/TestResults/HushVoting/9b2dcc65-d92f-42a5-839b-40f40d456038/HV-LIC-DIRECT-FREE.provenance.json"
     },
     {
       "stableId": "AT-LIC-003",
@@ -53,16 +58,22 @@
       "stableId": "AT-LIC-010",
       "evidenceClass": "TWIN",
       "state": "PASS",
-      "counts": "6/6 focused FEAT-016 TwinTests",
-      "command": "dotnet test HushNode.IntegrationTests/HushNode.IntegrationTests.csproj --no-build --filter Category=FEAT-016&Category=TwinTest&Category=NON_E2E",
-      "revision": "b472626"
+      "counts": "9/9 focused real PostgreSQL index and reservation Twins",
+      "command": "dotnet test Node/HushNode.IntegrationTests --no-build --filter FullyQualifiedName~HushVotingLicenceBlockIndexWriterTwinTests",
+      "revision": "Uncommitted workspace; AUD-067 records implementation and matching browser provenance",
+      "resultArtifact": "../hush-server-node/TestResults/HushVoting/expiry-block-time-regression/block-index-final-twins.trx"
     },
     {
       "stableId": "AT-LIC-010",
       "evidenceClass": "EXECUTABLE_ROOT",
-      "state": "NOT_EXECUTED",
-      "note": "full production-composition journey requires the controlled real HushServerNode fixture (EXT-016-001)",
-      "captureDisabled": true
+      "state": "PASS",
+      "note": "Real annual assignment, gated authoritative expiry query, signed Direct Free and indexed workspace recovery; whole-criterion and release review remain open",
+      "captureDisabled": true,
+      "counts": "1/1 .NET browser/server annual-expiry scenario, zero failures or skips",
+      "command": "npm run test:licence-expiry:bdd",
+      "revision": "Uncommitted workspace; source and artifact digests retained in the referenced run provenance",
+      "resultArtifact": "../hush-server-node/TestResults/HushVoting/e01f2171-4449-47f8-a9d5-3ff6275c50fa/HV-LIC-EXPIRY.trx",
+      "provenanceArtifact": "../hush-server-node/TestResults/HushVoting/e01f2171-4449-47f8-a9d5-3ff6275c50fa/HV-LIC-EXPIRY.provenance.json"
     },
     {
       "stableId": "AT-LIC-011",
@@ -105,9 +116,14 @@
     {
       "stableId": "AT-LIC-016-001",
       "evidenceClass": "EXECUTABLE_ROOT",
-      "state": "NOT_EXECUTED",
-      "note": "full production-composition journey requires the controlled real HushServerNode fixture (EXT-016-001)",
-      "captureDisabled": true
+      "state": "PASS",
+      "note": "Observed browser/server runtime result only; full criterion review and external qualification remain separate",
+      "captureDisabled": true,
+      "counts": "4/4 focused .NET browser/server scenarios; zero failures or skips",
+      "command": "bash hush-server-node/scripts/run-hushvoting-e2e.sh --build --group HV-LIC-DIRECT-FREE",
+      "revision": "Uncommitted workspace; exact source and artifact digests retained in the referenced run provenance",
+      "resultArtifact": "../hush-server-node/TestResults/HushVoting/9b2dcc65-d92f-42a5-839b-40f40d456038/HV-LIC-DIRECT-FREE.trx",
+      "provenanceArtifact": "../hush-server-node/TestResults/HushVoting/9b2dcc65-d92f-42a5-839b-40f40d456038/HV-LIC-DIRECT-FREE.provenance.json"
     },
     {
       "stableId": "AT-LIC-016-002",
@@ -120,9 +136,14 @@
     {
       "stableId": "AT-LIC-016-002",
       "evidenceClass": "EXECUTABLE_ROOT",
-      "state": "NOT_EXECUTED",
-      "note": "full production-composition journey requires the controlled real HushServerNode fixture (EXT-016-001)",
-      "captureDisabled": true
+      "state": "PASS",
+      "note": "Observed browser/server runtime result only; full criterion review and external qualification remain separate",
+      "captureDisabled": true,
+      "counts": "4/4 focused .NET browser/server scenarios; zero failures or skips",
+      "command": "bash hush-server-node/scripts/run-hushvoting-e2e.sh --build --group HV-LIC-DIRECT-FREE",
+      "revision": "Uncommitted workspace; exact source and artifact digests retained in the referenced run provenance",
+      "resultArtifact": "../hush-server-node/TestResults/HushVoting/9b2dcc65-d92f-42a5-839b-40f40d456038/HV-LIC-DIRECT-FREE.trx",
+      "provenanceArtifact": "../hush-server-node/TestResults/HushVoting/9b2dcc65-d92f-42a5-839b-40f40d456038/HV-LIC-DIRECT-FREE.provenance.json"
     },
     {
       "stableId": "AT-LIC-016-003",
@@ -135,9 +156,14 @@
     {
       "stableId": "AT-LIC-016-003",
       "evidenceClass": "EXECUTABLE_ROOT",
-      "state": "NOT_EXECUTED",
-      "note": "full production-composition journey requires the controlled real HushServerNode fixture (EXT-016-001)",
-      "captureDisabled": true
+      "state": "PASS",
+      "note": "Observed browser/server runtime result only; full criterion review and external qualification remain separate",
+      "captureDisabled": true,
+      "counts": "4/4 focused .NET browser/server scenarios; zero failures or skips",
+      "command": "bash hush-server-node/scripts/run-hushvoting-e2e.sh --build --group HV-LIC-DIRECT-FREE",
+      "revision": "Uncommitted workspace; exact source and artifact digests retained in the referenced run provenance",
+      "resultArtifact": "../hush-server-node/TestResults/HushVoting/9b2dcc65-d92f-42a5-839b-40f40d456038/HV-LIC-DIRECT-FREE.trx",
+      "provenanceArtifact": "../hush-server-node/TestResults/HushVoting/9b2dcc65-d92f-42a5-839b-40f40d456038/HV-LIC-DIRECT-FREE.provenance.json"
     },
     {
       "stableId": "AT-LIC-016-004",

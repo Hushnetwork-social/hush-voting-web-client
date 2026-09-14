@@ -144,6 +144,27 @@ describe('LicenceWorkspace options surface (L1/L2)', () => {
     expect(onViewProgress).toHaveBeenCalledTimes(1);
     void view;
   });
+
+  it('a retained draft marks only the matching option Selected (text + glyph, aria-current)', () => {
+    // C0 in-app Back keeps the draft; the options surface reopens with the
+    // matching higher option visibly Selected (never colour-only) while the
+    // other options stay unselected and reviewable.
+    const view = renderWorkspace(workspaceFacts(directFreeInput(), 'options', VERITAS_2000_PLAN));
+    const articles = screen.getAllByRole('article');
+    expect(articles).toHaveLength(3);
+    const target = articles.find((article) => within(article).queryByText('HushVoting! Veritas 2k') !== null);
+    expect(target).toBeDefined();
+    expect(within(target as HTMLElement).getByTestId('option-selected')).toHaveTextContent('Selected');
+    expect((target as HTMLElement).getAttribute('aria-current')).toBe('true');
+    for (const other of articles) {
+      if (other === target) continue;
+      expect(within(other).queryByTestId('option-selected')).toBeNull();
+      expect(other.getAttribute('aria-current')).toBeNull();
+    }
+    // A draft alone never locks selection: every option stays reviewable.
+    expect(screen.getAllByRole('button', { name: 'Review plan' })).toHaveLength(3);
+    void view;
+  });
 });
 
 describe('LicenceWorkspace confirmation (C0)', () => {
@@ -171,6 +192,18 @@ describe('LicenceWorkspace confirmation (C0)', () => {
   it('does not render raw template/identity material', () => {
     const view = renderWorkspace(workspaceFacts(directFreeInput(), 'confirmation', VERITAS_2000_PLAN));
     expect(screen.queryByText(/signature|bytes|journal|admission|hushvoting\.direct\.free/)).toBeNull();
+    void view;
+  });
+
+  it('C0 Back to plans is a non-mutating leave: onBackToPlans fires, never onActivate', async () => {
+    const handlers = noopHandlers();
+    const view = renderWorkspace(workspaceFacts(directFreeInput(), 'confirmation', VERITAS_2000_PLAN), handlers);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Back to plans' }));
+    expect(handlers.onBackToPlans).toHaveBeenCalledTimes(1);
+    expect(handlers.onActivate).not.toHaveBeenCalled();
+    // Still on the confirmation surface: the component never commits by itself.
+    expect(screen.getByTestId('licence-confirmation')).toBeInTheDocument();
     void view;
   });
 });
@@ -225,6 +258,33 @@ describe('LicenceWorkspace progress/delayed/result/stale surfaces', () => {
     ).toBeGreaterThanOrEqual(1);
     // Fresh options are reviewable again.
     expect(screen.getAllByRole('button', { name: 'Review plan' }).length).toBeGreaterThan(0);
+    void view;
+  });
+
+  it('D0 Continue working never retries or submits: onContinueWorking fires once', async () => {
+    const handlers = noopHandlers();
+    const view = renderWorkspace(
+      workspaceFacts(presentationInput({ upgradeOperation: upgradeOperationOf('delayed') }), 'delayed'),
+      handlers,
+    );
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Continue working' }));
+    expect(handlers.onContinueWorking).toHaveBeenCalledTimes(1);
+    expect(handlers.onRetry).not.toHaveBeenCalled();
+    expect(handlers.onActivate).not.toHaveBeenCalled();
+    void view;
+  });
+
+  it('R0 actions route deterministically: Return to workspace and View current licence', async () => {
+    const handlers = noopHandlers();
+    const input = presentationInput({ projection: veritas2000ActiveProjection(), upgradeOperation: upgradeOperationOf('local-success') });
+    const view = renderWorkspace(workspaceFacts(input, 'result'), handlers);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Return to workspace' }));
+    expect(handlers.onReturnToWorkspace).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole('button', { name: 'View current licence' }));
+    expect(handlers.onViewCurrentLicence).toHaveBeenCalledTimes(1);
+    expect(handlers.onActivate).not.toHaveBeenCalled();
     void view;
   });
 });
@@ -307,6 +367,27 @@ describe('N0 pending indicator + N1 activation notification', () => {
     );
     view.rerender(<LicenceActivationNotification facts={competing} onViewLicence={onViewLicence} onDismiss={onDismiss} />);
     expect(screen.queryByTestId('licence-activation-notification')).toBeNull();
+  });
+
+  it('N1 actions route once: View licence reopens, Dismiss acknowledges without navigation', async () => {
+    const onViewLicence = vi.fn();
+    const onDismiss = vi.fn();
+    const input = presentationInput({
+      upgradeOperation: upgradeOperationOf('local-success'),
+      upgradeNotificationEligible: true,
+      projection: veritas2000ActiveProjection(),
+    });
+    const facts = projectActivationNotification(input, 'workspace');
+    expect(facts.visible).toBe(true);
+    const view = render(
+      <LicenceActivationNotification facts={facts} onViewLicence={onViewLicence} onDismiss={onDismiss} />,
+    );
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'View licence' }));
+    expect(onViewLicence).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole('button', { name: 'Dismiss' }));
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+    void view;
   });
 });
 

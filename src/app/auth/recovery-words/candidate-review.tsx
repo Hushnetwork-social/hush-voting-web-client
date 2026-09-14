@@ -12,6 +12,9 @@ import { useState } from 'react';
 import type { CandidateReviewProjection } from '../../../lib/recovery-words/contracts/projection';
 import { RecoveryActionButton, RecoveryBackButton, RecoveryPanel, RecoveryStatusRegion } from './surfaces';
 import { CANDIDATE_REVIEW, LOOKUP } from './copy';
+import { SafeAlias } from '../SafeAlias';
+import { useProgressDelay } from '../use-progress-delay';
+export { SafeAlias } from '../SafeAlias';
 
 export interface CandidateReviewProps {
   readonly review: CandidateReviewProjection;
@@ -23,19 +26,9 @@ export interface CandidateReviewProps {
   readonly onBack: () => void;
 }
 
-/** Safe historical-alias rendering: escaped text with Unicode isolation. */
-export function SafeAlias({ alias }: { alias: string | null }) {
-  if (alias === null || alias.length === 0) {
-    return <span className="text-[var(--text-muted)]">—</span>;
-  }
-  return (
-    <span className="break-all" data-testid="safe-alias" dir="auto">
-      {alias}
-    </span>
-  );
-}
-
 export function LookupProgress({ done, total }: { done: number; total: number }) {
+  const ready = useProgressDelay();
+  if (!ready) return null;
   return (
     <RecoveryStatusRegion>
       {LOOKUP.progress(done, total)}
@@ -43,7 +36,7 @@ export function LookupProgress({ done, total }: { done: number; total: number })
   );
 }
 
-export function CandidateReviewScreen({ review, onSelectCandidate, onConfirmExistingProfile, onRetryLookup, onReveal, onCopyAddress, onBack }: CandidateReviewProps) {
+export function CandidateReviewScreen({ review, onSelectCandidate, onConfirmExistingProfile, onReveal, onCopyAddress, onBack }: CandidateReviewProps) {
   const [revealedIndex, setRevealedIndex] = useState<number | null>(null);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
@@ -93,6 +86,10 @@ export function CandidateReviewScreen({ review, onSelectCandidate, onConfirmExis
                 )}
               </div>
               <dl className="mt-2 grid grid-cols-1 gap-1 text-xs text-[var(--text-muted)] sm:grid-cols-2">
+                {entry.visibility !== null && <div>
+                  <dt className="font-medium">Visibility</dt>
+                  <dd>{entry.visibility === 'public' ? 'Public' : 'Private'}</dd>
+                </div>}
                 <div>
                   <dt className="font-medium">{CANDIDATE_REVIEW.signing}</dt>
                   <dd className="break-all">{revealed && review.revealState.fullSigningAddress ? review.revealState.fullSigningAddress : entry.abbreviatedSigningAddress}</dd>
@@ -113,7 +110,12 @@ export function CandidateReviewScreen({ review, onSelectCandidate, onConfirmExis
                 </RecoveryActionButton>
                 {revealed && review.revealState.fullSigningAddress !== null && (
                   <RecoveryActionButton variant="secondary" onClick={() => onCopyAddress(review.revealState.fullSigningAddress!)}>
-                    {CANDIDATE_REVIEW.copyAddress}
+                    Copy signing address
+                  </RecoveryActionButton>
+                )}
+                {revealed && review.revealState.fullEncryptionAddress !== null && (
+                  <RecoveryActionButton variant="secondary" onClick={() => onCopyAddress(review.revealState.fullEncryptionAddress!)}>
+                    Copy encryption address
                   </RecoveryActionButton>
                 )}
                 {review.outcome !== 'exactlyOneExisting' && (
@@ -136,15 +138,9 @@ export function CandidateReviewScreen({ review, onSelectCandidate, onConfirmExis
 
       <div className="mt-4 flex items-center justify-between gap-3">
         <RecoveryBackButton onClick={onBack} />
-        {review.outcome === 'exactlyOneExisting' ? (
-          <RecoveryActionButton variant="primary" onClick={onConfirmExistingProfile} disabled={review.busy}>
-            {CANDIDATE_REVIEW.continue}
-          </RecoveryActionButton>
-        ) : (
-          <RecoveryActionButton variant="secondary" onClick={onRetryLookup} disabled={review.busy}>
-            {LOOKUP.retry}
-          </RecoveryActionButton>
-        )}
+        <RecoveryActionButton variant="primary" onClick={onConfirmExistingProfile} disabled={review.busy || (review.selectionRequired && selectedIndex === null)}>
+          {review.outcome.startsWith('zero') ? 'Continue to review profile' : CANDIDATE_REVIEW.continue}
+        </RecoveryActionButton>
       </div>
     </RecoveryPanel>
   );

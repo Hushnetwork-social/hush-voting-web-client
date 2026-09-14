@@ -1,3 +1,4 @@
+import { createRecoveryWordDisplay } from '../../../lib/auth/web/recovery-word-display';
 /**
  * FEAT-007 Task 5.2/5.4/5.6 — component and accessibility tests for the
  * create-user surfaces. Coverage: AC-007-001–021, 032–060, 068–069
@@ -78,7 +79,8 @@ describe('Generate (Task 5.2)', () => {
     await userEvent.click(screen.getByRole('button', { name: /Generate recovery words/ }));
     expect(onGenerate).toHaveBeenCalledOnce();
     rerender(<GenerateScreen onGenerate={onGenerate} onBack={vi.fn()} progressVisible={true} progressComplete={false} />);
-    expect(screen.getByText(/Generating your identity securely/)).toBeDefined();
+    expect(screen.queryByText(/Generating your identity securely/)).toBeNull();
+    expect(await screen.findByText(/Generating your identity securely/)).toBeDefined();
     expect(screen.getByTestId('create-action')).toBeDisabled();
   });
 });
@@ -86,9 +88,25 @@ describe('Generate (Task 5.2)', () => {
 describe('Recovery (Task 5.4)', () => {
   const words = Array.from({ length: 24 }, (_, i) => `word${i + 1}`);
 
+  it('requires destructive confirmation and permits cancelling regeneration without replacing words', async () => {
+    const regenerate = vi.fn();
+    render(<RecoveryScreen display={testDisplay(words)} visible={true} onCopy={vi.fn()} onRegenerateRequest={regenerate} onContinue={vi.fn()}
+      onBack={vi.fn()} acknowledged={true} onAcknowledge={vi.fn()} timeoutMessage={null} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Regenerate' }));
+    expect(regenerate).not.toHaveBeenCalled();
+    expect(screen.getByRole('alertdialog', { name: 'Regenerate recovery words?' })).toBeVisible();
+    expect(screen.queryByTestId('recovery-list')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Keep current words' }));
+    expect(regenerate).not.toHaveBeenCalled();
+    expect(screen.getByTestId('recovery-list')).toBeVisible();
+    await userEvent.click(screen.getByRole('button', { name: 'Regenerate' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Regenerate and destroy previous words' }));
+    expect(regenerate).toHaveBeenCalledExactlyOnceWith(true);
+  });
+
   it('renders a semantic ordered 24-word list only while revealed', () => {
     render(
-      <RecoveryScreen words={words} onCopy={vi.fn()} onRegenerateRequest={vi.fn()} onContinue={vi.fn()} onBack={vi.fn()} acknowledged={true} onAcknowledge={vi.fn()} timeoutMessage={null} />,
+      <RecoveryScreen display={testDisplay(words)} visible={true} onCopy={vi.fn()} onRegenerateRequest={vi.fn()} onContinue={vi.fn()} onBack={vi.fn()} acknowledged={true} onAcknowledge={vi.fn()} timeoutMessage={null} />,
     );
     const list = screen.getByTestId('recovery-list');
     expect(list.tagName).toBe('OL');
@@ -100,11 +118,11 @@ describe('Recovery (Task 5.4)', () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
     render(
-      <RecoveryScreen words={words} onCopy={onCopy} onRegenerateRequest={vi.fn()} onContinue={vi.fn()} onBack={vi.fn()} acknowledged={false} onAcknowledge={vi.fn()} timeoutMessage={null} />,
+      <RecoveryScreen display={testDisplay(words)} visible={true} onCopy={onCopy} onRegenerateRequest={vi.fn()} onContinue={vi.fn()} onBack={vi.fn()} acknowledged={false} onAcknowledge={vi.fn()} timeoutMessage={null} />,
     );
 
     const copy = screen.getByRole('button', { name: 'Copy words' });
-    expect(copy).toHaveClass('button-default');
+    expect(copy).not.toHaveClass('button-default');
     expect(copy).toBeEnabled();
     expect(writeText).not.toHaveBeenCalled();
     await userEvent.click(copy);
@@ -120,7 +138,7 @@ describe('Recovery (Task 5.4)', () => {
     const writeText = vi.fn().mockRejectedValue(new DOMException('Denied', 'NotAllowedError'));
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
     render(
-      <RecoveryScreen words={words} onCopy={vi.fn()} onRegenerateRequest={vi.fn()} onContinue={vi.fn()} onBack={vi.fn()} acknowledged={false} onAcknowledge={vi.fn()} timeoutMessage={null} />,
+      <RecoveryScreen display={testDisplay(words)} visible={true} onCopy={vi.fn()} onRegenerateRequest={vi.fn()} onContinue={vi.fn()} onBack={vi.fn()} acknowledged={false} onAcknowledge={vi.fn()} timeoutMessage={null} />,
     );
 
     await userEvent.click(screen.getByRole('button', { name: 'Copy words' }));
@@ -130,7 +148,7 @@ describe('Recovery (Task 5.4)', () => {
 
   it('conceals visual AND accessibility content when words are not revealed', () => {
     render(
-      <RecoveryScreen words={null} onCopy={vi.fn()} onRegenerateRequest={vi.fn()} onContinue={vi.fn()} onBack={vi.fn()} acknowledged={false} onAcknowledge={vi.fn()} timeoutMessage="Recovery words are hidden." />,
+      <RecoveryScreen display={testDisplay(null)} visible={false} onCopy={vi.fn()} onRegenerateRequest={vi.fn()} onContinue={vi.fn()} onBack={vi.fn()} acknowledged={false} onAcknowledge={vi.fn()} timeoutMessage="Recovery words are hidden." />,
     );
     expect(screen.queryByTestId('recovery-list')).toBeNull();
     expect(screen.getByText(/Recovery words are hidden/)).toBeDefined();
@@ -139,7 +157,7 @@ describe('Recovery (Task 5.4)', () => {
   it('keeps Continue disabled until acknowledged', () => {
     const onContinue = vi.fn();
     render(
-      <RecoveryScreen words={words} onCopy={vi.fn()} onRegenerateRequest={vi.fn()} onContinue={onContinue} onBack={vi.fn()} acknowledged={false} onAcknowledge={vi.fn()} timeoutMessage={null} />,
+      <RecoveryScreen display={testDisplay(words)} visible={true} onCopy={vi.fn()} onRegenerateRequest={vi.fn()} onContinue={onContinue} onBack={vi.fn()} acknowledged={false} onAcknowledge={vi.fn()} timeoutMessage={null} />,
     );
     expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled();
   });
@@ -213,8 +231,19 @@ describe('Review (Task 5.4)', () => {
     );
     expect(screen.getByText('Voter')).toBeDefined();
     expect(screen.getByText('ABCDEFGH…456789')).toBeDefined();
+    expect(screen.getByText('QWERTY12…890XYZ')).toBeDefined();
     expect(screen.getByText('24 words confirmed')).toBeDefined();
     expect(screen.queryByText(/private key|full address|mnemonic/i)).toBeNull();
+  });
+
+  it('does not claim confirmation or readiness when authority facts are false', () => {
+    render(<ReviewScreen review={{ normalizedAlias: 'Voter', visibility: 'private',
+      abbreviatedSigningAddress: 'ABC…123', abbreviatedEncryptionAddress: 'XYZ…456',
+      recoveryConfirmed: false, deviceProtectionReady: false, stage: 'review', progress: 1,
+    }} onCreate={vi.fn()} onBack={vi.fn()} submitting={false} />);
+    expect(screen.queryByText('24 words confirmed')).toBeNull();
+    expect(screen.queryByText('Ready')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Create HushNetwork identity' })).toBeDisabled();
   });
 });
 
@@ -235,9 +264,10 @@ describe('Status surfaces (Task 5.6)', () => {
     expect(screen.queryByText(/retry|resubmit|submit/i)).toBeNull();
   });
 
-  it('connection screen preserves the exact transaction message', () => {
+  it('connection recovery remains accurate before a transaction has been created', () => {
     render(<ConnectionScreen onRetry={vi.fn()} onLock={vi.fn()} />);
-    expect(screen.getByText(/exact transaction remains encrypted/)).toBeDefined();
+    expect(screen.getByText(/identity remains protected on this device/)).toBeDefined();
+    expect(screen.queryByText(/exact transaction remains encrypted/)).toBeNull();
   });
 
   it('correction reopens Profile only with a stable ref code', () => {
@@ -253,3 +283,9 @@ describe('Status surfaces (Task 5.6)', () => {
     expect(screen.getByRole('button', { name: 'Keep setting up' })).toBeDefined();
   });
 });
+
+function testDisplay(words: readonly string[] | null) {
+  const controller = createRecoveryWordDisplay();
+  controller.update(words);
+  return controller.display;
+}

@@ -1,3 +1,4 @@
+import { hasBoundedHistoricalName, readIdentityResponse } from '../../identity-compatibility/historical-profile';
 /**
  * FEAT-010 production browser worker environment (Task 7.3).
  *
@@ -68,7 +69,7 @@ const LOOKUP_TIMEOUT_MS = 10_000 as const;
 /** Closed outcome vocabulary emitted to the authority (typed, secret-free). */
 export type WorkerOperationOutcome =
   | { readonly outcome: 'OK'; readonly payload?: unknown }
-  | { readonly outcome: 'WRONG_PASSWORD_OR_DAMAGED' }
+  | { readonly outcome: 'WRONG_PASSWORD_OR_DAMAGED'; readonly retryDeadlineMs?: number }
   | { readonly outcome: 'THROTTLED'; readonly retryDeadlineMs?: number }
   | { readonly outcome: 'NETWORK_MISMATCH' }
   | { readonly outcome: 'UNSUPPORTED_VAULT' }
@@ -93,7 +94,7 @@ function outcomeFromSealed(result: SealedOutcome): WorkerOperationOutcome {
     case 'OK':
       return { outcome: 'OK', payload: result.detail };
     case 'WRONG_PASSWORD_OR_DAMAGED':
-      return { outcome: 'WRONG_PASSWORD_OR_DAMAGED' };
+      return { outcome: 'WRONG_PASSWORD_OR_DAMAGED', retryDeadlineMs: result.cooldownDeadlineMs };
     case 'THROTTLED':
       return { outcome: 'THROTTLED', retryDeadlineMs: result.cooldownDeadlineMs };
     case 'NETWORK_MISMATCH':
@@ -113,7 +114,7 @@ function outcomeFromSealed(result: SealedOutcome): WorkerOperationOutcome {
     case 'NETWORK_UNAVAILABLE':
       return { outcome: 'NETWORK_UNAVAILABLE' };
     case 'INVALID_INPUT':
-      return { outcome: 'INVALID_INPUT', payload: { reason: result.reason } };
+      return { outcome: 'INVALID_INPUT', payload: { reason: result.reason, ...(result.invalidPositions ? { invalidPositions: result.invalidPositions } : {}) } };
     case 'UNKNOWN_FAILURE':
       return { outcome: 'UNKNOWN_FAILURE', payload: { supportCode: result.supportCode } };
   }
@@ -188,17 +189,16 @@ export function createWorkerBffIdentityLookup(fetchImpl: typeof fetch = fetch): 
       if (!response.ok) {
         return { kind: 'unavailable' };
       }
-      const payload = (await response.json()) as {
+      const payload = (await readIdentityResponse(response, controller.signal)) as {
         reply?: { successfull?: unknown; profileName?: unknown; publicSigningAddress?: unknown; publicEncryptAddress?: unknown; isPublic?: unknown } | null;
       };
       const reply = payload.reply;
-      if (reply === null || reply === undefined || reply.successfull === false) {
-        return { kind: 'missing' };
-      }
+      if (reply?.successfull === false) return { kind: 'missing' };
+      if (reply?.successfull !== true) return { kind: 'unavailable' };
       const signing = reply.publicSigningAddress;
       const encryption = reply.publicEncryptAddress;
-      if (typeof signing !== 'string' || typeof encryption !== 'string') {
-        return { kind: 'missing' };
+      if (!hasBoundedHistoricalName(reply.profileName) || typeof signing !== 'string' || signing.length === 0 || typeof encryption !== 'string' || encryption.length === 0 || typeof reply.isPublic !== 'boolean') {
+        return { kind: 'unavailable' };
       }
       return {
         kind: 'exact',
@@ -227,6 +227,8 @@ export interface SecretTransfer {
 }
 
 export interface SecretTransferBook {
+  readonly clear: () => void;
+  readonly discard: (operationId: string) => void;
   readonly store: (transfer: SecretTransfer) => void;
   readonly take: (operationId: string, kind: SecretTransfer['kind']) => string | Uint8Array | null;
 }
@@ -254,7 +256,19 @@ export function createSecretTransferBook(): SecretTransferBook {
     if (operation.size === 0) operations.delete(operationId);
     return transfer.value;
   };
-  return { store, take };
+  const discard = (operationId: string): void => {
+    const operation = operations.get(operationId);
+    if (!operation) return;
+    for (const transfer of operation.values()) {
+      if (transfer.value instanceof Uint8Array) transfer.value.fill(0);
+      transfer.consumed = true;
+    }
+    operations.delete(operationId);
+  };
+  const clear = (): void => {
+    for (const operationId of operations.keys()) discard(operationId);
+  };
+  return { store, take, clear, discard };
 }
 
 /** Production authority environment over the sealed engine. */
@@ -303,6 +317,7 @@ export function createProductionWorkerEnvironment(params: {
         executeOperation: failClosedOutcome as unknown as AuthorityEnvironment['executeOperation'],
         deliver: params.deliver,
         broadcast: params.broadcast,
+      onInvalidate: secretBook.clear,
         cleanupBoundMs: 1000,
         onForceCleanup: params.onForceCleanup,
       },
@@ -499,10 +514,22 @@ export function createProductionWorkerEnvironment(params: {
           const outcome = engine.concealCandidate(candidateRef);
           return toAuthorityResult(outcomeFromSealed(outcome));
         }
+        case 'discardSecretTransfers': {
+          if (typeof payload.transferOperationId !== 'string' || payload.transferOperationId.length === 0) return toAuthorityResult({ outcome: 'INVALID_INPUT' });
+          secretBook.discard(payload.transferOperationId);
+          return toAuthorityResult({ outcome: 'OK' });
+        }
         case 'destroyCandidate': {
           const candidateRef = typeof payload.candidateRef === 'string' ? payload.candidateRef : '';
           const outcome = engine.destroyCandidate(candidateRef);
           return toAuthorityResult(outcomeFromSealed(outcome));
+        }
+        case 'deriveRecoveryCandidates': {
+          const mnemonic = take(request.operationId, 'mnemonic');
+          if (typeof mnemonic !== 'string' || (payload.wordCount !== 12 && payload.wordCount !== 24)) {
+            return toAuthorityResult({ outcome: 'INVALID_INPUT', payload: { reason: 'UNSUPPORTED_INPUT' } });
+          }
+          return toAuthorityResult(outcomeFromSealed(engine.deriveRecoveryCandidates({ mnemonic, wordCount: payload.wordCount })));
         }
         case 'deriveWordsCandidate': {
           const mnemonic = take(request.operationId, 'mnemonic');
@@ -520,18 +547,34 @@ export function createProductionWorkerEnvironment(params: {
           if (typeof filePassword !== 'string' || typeof fileBytesValue !== 'string') {
             return toAuthorityResult({ outcome: 'INVALID_INPUT', payload: { reason: 'missing-file-material' } });
           }
+          if (filePassword.length === 0 && payload.emptyV1Confirmed !== true) {
+            return toAuthorityResult({ outcome: 'INVALID_INPUT', payload: { reason: 'empty-v1-confirmation-required' } });
+          }
           const fileBytes = decodeBase64Url(fileBytesValue);
           if (fileBytes === null) {
             return toAuthorityResult({ outcome: 'INVALID_INPUT', payload: { reason: 'file-encoding' } });
           }
-          const outcome = await engine.importFileCandidate({ fileBytes, filePassword });
-          return toAuthorityResult(outcomeFromSealed(outcome));
+          try {
+            const outcome = await engine.importFileCandidate({ fileBytes, filePassword });
+            if (outcome.code === 'WRONG_PASSWORD_OR_DAMAGED' || outcome.code === 'THROTTLED') {
+              // Retain only bounded ciphertext for Retry in the same import
+              // epoch. Its password was consumed and is never stored again.
+              store({ operationId: request.operationId, kind: 'fileBytes', value: fileBytesValue, consumed: false });
+            }
+            return toAuthorityResult(outcomeFromSealed(outcome));
+          } finally {
+            fileBytes.fill(0);
+          }
         }
         case 'provisionFromValidatedBundle': {
+          const sessionOnly = payload.protectionMode === 'sessionOnly';
+          if (payload.protectionMode !== undefined && !sessionOnly && payload.protectionMode !== 'devicePassword') {
+            return toAuthorityResult({ outcome: 'INVALID_INPUT', payload: { reason: 'unsupported-protection-mode' } });
+          }
           const devicePassword = take(request.operationId, 'devicePassword');
           const candidateRef = typeof payload.candidateRef === 'string' ? payload.candidateRef : '';
           emitDiagnosticBeacon({ kind: 'provision-inputs', operation: request.operationId, outcome: `pw=${typeof devicePassword === 'string'} ref=${candidateRef.length > 0}` });
-          if (typeof devicePassword !== 'string' || candidateRef.length === 0) {
+          if ((!sessionOnly && typeof devicePassword !== 'string') || candidateRef.length === 0) {
             return toAuthorityResult({ outcome: 'INVALID_INPUT', payload: { reason: 'missing-provision-input' } });
           }
           const alias = typeof payload.alias === 'string' ? payload.alias : '';
@@ -539,15 +582,16 @@ export function createProductionWorkerEnvironment(params: {
           if (alias.length === 0 || visibility === null) {
             return toAuthorityResult({ outcome: 'INVALID_INPUT', payload: { reason: 'profile-input' } });
           }
-          const outcome = await engine.provision({
+          const input = {
             candidateRef,
-            devicePassword,
             alias,
-            visibility,
+            visibility: visibility as 'private' | 'public',
             configurationId: manifest.configurationId,
             networkBinding: { canonicalNetworkId: manifest.canonicalNetworkId, networkMagic: manifest.networkMagic, configurationId: manifest.configurationId },
             producerId: 'P-01',
-          });
+          };
+          const outcome = sessionOnly ? await engine.provisionSessionOnly(input)
+            : await engine.provision({ ...input, devicePassword: devicePassword as string });
           return toAuthorityResult(outcomeFromSealed(outcome));
         }
         case 'unlockPassword': {
@@ -708,6 +752,12 @@ export function createProductionWorkerEnvironment(params: {
       executeOperation,
       deliver: params.deliver,
       broadcast: params.broadcast,
+      shouldInvalidateOnLifecycle: signal => engine.isSessionOnly() && (signal === 'pagehide' || signal === 'disconnect'),
+      onInvalidate: () => {
+        secretBook.clear();
+        stopLicenceSession();
+        engine.wipeSecrets();
+      },
       cleanupBoundMs: 1000,
       onForceCleanup: params.onForceCleanup,
     },
@@ -721,7 +771,7 @@ function toAuthorityResult(outcome: WorkerOperationOutcome): { readonly outcome:
     case 'OK':
       return { outcome: 'OK', retryable: false, allowedActions: [], supportCode: undefined, payload: outcome.payload };
     case 'WRONG_PASSWORD_OR_DAMAGED':
-      return { outcome: 'WRONG_PASSWORD_OR_DAMAGED', retryable: true, allowedActions: ['retry'], supportCode: undefined };
+      return { outcome: 'WRONG_PASSWORD_OR_DAMAGED', retryable: true, allowedActions: ['retry'], retryDeadlineMs: outcome.retryDeadlineMs, supportCode: undefined };
     case 'THROTTLED':
       return { outcome: 'THROTTLED', retryable: false, allowedActions: ['retry'], retryDeadlineMs: outcome.retryDeadlineMs, supportCode: undefined };
     case 'NETWORK_MISMATCH':

@@ -18,6 +18,12 @@
  *   - no native Browser fallback inside native vault modules;
  *   - no FEAT-018 client-side authorization import into FEAT-017 surfaces.
  *
+ * The polling property is scoped to the page/UI surfaces (`src/app/auth`).
+ * FEAT-017 reuses FEAT-016's serialized authority polling; a 3-second poll
+ * that belongs to another lifecycle authority running in the same tree (for
+ * example the EPIC-001 identity create/recovery bridge) is not a page-owned
+ * licence loop and must not be reported as one.
+ *
  * Test files, conformance fixtures and generated artifacts are excluded
  * (covered by secret/artifact scans and their own tests). Roots can be
  * extended with FEAT017_SCAN_ROOTS (colon-separated absolute paths) so the
@@ -77,6 +83,7 @@ const PROPERTIES = [
   },
   {
     label: 'page-owned polling loop (setInterval/setTimeout cadence) in UI',
+    file: /src\/app\/auth/,
     re: /set(?:Interval|Timeout)\s*\(\s*(?:[^,]*,\s*)?3000\s*\)/,
   },
   {
@@ -159,10 +166,10 @@ for (const extra of EXTRA_FILES) {
   }
 }
 
-const findings = [];
-for (const file of files) {
-  const content = readFileSync(file, 'utf8');
-  for (const { label, re, file: fileMatcher } of PROPERTIES) {
+/** Return the forbidden-property findings for one source file and content. */
+export function findForbiddenProperties(file, content, properties = PROPERTIES) {
+  const findings = [];
+  for (const { label, re, file: fileMatcher } of properties) {
     if (fileMatcher !== undefined && !fileMatcher.test(file)) continue;
     const globalRe = new RegExp(re.source, re.flags.includes('g') ? re.flags : `${re.flags}g`);
     for (const match of content.matchAll(globalRe)) {
@@ -170,6 +177,12 @@ for (const file of files) {
       break;
     }
   }
+  return findings;
+}
+
+const findings = [];
+for (const file of files) {
+  findings.push(...findForbiddenProperties(file, readFileSync(file, 'utf8')));
 }
 
 if (findings.length > 0) {

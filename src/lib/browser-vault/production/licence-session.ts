@@ -266,12 +266,16 @@ export class LicenceBootstrapSession {
       this.teardown();
       return { ok: false, reason: 'not-authenticated' };
     }
-    const snapshot = await this.coordinator.tick({
+    const pending = this.coordinator.tick({
       authenticated: true,
       foregrounded: this.eligibility.foregrounded,
       reachable: this.eligibility.reachable,
       paused: this.eligibility.paused,
     });
+    // Publish the expiry gate before awaiting transport; stale ready state must
+    // not stay on connected pages while the fresh authority query is in flight.
+    this.emitProgress(snapshotFromCoordinator(this.coordinator.snapshot()));
+    const snapshot = await pending;
     const safe = snapshotFromCoordinator(snapshot);
     await this.flushDurable();
     this.emitProgress(safe);

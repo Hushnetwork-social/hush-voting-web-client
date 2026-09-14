@@ -6,9 +6,10 @@
  * any recovery word or password appears (config already defaults capture off;
  * steps must never enable it for these scenarios).
  *
- * Full execution is gated on the controlled pinned HushServerNode fixture
- * (external release blocker EXT-008-002); the step wiring is complete and CI
- * runs the coverage-manifest validator independently (`recovery-words:coverage`).
+ * These are remaining legacy handlers, including incomplete assertions. They
+ * do not establish production-composition readiness. Validated replacements
+ * live in HushVoting's isolated .NET catalogue; coverage mapping is checked
+ * independently by recovery-words:coverage.
  */
 import { createBdd } from 'playwright-bdd';
 
@@ -26,37 +27,6 @@ Then(/^recovery starts only with no active, staged, rollback, quarantine, or com
   await page.getByTestId('recovery-surface').waitFor();
 });
 
-// Word entry / paste / validate
-Given('a twelve-or-twenty-four word selector with indexed fields', async ({ page }) => {
-  await page.getByRole('radio', { name: '12 words' }).waitFor();
-});
-When('the user selects a word count', async ({ page }) => {
-  await page.getByRole('radio', { name: '12 words' }).check();
-});
-Then(/^exactly that many indexed responsive fields render with accessible labels$/, async ({ page }) => {
-  await page.getByRole('textbox', { name: 'Recovery word 1 of 12' }).waitFor();
-});
-
-Given('a focused word box and a clipboard phrase', async ({ page }) => {
-  await page.getByRole('textbox', { name: 'Recovery word 1 of 12' }).focus();
-});
-When('the user pastes a complete phrase', async ({ page }) => {
-  await page.getByRole('textbox', { name: 'Recovery word 1 of 12' }).fill('word1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12');
-});
-Then(/^count-correct phrases fill the grid atomically and mismatches reject the entire paste$/, async ({ page }) => {
-  await page.getByRole('textbox', { name: 'Recovery word 12 of 12' }).waitFor();
-});
-
-Given('entered recovery words', async ({ page }) => {
-  await page.getByRole('textbox', { name: 'Recovery word 1 of 12' }).waitFor();
-});
-When('validation runs inside the authority', async ({ page }) => {
-  await page.getByRole('button', { name: 'Verify' }).click();
-});
-Then(/^NFKD\/vocabulary\/count\/checksum rules apply without autocorrection or lockout$/, async () => {
-  // Validation is authority-owned; the UI exposes only numbered validity positions.
-});
-
 // Custody / candidates / control
 Given('a valid phrase in the input component', async ({ page }) => {
   await page.getByRole('textbox', { name: 'Recovery word 1 of 12' }).waitFor();
@@ -69,36 +39,6 @@ Then(/^page buffers clear and the phrase never enters state, storage, logs, or h
   await page.getByRole('textbox', { name: 'Recovery word 1 of 12' }).waitFor();
 });
 
-Given('a checksum-valid phrase', async () => {
-  // The pinned public TEST-ONLY corpus phrase is used only inside the authority.
-});
-When('every applicable Approved producer derives public candidates', async ({ page }) => {
-  await page.getByTestId('recovery-surface').waitFor();
-});
-Then(/^the complete deduplicated candidate set is assembled and partial sets fail closed$/, async ({ page }) => {
-  await page.getByTestId('candidate-list').waitFor();
-});
-
-Given('a complete candidate set and a bound network', async ({ page }) => {
-  await page.getByTestId('candidate-list').waitFor();
-});
-When('sequential public lookups run', async ({ page }) => {
-  await page.getByTestId('recovery-status').waitFor();
-});
-Then(/^every candidate resolves to exact profile or authoritative not-found with a 10-second bound$/, async ({ page }) => {
-  await page.getByTestId('candidate-list').waitFor();
-});
-
-Given('complete lookup outcomes', async ({ page }) => {
-  await page.getByTestId('candidate-list').waitFor();
-});
-When('the resolution review renders', async ({ page }) => {
-  await page.getByTestId('candidate-list').waitFor();
-});
-Then(/^zero\/one\/multiple outcomes require explicit no-default selection$/, async ({ page }) => {
-  await page.getByTestId('candidate-list').waitFor();
-});
-
 Given('a selected candidate', async ({ page }) => {
   await page.getByTestId('candidate-list').waitFor();
 });
@@ -107,27 +47,6 @@ When('the selected-key control proof runs locally', async ({ page }) => {
 });
 Then(/^exact signing and encryption consistency is proven before staging$/, async ({ page }) => {
   await page.getByTestId('recovery-surface').waitFor();
-});
-
-// Profile / recreate
-Given('an existing blockchain profile', async ({ page }) => {
-  await page.getByTestId('candidate-list').waitFor();
-});
-When('profile review renders', async ({ page }) => {
-  await page.getByTestId('safe-alias').first().waitFor();
-});
-Then(/^blockchain alias and visibility are authoritative and historical aliases render safely$/, async ({ page }) => {
-  await page.getByTestId('safe-alias').first().waitFor();
-});
-
-Given('no profile for the recovered keys', async ({ page }) => {
-  await page.getByTestId('zero-hint').waitFor();
-});
-When('missing-profile recreation review renders', async ({ page }) => {
-  await page.getByTestId('recreate-alias').waitFor();
-});
-Then(/^alias starts empty, visibility defaults Private, and exact recovered keys are reused$/, async ({ page }) => {
-  await page.getByTestId('visibility-private').waitFor();
 });
 
 // Protection / passkey / native passwordless / session / staging
@@ -171,16 +90,6 @@ Then(/^nothing persists and recovery is required after authority loss$/, async (
   await page.getByRole('button', { name: 'Continue' }).waitFor();
 });
 
-Given('selected keys and a protection mode', async ({ page }) => {
-  await page.getByTestId('no-retention').waitFor();
-});
-When('encrypted staging runs', async ({ page }) => {
-  await page.getByTestId('recovery-status').waitFor();
-});
-Then(/^selected keys stage atomically with read-back verification before mnemonic destruction$/, async ({ page }) => {
-  await page.getByTestId('recovery-surface').waitFor();
-});
-
 // Resume / nav / owner / cleanup / migration / security
 Given('staged selected keys after restart', async ({ page }) => {
   await page.getByText('Finish restoring your identity').waitFor();
@@ -190,17 +99,6 @@ When('startup inspection runs', async () => {
 });
 Then(/^Finish restoring your identity is shown and words are never reconstructed$/, async ({ page }) => {
   await page.getByText('Finish restoring your identity').waitFor();
-});
-
-Given('a recovery workflow step', async ({ page }) => {
-  await page.getByTestId('recovery-surface').waitFor();
-});
-When('Back is invoked at any stage', async ({ page }) => {
-  await page.getByTestId('recovery-back').click();
-});
-Then(/^root-only navigation clears, destroys, or locks per stage without history restoration$/, async ({ page }) => {
-  // URL stays /; stale history tokens cannot bypass inspection.
-  await page.waitForURL((url) => url.pathname === '/');
 });
 
 Given('one live recovery owner', async ({ page }) => {

@@ -98,6 +98,24 @@ describe('root licence workspace host (Task 6.1 composition)', () => {
     expect(screen.getByTestId('licence-options')).toBeInTheDocument();
   });
 
+  it('reselection acknowledges a stale operation and requires a fresh confirmation before activation', async () => {
+    const user = userEvent.setup();
+    const fresh = presentationInput({ projection: directFreeWithOptionsProjection() });
+    const { view, callbacks } = renderHost(presentationInput({
+      projection: fresh.projection,
+      upgradeOperation: upgradeOperationOf('stale'),
+    }), true);
+    expect(screen.getByTestId('licence-stale')).toBeVisible();
+    await user.click(screen.getAllByRole('button', { name: 'Review plan' })[0]);
+    expect(callbacks.onAcknowledgeOutcome).toHaveBeenCalledTimes(1);
+    expect(callbacks.onActivate).not.toHaveBeenCalled();
+    view.rerender(<LicenceWorkspaceHost input={fresh} visible actions={callbacks} timeZone={FIXTURE_TIME_ZONE} />);
+    expect(screen.getByTestId('licence-confirmation')).toBeVisible();
+    expect(callbacks.onActivate).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Activate licence' }));
+    expect(callbacks.onActivate).toHaveBeenCalledExactlyOnceWith('hushvoting.veritas.500');
+  });
+
   it('live pending restores to the progress surface and forwards its real action', async () => {
     const user = userEvent.setup();
     const pending = presentationInput({ projection: directFreeWithOptionsProjection(), upgradeOperation: upgradeOperationOf('pending') });

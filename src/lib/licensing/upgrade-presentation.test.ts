@@ -20,7 +20,11 @@ import { describe, expect, it } from 'vitest';
 import type { LicenceSafeProjection } from './projection';
 import type { LicenceUpgradePresentationInput } from './upgrade-presentation';
 import {
+  conciseLicenceCapText,
+  currentLicenceMetricRows,
   draftFromHigherOption,
+  draftMatchesFreshOptions,
+  eligibleVotersMetricValue,
   hasLiveUpgradeOperation,
   licenceAnnouncementPolicy,
   licenceFocusTargetFor,
@@ -42,12 +46,18 @@ import {
 } from './upgrade-presentation';
 import {
   directFreeNoHigherProjection,
+  directFreeTransportView,
   directFreeWithOptionsProjection,
+  ENTERPRISE_PLAN,
   enterpriseActiveProjection,
   FIXTURE_TIME_ZONE,
+  higherOptionView,
+  safeProjectionOf,
   upgradeOperationOf,
   veritas2000ActiveProjection,
+  VERITAS_10000_PLAN,
   VERITAS_2000_PLAN,
+  VERITAS_500_PLAN,
 } from './fixtures/presentation-fixtures';
 
 const TIME_ZONE = FIXTURE_TIME_ZONE;
@@ -652,5 +662,311 @@ describe('helper predicates and data boundaries', () => {
     expect(governance?.value).toBe('No customer trustees; 3-of-5 trustees; 7-of-10 trustees');
     const term = detail.metricRows.find((row) => row.label === 'Term');
     expect(term?.value).toBe('One-year term');
+  });
+});
+
+describe('unresolved operation display facts never become invented copy', () => {
+  it('A0P keeps View progress precedence without inventing a pending target when its name is unresolved', () => {
+    const facts = projectAccountLicenceSummary(
+      inputOf({ upgradeOperation: upgradeOperationOf('pending', { targetPlanDisplayName: null }) }),
+      TIME_ZONE,
+    );
+    expect(facts.action).toBe('view-progress');
+    expect(facts.pendingTargetName).toBeNull();
+    expect(facts.pendingStatusText).toBeNull();
+    expect(facts.currentLimitsRemain).toBe(true);
+    // The current licence is still the old indexed plan — never the target.
+    expect(facts.planDisplayName).toBe('HushVoting! Direct Free');
+  });
+
+  it('P0 waits without a target line when the safe operation has no resolved target name', () => {
+    const facts = projectProgressViewFacts(
+      inputOf({ upgradeOperation: upgradeOperationOf('pending', { targetPlanDisplayName: null }) }),
+    );
+    expect(facts?.view).toBe('progress');
+    expect(facts?.waitingMessage).toBeNull();
+    expect(facts?.targetName).toBeNull();
+    expect(facts?.currentName).toBe('HushVoting! Direct Free');
+    expect(facts?.statusText).toBe('Waiting for indexed activation');
+    expect(facts?.ariaBusy).toBe(true);
+  });
+
+  it('D0 never invents target/current lines when both names are unresolved', () => {
+    const facts = projectDelayedViewFacts(
+      inputOf({
+        projection: null,
+        upgradeOperation: upgradeOperationOf('delayed', {
+          targetPlanDisplayName: null,
+          currentPlanDisplayName: null,
+        }),
+      }),
+    );
+    expect(facts?.view).toBe('delayed');
+    expect(facts?.targetMessage).toBeNull();
+    expect(facts?.currentMessage).toBeNull();
+    expect(facts?.retryExplainer).toBeTruthy();
+  });
+
+  it('R0 hides the active line when the local-success target name is unresolved', () => {
+    const facts = projectResultViewFacts(
+      inputOf({
+        projection: veritas2000ActiveProjection(),
+        upgradeOperation: upgradeOperationOf('local-success', { targetPlanDisplayName: null }),
+      }),
+      TIME_ZONE,
+    );
+    expect(facts?.view).toBe('result');
+    expect(facts?.activeMessage).toBeNull();
+    expect(facts?.current?.displayName).toBe('HushVoting! Veritas 2k');
+  });
+
+  it('N0 stays hidden while the live operation target name is unresolved', () => {
+    const hidden = projectPendingIndicator(
+      inputOf({ upgradeOperation: upgradeOperationOf('pending', { targetPlanDisplayName: null }) }),
+      'workspace',
+    );
+    expect(hidden.visible).toBe(false);
+    expect(hidden.visibleLabel).toBeNull();
+    expect(hidden.targetPlanName).toBeNull();
+  });
+
+  it('N1 eligibility without a resolved plan name never fabricates a message', () => {
+    const facts = projectActivationNotification(
+      inputOf({
+        projection: veritas2000ActiveProjection(),
+        upgradeOperation: upgradeOperationOf('local-success', { targetPlanDisplayName: null }),
+        upgradeNotificationEligible: true,
+      }),
+      'workspace',
+    );
+    expect(facts.visible).toBe(true);
+    expect(facts.planName).toBeNull();
+    expect(facts.message).toBeNull();
+    expect(facts.noFocusMovement).toBe(true);
+    expect(facts.noRedirect).toBe(true);
+  });
+});
+
+describe('sparse safe truth never invents cap, elections, or governance rows', () => {
+  it('uses the unlimited flag alone when no cap is present', () => {
+    const unlimitedOnly = safeProjectionOf(
+      directFreeTransportView({ EligibleVoterCap: undefined, UnlimitedElections: true }),
+    );
+    expect(conciseLicenceCapText(unlimitedOnly)).toBe('Unlimited');
+    expect(eligibleVotersMetricValue(unlimitedOnly)).toBe('Unlimited');
+    const rows = currentLicenceMetricRows(unlimitedOnly, TIME_ZONE);
+    expect(rows.find((row) => row.label === 'Eligible voters')?.value).toBe('Unlimited');
+    expect(rows.find((row) => row.label === 'Elections')?.value).toBe('Unlimited');
+  });
+
+  it('omits cap and elections rows when neither cap nor unlimited truth exists', () => {
+    const sparse = safeProjectionOf(
+      directFreeTransportView({
+        EligibleVoterCap: undefined,
+        UnlimitedElections: false,
+        AllowedGovernanceOptionIds: [],
+      }),
+    );
+    expect(conciseLicenceCapText(sparse)).toBeNull();
+    expect(eligibleVotersMetricValue(sparse)).toBeNull();
+    const rows = currentLicenceMetricRows(sparse, TIME_ZONE);
+    expect(rows.map((row) => row.label)).toEqual(['Validity']);
+    expect(rows[0].value).toBe('Perpetual');
+  });
+
+  it('never duplicates perpetual validity as a separate Term row', () => {
+    const rows = currentLicenceMetricRows(directFreeWithOptionsProjection(), TIME_ZONE);
+    expect(rows.map((row) => row.label)).toEqual([
+      'Eligible voters',
+      'Elections',
+      'Validity',
+      'Governance',
+    ]);
+    expect(rows.find((row) => row.label === 'Validity')?.value).toBe('Perpetual');
+    expect(rows.find((row) => row.label === 'Term')).toBeUndefined();
+  });
+});
+
+describe('options view boundaries (L1/L2)', () => {
+  it('lists a sparse server option without inventing cap, elections, or term facts', () => {
+    const projection = safeProjectionOf(
+      directFreeTransportView({
+        HigherOptions: [
+          higherOptionView({
+            PlanId: VERITAS_500_PLAN,
+            DisplayName: 'HushVoting! Veritas 500',
+            EligibleVoterCap: undefined,
+            UnlimitedElections: undefined,
+            TermKind: undefined,
+            TermYears: undefined,
+          }),
+        ],
+      }),
+    );
+    const facts = projectOptionsViewFacts(inputOf({ projection }), TIME_ZONE, null);
+    expect(facts?.options).toHaveLength(1);
+    expect(facts?.options[0].planId).toBe(VERITAS_500_PLAN);
+    expect(facts?.options[0].capText).toBeNull();
+    expect(facts?.options[0].electionsText).toBeNull();
+    expect(facts?.options[0].termText).toBeNull();
+  });
+
+  it('keeps Enterprise informational even when no higher self-service plan exists', () => {
+    const projection = safeProjectionOf(
+      directFreeTransportView({
+        HigherOptions: [],
+        Enterprise: {
+          PlanId: ENTERPRISE_PLAN,
+          DisplayName: 'HushVoting! Enterprise',
+          SafeDescription: 'Customer-specific limits and approved custom n-of-k governance.',
+        },
+      }),
+    );
+    const facts = projectOptionsViewFacts(inputOf({ projection }), TIME_ZONE, null);
+    expect(facts?.noHigher).toBe(true);
+    expect(facts?.noHigherMessage).toBe('No higher self-service plan is available.');
+    expect(facts?.enterprise?.actionable).toBe(false);
+    expect(facts?.enterprise?.displayName).toBe('HushVoting! Enterprise');
+  });
+});
+
+describe('confirmation (C0) current/target sides follow the fresh current truth', () => {
+  const draftTo10k = draftFromHigherOption(optionOf(veritas2000ActiveProjection(), VERITAS_10000_PLAN));
+
+  it('renders an annual multi-governance current side without duplicating validity', () => {
+    const facts = projectConfirmationViewFacts(
+      inputOf({ projection: veritas2000ActiveProjection() }),
+      draftTo10k,
+      TIME_ZONE,
+    );
+    expect(facts?.view).toBe('confirmation');
+    expect(facts?.currentSide.displayName).toBe('HushVoting! Veritas 2k');
+    expect(facts?.currentSide.capText).toBe('Up to 2,000 eligible voters');
+    expect(facts?.currentSide.validityText).toContain('Expires ');
+    expect(facts?.currentSide.governanceText).toBe(
+      'No customer trustees; 3-of-5 trustees; 7-of-10 trustees',
+    );
+    expect(facts?.currentSide.termText).toBe('One-year term');
+    expect(facts?.targetSide.displayName).toBe('HushVoting! Veritas 10k');
+    expect(facts?.reference?.fullText).toBe('8c6a1b77-4d2e-4f91-a4c0-9e7b2d8f1a55');
+  });
+
+  it('omits governance and term rows when the current truth has none to show', () => {
+    const projection = safeProjectionOf(
+      directFreeTransportView({
+        AllowedGovernanceOptionIds: [],
+        HigherOptions: [higherOptionView()],
+      }),
+    );
+    const draft = draftFromHigherOption(optionOf(projection, VERITAS_2000_PLAN));
+    const facts = projectConfirmationViewFacts(inputOf({ projection }), draft, TIME_ZONE);
+    expect(facts?.view).toBe('confirmation');
+    expect(facts?.currentSide.governanceText).toBeNull();
+    expect(facts?.currentSide.termText).toBeNull();
+    expect(facts?.currentSide.validityText).toBe('Perpetual');
+  });
+});
+
+describe('workspace view validation and restored surfaces (closed matrix)', () => {
+  it('rejects every requested view the authority state does not permit', () => {
+    const idle = inputOf();
+    expect(projectLicenceWorkspaceViewFacts(idle, 'progress', null, TIME_ZONE)).toBeNull();
+    expect(projectLicenceWorkspaceViewFacts(idle, 'delayed', null, TIME_ZONE)).toBeNull();
+    expect(projectLicenceWorkspaceViewFacts(idle, 'result', null, TIME_ZONE)).toBeNull();
+    expect(projectLicenceWorkspaceViewFacts(idle, 'stale', null, TIME_ZONE)).toBeNull();
+    expect(projectLicenceWorkspaceViewFacts(idle, 'confirmation', null, TIME_ZONE)).toBeNull();
+    expect(
+      projectLicenceWorkspaceViewFacts(inputOf({ connectivity: 'offline' }), 'gate', null, TIME_ZONE),
+    ).toBeNull();
+    expect(
+      projectLicenceWorkspaceViewFacts(
+        inputOf({ connectivity: 'reconnecting' }),
+        'options',
+        null,
+        TIME_ZONE,
+      ),
+    ).toBeNull();
+    expect(projectLicenceWorkspaceViewFacts(idle, 'recovery', null, TIME_ZONE)).toBeNull();
+  });
+
+  it('permits recovery/gate views only when the authority requires them', () => {
+    const offline = inputOf({ connectivity: 'offline' });
+    expect(projectLicenceWorkspaceViewFacts(offline, 'recovery', null, TIME_ZONE)).toEqual({
+      view: 'recovery',
+      reason: 'offline',
+      rememberNothing: true,
+    });
+    const resolving = inputOf({ phase: 'resolving' });
+    expect(projectLicenceWorkspaceViewFacts(resolving, 'gate', null, TIME_ZONE)).toEqual({
+      view: 'gate',
+      reuseEntitlementGate: true,
+      heading: null,
+    });
+  });
+
+  it('restores to recovery for no-session, offline, reconnecting, and other closed gates', () => {
+    expect(projectRestoredLicenceSurface(inputOf({ phase: 'no-session' }))).toBe('recovery');
+    expect(projectRestoredLicenceSurface(inputOf({ connectivity: 'offline' }))).toBe('recovery');
+    expect(projectRestoredLicenceSurface(inputOf({ connectivity: 'reconnecting' }))).toBe('recovery');
+    expect(
+      projectRestoredLicenceSurface(inputOf({ phase: 'lockedOut', projection: null })),
+    ).toBe('recovery');
+    expect(
+      projectRestoredLicenceSurface(inputOf({ phase: 'entitlementRepair', projection: null })),
+    ).toBe('recovery');
+  });
+
+  it('S0 surfaces every closed typed reason without retaining any selection', () => {
+    for (const reason of ['current-changed', 'catalogue-changed', 'stale-rejection'] as const) {
+      const facts = projectStaleViewFacts(
+        inputOf({ upgradeOperation: upgradeOperationOf('stale', { reason }) }),
+        TIME_ZONE,
+      );
+      expect(facts?.view).toBe('stale');
+      expect(facts?.reason).toBe(reason);
+      expect(facts?.notice).toBe(
+        'Your licence or available plans have changed. Please review the updated options.',
+      );
+      expect(facts?.fresh?.options.every((option) => !option.selected)).toBe(true);
+    }
+  });
+});
+
+describe('focus targets, announcement flags, and draft validity tables are closed', () => {
+  it('assigns heading focus for every non-stale workspace view', () => {
+    for (const view of [
+      'options',
+      'gate',
+      'recovery',
+      'progress',
+      'delayed',
+      'result',
+      'confirmation',
+    ] as const) {
+      expect(licenceFocusTargetFor(view)).toBe('heading');
+    }
+  });
+
+  it('announces only meaningful entries from any origin including a cold entry', () => {
+    expect(licenceAnnouncementPolicy('none', 'progress').announce).toBe(true);
+    expect(licenceAnnouncementPolicy('none', 'stale').announce).toBe(true);
+    expect(licenceAnnouncementPolicy('options', 'progress').announce).toBe(true);
+    expect(licenceAnnouncementPolicy('result', 'progress').announce).toBe(true);
+  });
+
+  it('validates drafts only against the fresh higher-option set', () => {
+    const projection = directFreeWithOptionsProjection();
+    const fresh = draftFromHigherOption(optionOf(projection, VERITAS_2000_PLAN));
+    expect(draftMatchesFreshOptions(projection, fresh)).toBe(true);
+    expect(draftMatchesFreshOptions(projection, null)).toBe(false);
+    expect(draftMatchesFreshOptions(null, fresh)).toBe(false);
+    // A draft naming the now-current plan or an unknown plan is never valid.
+    expect(draftMatchesFreshOptions(veritas2000ActiveProjection(), fresh)).toBe(false);
+    expect(draftMatchesFreshOptions(projection, { ...fresh, planId: 'hushvoting.direct.free' })).toBe(
+      false,
+    );
+    expect(draftMatchesFreshOptions(projection, { ...fresh, planId: 'hushvoting.veritas.9999' })).toBe(
+      false,
+    );
   });
 });

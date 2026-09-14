@@ -6,7 +6,7 @@
   "entries": [
     {
       "scenarioId": "AT-LIC-001",
-      "browserFeature": "features/licence-upgrade/account-licence-summary.feature",
+      "browserFeature": "../hush-server-node/Node/HushNode.IntegrationTests/HushVoting/Features/licence-upgrade/account-licence-summary.feature",
       "browserScenario": "Account popup shows the exact indexed plan, limits, and shortened public reference",
       "serverClass": "HushVotingLicensingEntitlementTwinTests",
       "serverMethod": "Existing_unexpired_assignment_resolves_without_mutation",
@@ -17,7 +17,7 @@
     },
     {
       "scenarioId": "AT-LIC-004",
-      "browserFeature": "features/licence-upgrade/account-licence-summary.feature",
+      "browserFeature": "../hush-server-node/Node/HushNode.IntegrationTests/HushVoting/Features/licence-upgrade/account-licence-summary.feature",
       "browserScenario": "The full-width licence page reflects the exact server catalogue in server order",
       "serverClass": "HushVotingLicenceEntitlementQueryTwinTests",
       "serverMethod": "Active_veritas_returns_safe_view_with_higher_option_and_enterprise",
@@ -28,7 +28,7 @@
     },
     {
       "scenarioId": "AT-LIC-005",
-      "browserFeature": "features/licence-upgrade/account-licence-summary.feature",
+      "browserFeature": "../hush-server-node/Node/HushNode.IntegrationTests/HushVoting/Features/licence-upgrade/account-licence-summary.feature",
       "browserScenario": "Activation requires explicit informed confirmation and cancel commits nothing",
       "serverClass": "HushVotingLicensingActivationTwinTests",
       "serverMethod": "Valid_activation_supersedes_direct_free_and_starts_one_annual_veritas",
@@ -39,7 +39,7 @@
     },
     {
       "scenarioId": "AT-LIC-006",
-      "browserFeature": "features/licence-upgrade/upgrade-activation-progress.feature",
+      "browserFeature": "../hush-server-node/Node/HushNode.IntegrationTests/HushVoting/Features/licence-upgrade/upgrade-activation-progress.feature",
       "browserScenario": "A strictly higher Veritas plan activates only after indexed confirmation",
       "serverClass": "HushVotingLicenceVerticalSmokeTwinTests",
       "serverMethod": "UpgradeTraversesTheRealPipeline_AfterDirectFree",
@@ -50,7 +50,7 @@
     },
     {
       "scenarioId": "AT-LIC-008",
-      "browserFeature": "features/licence-upgrade/account-licence-summary.feature",
+      "browserFeature": "../hush-server-node/Node/HushNode.IntegrationTests/HushVoting/Features/licence-upgrade/account-licence-summary.feature",
       "browserScenario": "Current lower and Enterprise actions cannot mutate the assignment",
       "serverClass": "HushVotingLicensingActivationTwinTests",
       "serverMethod": "Same_plan_activation_returns_transition_unchanged_durably",
@@ -61,7 +61,7 @@
     },
     {
       "scenarioId": "AT-LIC-009",
-      "browserFeature": "features/licence-upgrade/upgrade-activation-progress.feature",
+      "browserFeature": "../hush-server-node/Node/HushNode.IntegrationTests/HushVoting/Features/licence-upgrade/upgrade-activation-progress.feature",
       "browserScenario": "A stale current-plan or catalogue precondition refreshes and requires reselection",
       "serverClass": "HushVotingLicensingActivationTwinTests",
       "serverMethod": "Stale_precondition_returns_precondition_conflict_durably",
@@ -70,5 +70,6 @@
       "twinRunCounts": "6/6 focused FEAT-017 TwinTests (stale expected revision returns precondition-conflict durably with no mutation)",
       "resultArtifact": "FEAT-017 focused TwinTest run 2026-09-07 (server commit on feat/FEAT-017-account-licence-and-upgrade-experience)"
     }
-  ]
+  ],
+  "migrationNote": "2026-09-10: browserFeature links now resolve from the frontend repository to the isolated .NET suite. TwinTest results below remain historical FEAT-level evidence only; they do not discharge EPIC acceptance. Current live E2E receipts are in the server migration manifest; semantic acceptance review remains open."
 }

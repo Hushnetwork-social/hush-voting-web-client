@@ -130,3 +130,25 @@ describe('no telemetry or log path exists in the helper surface', () => {
     expect(() => licenceReferenceFacts(FULL_REFERENCE, 'full')).not.toThrow();
   });
 });
+
+describe('boundary characters and length thresholds', () => {
+  it('rejects DEL and the 128/129 length thresholds consistently', () => {
+    expect(isPresentableLicenceReference('abc\x7fdef')).toBe(false);
+    expect(shortenLicenceReference('abc\x7fdef')).toBeNull();
+    expect(isPresentableLicenceReference('x'.repeat(128))).toBe(true);
+    expect(isPresentableLicenceReference('x'.repeat(129))).toBe(false);
+  });
+
+  it('shortens only above the 16-character full-display threshold', () => {
+    expect(shortenLicenceReference('x'.repeat(16))).toBe('x'.repeat(16));
+    expect(shortenLicenceReference('x'.repeat(17))).toBe('xxxxxxxx…xxxxx');
+    expect(shortenLicenceReference('x'.repeat(17))?.length).toBeLessThan(17);
+  });
+
+  it('keeps the longest presentable reference selectable in full mode', () => {
+    const facts = licenceReferenceFacts('y'.repeat(128), 'full');
+    expect(facts?.displayText).toBe('y'.repeat(128));
+    expect(facts?.fullText).toBe('y'.repeat(128));
+    expect(facts?.selectable).toBe(true);
+  });
+});

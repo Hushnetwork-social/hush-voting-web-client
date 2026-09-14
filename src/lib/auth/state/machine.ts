@@ -29,8 +29,9 @@
  * back. Tests drive the same event stream deterministically.
  */
 
-import { assign, fromCallback, setup } from 'xstate';
+import { assign, fromCallback, sendTo, setup } from 'xstate';
 import { INITIAL_EPOCH, isStaleEpoch, nextEpoch } from './policies';
+import { PREVIEW_SIGNING_ADDRESS_PREFIX_LENGTH, PREVIEW_SIGNING_ADDRESS_SUFFIX_LENGTH } from '../../vault-core/contracts/preview';
 import type {
   AuthIntent,
   AuthMachineContext,
@@ -44,7 +45,7 @@ import type {
   SessionEpoch,
   SupportCode,
 } from '../types';
-import type { AuthActors } from '../ports';
+import type { ActorOperation, AuthActors } from '../ports';
 import type {
   InitializationResult,
   OnboardingResult,
@@ -73,6 +74,7 @@ export type AuthMachineEvent =
   | { readonly type: 'ACTOR.REMOVAL_RESULT'; readonly operationId: OperationId; readonly epoch: SessionEpoch; readonly result: RemovalResult }
   | { readonly type: 'CONNECTIVITY.CHANGE'; readonly state: ConnectivityStateCode }
   | { readonly type: 'SESSION.AUTHORITY_LOST' }
+  | { readonly type: 'SESSION.CUSTODY_RECHECK' }
   | { readonly type: 'SESSION.INVALIDATED'; readonly reason: InvalidationReason }
   | { readonly type: 'TIMER.IDLE_TIMEOUT' }
   | { readonly type: 'TIMER.BACKGROUND_TIMEOUT' }
@@ -88,6 +90,9 @@ export type AuthMachineContextWithActors = AuthMachineContext & {
   readonly actors: AuthActors;
   /** Active onboarding child flow kind, when in onboarding. */
   readonly onboardingKind: OnboardingKind | null;
+  /** Ephemeral restoration receipt; display still requires verified protected access. */
+  readonly completedRestorationEpoch: number | null;
+  readonly completedRestorationKind: 'restoreCredentialFile' | 'restoreRecoveryWords' | null;
   /** Opaque local-user reference held while provisioned (never a secret). */
   readonly localUserRef: LocalUserRef | null;
   /** Parallel connectivity region state (mirrors the region for guards). */
@@ -223,18 +228,30 @@ export const authMachine = setup({
       };
     }),
     confirmMissingProfileActor: fromCallback<AuthMachineEvent, { actor: AuthActors['onboarding'][OnboardingKind]; epoch: SessionEpoch }>(
-      ({ input, sendBack }) => {
+      ({ input, sendBack, receive }) => {
         if (input.actor === null) {
           sendBack({ type: 'SESSION.AUTHORITY_LOST' });
           return () => undefined;
         }
-        const op = input.actor.confirmMissingProfile(input.epoch);
-        sendBack({ type: 'OPERATION.STARTED', kind: 'confirmMissingProfile', operationId: op.operationId, epoch: input.epoch });
-        void op.result.then((result) => {
-          sendBack({ type: 'ACTOR.VERIFY_RESULT', operationId: op.operationId, epoch: input.epoch, result });
+        const actor = input.actor;
+        let pending: ActorOperation<VerificationResult> | null = null;
+        let active = true;
+        // Entering the review surface is not consent. Only its explicit action
+        // starts the port, and repeated clicks cannot overlap an operation.
+        receive((event) => {
+          if (event.type !== 'INTENT.CONFIRM_MISSING_PROFILE' || pending !== null) return;
+          const op = actor.confirmMissingProfile(input.epoch);
+          pending = op;
+          sendBack({ type: 'OPERATION.STARTED', kind: 'confirmMissingProfile', operationId: op.operationId, epoch: input.epoch });
+          void op.result.then((result) => {
+            if (!active || pending !== op) return;
+            pending = null;
+            sendBack({ type: 'ACTOR.VERIFY_RESULT', operationId: op.operationId, epoch: input.epoch, result });
+          });
         });
         return () => {
-          input.actor?.cancel(op.operationId);
+          active = false;
+          if (pending !== null) actor.cancel(pending.operationId);
         };
       },
     ),
@@ -263,9 +280,19 @@ export const authMachine = setup({
     incrementEpoch: assign({
       sessionEpoch: ({ context }) => nextEpoch(context.sessionEpoch),
       activeOperationId: () => null as OperationId | null,
+      completedRestorationEpoch: () => null,
+      completedRestorationKind: () => null,
     }),
     assignOnboardingKind: assign({
       onboardingKind: (args) => onboardingKindForIntent(args.event.type) as OnboardingKind | null,
+      completedRestorationEpoch: () => null,
+      completedRestorationKind: () => null,
+    }),
+    recordRestorationCompletion: assign({
+      completedRestorationEpoch: ({ context }) => context.onboardingKind === 'restoreCredentialFile' || context.onboardingKind === 'restoreRecoveryWords'
+        ? context.sessionEpoch : null,
+      completedRestorationKind: ({ context }) => context.onboardingKind === 'restoreCredentialFile' || context.onboardingKind === 'restoreRecoveryWords'
+        ? context.onboardingKind : null,
     }),
     clearOnboardingKind: assign({ onboardingKind: () => null as OnboardingKind | null }),
     assignSafeIdentity: assign({
@@ -276,6 +303,16 @@ export const authMachine = setup({
     assignAuthenticatedIdentity: assign({
       authenticatedIdentity: (args) =>
         (args.event as { result?: { identity?: AuthMachineContext['authenticatedIdentity'] } }).result?.identity ?? null,
+      // Fresh onboarding has no startup preview. Keep only the approved public
+      // preview after verified success so Lock and failed removal retain context.
+      // This is presentation data, not persisted consent or a removal capability.
+      safeIdentity: ({ context, event }) => {
+        const identity = (event as { result?: { identity?: AuthMachineContext['authenticatedIdentity'] } }).result?.identity;
+        return identity ? {
+          alias: identity.alias,
+          abbreviatedSigningAddress: `${identity.publicSigningKey.slice(0, PREVIEW_SIGNING_ADDRESS_PREFIX_LENGTH)}…${identity.publicSigningKey.slice(-PREVIEW_SIGNING_ADDRESS_SUFFIX_LENGTH)}`,
+        } : context.safeIdentity;
+      },
     }),
     clearAuthenticatedIdentity: assign({ authenticatedIdentity: () => null }),
     assignLocalUserRef: assign({
@@ -325,6 +362,8 @@ export const authMachine = setup({
     entitlementRequired: input.entitlementRequired ?? true,
     actors: input.actors,
     onboardingKind: null as OnboardingKind | null,
+    completedRestorationEpoch: null,
+    completedRestorationKind: null,
     localUserRef: null as LocalUserRef | null,
     connectivity: 'unknown' as ConnectivityStateCode,
   }),
@@ -400,6 +439,15 @@ export const authMachine = setup({
         },
         onboarding: {
           initial: 'running',
+          on: {
+            // A worker revocation cancels the child and rereads durable state.
+            // Provisioning may already have created a local user, so first-run
+            // must never be inferred from the screen that was active before Lock.
+            'SESSION.AUTHORITY_LOST': {
+              target: '#auth.initializing',
+              actions: ['incrementEpoch', 'clearOutcome', 'clearOnboardingKind'],
+            },
+          },
           states: {
             running: {
               invoke: {
@@ -413,7 +461,8 @@ export const authMachine = setup({
               },
               on: {
                 'INTENT.BACK_FROM_ONBOARDING': {
-                  target: '../cleanup',
+                  target: '#onboardingCleanupState',
+                  actions: 'clearActiveOperation',
                 },
                 'OPERATION.STARTED': {
                   guard: ({ context, event }) =>
@@ -425,7 +474,7 @@ export const authMachine = setup({
                     target: '#auth.verifyingIdentityOnline',
                     guard: ({ context, event }) =>
                       machineGuards.isCurrentOperation(context, event) && event.result.code === 'ONBOARDING_COMPLETED',
-                    actions: ['clearActiveOperation', 'assignOutcome', 'assignLocalUserRef'],
+                    actions: ['clearActiveOperation', 'assignOutcome', 'assignLocalUserRef', 'recordRestorationCompletion'],
                   },
                   {
                     target: '#auth.recoverableError',
@@ -434,7 +483,7 @@ export const authMachine = setup({
                     actions: ['clearActiveOperation', 'assignOutcome', 'assignSupportCode'],
                   },
                   {
-                    target: '../cleanup',
+                    target: '#onboardingCleanupState',
                     guard: ({ context, event }) =>
                       machineGuards.isCurrentOperation(context, event) && event.result.code === 'ONBOARDING_BACK',
                     actions: 'clearActiveOperation',
@@ -443,6 +492,7 @@ export const authMachine = setup({
               },
             },
             cleanup: {
+              id: 'onboardingCleanupState',
               invoke: {
                 id: 'onboardingCleanup',
                 src: 'onboardingCleanupActor',
@@ -457,12 +507,46 @@ export const authMachine = setup({
                     context.activeOperationId === null && !isStaleEpoch(event.epoch, context.sessionEpoch),
                   actions: 'assignActiveOperation',
                 },
-                'ACTOR.ONBOARDING_RESULT': {
-                  target: '#auth.noLocalUser',
+                'ACTOR.ONBOARDING_RESULT': [{
+                  target: 'recheckFilePicker',
+                  guard: ({ context, event }) => machineGuards.isCurrentOperation(context, event)
+                    && context.onboardingKind === 'restoreCredentialFile'
+                    && event.result.code === 'ONBOARDING_CLEANUP_COMPLETE' && event.result.next === 'credentialFilePicker',
+                  actions: ['clearActiveOperation', 'clearOutcome'],
+                }, {
+                  target: '#auth.blockedError',
+                  guard: ({ context, event }) => machineGuards.isCurrentOperation(context, event) && event.result.code === 'UNKNOWN_FAILURE',
+                  actions: ['clearActiveOperation', 'assignOutcome', 'assignSupportCode'],
+                }, {
+                  // Cleanup may follow committed staging. Re-read durable state
+                  // before offering Create/Restore again.
+                  target: '#auth.initializing',
                   guard: ({ context, event }) =>
                     machineGuards.isCurrentOperation(context, event) && event.result.code === 'ONBOARDING_CLEANUP_COMPLETE',
                   actions: ['clearActiveOperation', 'clearOutcome', 'clearOnboardingKind'],
+                }],
+              },
+            },
+            recheckFilePicker: {
+              invoke: {
+                src: 'initializeActor',
+                input: ({ context }) => ({ actor: context.actors.localUserAuthority, epoch: context.sessionEpoch }),
+              },
+              on: {
+                'OPERATION.STARTED': {
+                  guard: ({ context, event }) => context.activeOperationId === null && !isStaleEpoch(event.epoch, context.sessionEpoch),
+                  actions: 'assignActiveOperation',
                 },
+                'ACTOR.INITIALIZE_RESULT': [{
+                  target: 'running',
+                  guard: ({ context, event }) => machineGuards.isCurrentOperation(context, event) && event.result.code === 'INIT_NO_LOCAL_USER',
+                  actions: ['clearActiveOperation', 'clearOutcome', 'clearSafeIdentity', 'clearLocalUserRef'],
+                }, {
+                  // Changed or uncertain custody goes through ordinary startup precedence.
+                  target: '#auth.initializing',
+                  guard: ({ context, event }) => machineGuards.isCurrentOperation(context, event),
+                  actions: ['clearActiveOperation', 'clearOnboardingKind'],
+                }],
               },
             },
           },
@@ -473,6 +557,13 @@ export const authMachine = setup({
           // every OTHER transition INTO locked (below) and on INTENT.UNLOCK.
           entry: ['clearActiveOperation', 'clearSupportCode'],
           on: {
+            // Sent only after the worker acknowledges Lock and invalidates its
+            // capability. Reinspect storage instead of inventing a saved user
+            // for a session-only identity (FEAT-008/009).
+            'SESSION.CUSTODY_RECHECK': {
+              target: 'initializing',
+              actions: ['clearActiveOperation', 'clearOutcome'],
+            },
             'INTENT.UNLOCK': [
               { target: 'unlocking', guard: 'hasSecretAuthority', actions: 'clearOutcome' },
               { target: 'blockedError' },
@@ -583,6 +674,10 @@ export const authMachine = setup({
             }),
           },
           on: {
+            'INTENT.CONFIRM_MISSING_PROFILE': {
+              guard: ({ context }) => context.activeOperationId === null,
+              actions: sendTo('confirmMissingProfile', { type: 'INTENT.CONFIRM_MISSING_PROFILE' }),
+            },
             'OPERATION.STARTED': {
               guard: ({ context, event }) =>
                 context.activeOperationId === null && !isStaleEpoch(event.epoch, context.sessionEpoch),
@@ -616,7 +711,12 @@ export const authMachine = setup({
                 actions: ['clearActiveOperation', 'assignOutcome'],
               },
             ],
-            'INTENT.BACK_FROM_ONBOARDING': { target: 'noLocalUser' },
+            // AuthRoot completes the worker lock before forwarding this intent.
+            // Reinspect custody: a missing network profile is not a missing vault.
+            'INTENT.LOCK': {
+              target: 'initializing',
+              actions: ['incrementEpoch', 'clearActiveOperation', 'clearOutcome', 'clearOnboardingKind'],
+            },
           },
         },
         authenticated: {
@@ -738,7 +838,12 @@ export const authMachine = setup({
         blockedError: {
           entry: ['clearActiveOperation'],
           on: {
-            'INTENT.RETRY': { target: 'initializing' },
+            'INTENT.RETRY': [{
+              target: '#onboardingCleanupState',
+              guard: ({ context }) => context.onboardingKind !== null
+                && context.supportCode === 'ONBOARDING_CLEANUP_FAILED',
+              actions: ['clearActiveOperation', 'clearOutcome'],
+            }, { target: 'initializing' }],
             'INTENT.REMOVE_LOCAL_USER': { target: 'removingLocalUser', actions: 'incrementEpoch' },
           },
         },

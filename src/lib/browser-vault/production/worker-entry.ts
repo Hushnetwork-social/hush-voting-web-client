@@ -23,6 +23,8 @@ import { createBrowserSuiteExecutor, resolveBrowserCryptoEnvironment } from '../
 import { createProductionWorkerEnvironment } from './worker-env';
 import type { BrowserWorkerEvent } from '../contracts/protocol';
 import type { AuthorityPhase } from '../authority/capabilities';
+import { BROWSER_PROTOCOL_VERSION } from '../contracts/protocol';
+import { probeWorkerPrimitives, type PrimitivePreflightResult } from './primitive-preflight';
 
 /** Application build identity bound by every handshake (exact-match). */
 export interface WorkerAppIdentity {
@@ -44,11 +46,17 @@ export async function bootVaultWorker(params: {
   readonly openStorage?: typeof openVaultStorage;
   readonly createEnv?: typeof createProductionWorkerEnvironment;
   readonly indexedDBFactory?: IDBFactory;
+  readonly probePrimitives?: () => Promise<PrimitivePreflightResult>;
 }): Promise<{ readonly ok: true; readonly authority: WorkerAuthority; readonly registerPort: (port: MessagePort) => void } | { readonly ok: false; readonly reason: string }> {
   const runtimeConfigId = params.runtimeConfigId ?? EXPECTED_RUNTIME_CONFIG;
   if (runtimeConfigId !== EXPECTED_RUNTIME_CONFIG) {
     return { ok: false, reason: 'unapproved-runtime-config' };
   }
+
+  let preflight: PrimitivePreflightResult;
+  try { preflight = await (params.probePrimitives ?? probeWorkerPrimitives)(); }
+  catch { return { ok: false, reason: 'preflight-unavailable' }; }
+  if (!preflight.ok) return preflight;
 
   const factory = params.indexedDBFactory;
   let storageResult;
@@ -269,6 +277,16 @@ export async function bootAndAttach(params?: { readonly appVersion?: string; rea
 // ---------------------------------------------------------------------------
 const workerScope = typeof self !== 'undefined' ? (self as unknown as { location?: unknown; BroadcastChannel?: typeof BroadcastChannel }) : null;
 
+/** A failed boot still answers queued/new handshakes; never leave the page waiting. */
+export function rejectUnbootedPort(port: MessagePort): void {
+  port.onmessage = () => {
+    port.postMessage({ kind: 'handshake-rejected', protocolVersion: BROWSER_PROTOCOL_VERSION, reason: 'unsupported-config' });
+    port.onmessage = null;
+    port.close();
+  };
+  port.start();
+}
+
 /** Diagnostic boot beacon (BroadcastChannel; never affects boot success). */
 function emitBootBeacon(status: { readonly ok: boolean; readonly reason?: string }): void {
   try {
@@ -303,18 +321,15 @@ if (workerScope !== null) {
     void bootAndAttach()
       .then((result) => {
         emitBootBeacon(result);
-        if (result.ok) {
-          wired = result.registerPort;
-          for (const queued of pendingPorts.splice(0)) {
-            wired(queued);
-          }
+        wired = result.ok ? result.registerPort : rejectUnbootedPort;
+        for (const queued of pendingPorts.splice(0)) {
+          wired(queued);
         }
       })
-      .catch((error: unknown) => {
-        emitBootBeacon({ ok: false, reason: `boot-error: ${String(error)}` });
-        setTimeout(() => {
-          throw error;
-        }, 0);
+      .catch(() => {
+        emitBootBeacon({ ok: false, reason: 'boot-unavailable' });
+        wired = rejectUnbootedPort;
+        for (const queued of pendingPorts.splice(0)) wired(queued);
       });
   }
 }

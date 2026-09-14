@@ -116,18 +116,26 @@ export function deriveP01KeysWorker(mnemonic: string): {
   readonly publicKeyEncoding: PublicKeyEncoding;
 } | null {
   const seed = mnemonicToSeedWorker(mnemonic);
-  const signingPrivateKey = bytesToHexLower(hkdfSha256(seed, 'signing'));
-  const encryptionPrivateKey = bytesToHexLower(hkdfSha256(seed, 'encryption'));
-  if (!isUsableScalar(signingPrivateKey) || !isUsableScalar(encryptionPrivateKey)) {
-    return null;
+  let signingBytes: Uint8Array | undefined;
+  let encryptionBytes: Uint8Array | undefined;
+  try {
+    signingBytes = hkdfSha256(seed, 'signing');
+    encryptionBytes = hkdfSha256(seed, 'encryption');
+    const signingPrivateKey = bytesToHexLower(signingBytes);
+    const encryptionPrivateKey = bytesToHexLower(encryptionBytes);
+    if (!isUsableScalar(signingPrivateKey) || !isUsableScalar(encryptionPrivateKey)) return null;
+    return {
+      signingPrivateKey,
+      encryptionPrivateKey,
+      signingAddress: derivePublicKey(signingPrivateKey, 'COMPRESSED'),
+      encryptionAddress: derivePublicKey(encryptionPrivateKey, 'COMPRESSED'),
+      publicKeyEncoding: 'COMPRESSED',
+    };
+  } finally {
+    seed.fill(0);
+    signingBytes?.fill(0);
+    encryptionBytes?.fill(0);
   }
-  return {
-    signingPrivateKey,
-    encryptionPrivateKey,
-    signingAddress: derivePublicKey(signingPrivateKey, 'COMPRESSED'),
-    encryptionAddress: derivePublicKey(encryptionPrivateKey, 'COMPRESSED'),
-    publicKeyEncoding: 'COMPRESSED',
-  };
 }
 
 /** Worker-safe P-02 derivation (mirrors identity-compatibility deriveP02Keys). */
@@ -141,20 +149,24 @@ export function deriveP02KeysWorker(mnemonic: string): {
   const seed = mnemonicToSeedWorker(mnemonic);
   const deriveWithRetry = (info: string): string => {
     let attempt = 0;
-    let keyMaterial = hkdfSha256(seed, info);
-    while (!isUsableScalar(bytesToHexLower(keyMaterial))) {
+    while (true) {
+      const keyMaterial = hkdfSha256(seed, attempt === 0 ? info : `${info}/${attempt}`);
+      try {
+        const key = bytesToHexLower(keyMaterial);
+        if (isUsableScalar(key)) return key;
+      } finally { keyMaterial.fill(0); }
       attempt += 1;
-      keyMaterial = hkdfSha256(seed, `${info}/${attempt}`);
     }
-    return bytesToHexLower(keyMaterial);
   };
-  const signingPrivateKey = deriveWithRetry('hush/signing/secp256k1/v1');
-  const encryptionPrivateKey = deriveWithRetry('hush/encrypt/secp256k1/v1');
-  return {
-    signingPrivateKey,
-    encryptionPrivateKey,
-    signingAddress: derivePublicKey(signingPrivateKey, 'UNCOMPRESSED'),
-    encryptionAddress: derivePublicKey(encryptionPrivateKey, 'UNCOMPRESSED'),
-    publicKeyEncoding: 'UNCOMPRESSED',
-  };
+  try {
+    const signingPrivateKey = deriveWithRetry('hush/signing/secp256k1/v1');
+    const encryptionPrivateKey = deriveWithRetry('hush/encrypt/secp256k1/v1');
+    return {
+      signingPrivateKey,
+      encryptionPrivateKey,
+      signingAddress: derivePublicKey(signingPrivateKey, 'UNCOMPRESSED'),
+      encryptionAddress: derivePublicKey(encryptionPrivateKey, 'UNCOMPRESSED'),
+      publicKeyEncoding: 'UNCOMPRESSED',
+    };
+  } finally { seed.fill(0); }
 }

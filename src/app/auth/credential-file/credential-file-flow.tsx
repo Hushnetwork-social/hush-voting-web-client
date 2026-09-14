@@ -12,7 +12,7 @@ import { useState } from 'react';
 import type { RestoreViewState } from '../../../lib/credential-file-restore/presentation/view';
 import type { RestoreProtectionChoice } from '../../../lib/credential-file-restore/contracts/projection';
 import { COPY, RestoreBackButton, RestoreErrorRegion, RestorePanel, RestorePrimaryButton, RestoreStatusRegion } from './surfaces';
-import { PickerReadScreen, PasswordScreen } from './picker-password';
+import { PickerReadScreen, PasswordScreen, errorCopy } from './picker-password';
 import { ProfileReviewScreen, ProtectionScreen, ResumeAndStagingScreen, SuccessScreen } from './profile-protection';
 
 export interface CredentialFileFlowProps {
@@ -26,11 +26,15 @@ export interface CredentialFileFlowProps {
   readonly onChooseDifferentFile: () => void;
   readonly onChooseProtection: (mode: RestoreProtectionChoice, devicePassword?: string) => void;
   readonly onCreateIdentity: () => void;
+  readonly onUpdateProfile?: (alias: string, visibility: 'private' | 'public') => void;
+  readonly onAcknowledgePublic?: (acknowledged: boolean) => void;
+  readonly publicAcknowledged?: boolean;
+  readonly canCreateProfile?: boolean;
   readonly onReveal: () => void;
   readonly onUnlockResume: () => void;
   readonly onCancelStage: () => void;
   readonly onBack: () => void;
-  readonly onAcknowledgeSessionOnly: () => void;
+  readonly onAcknowledgeSessionOnly: (acknowledged?: boolean) => void;
   readonly onRetryCleanup: () => void;
 }
 
@@ -89,9 +93,9 @@ export function CredentialFileFlow(props: CredentialFileFlowProps) {
     case 'lookup':
       return <ProgressScreen view={view} onBack={props.onBack} />;
     case 'profileReview':
-      return <ProfileReviewScreen view={view} onChooseProtection={props.onChooseProtection} onCreateIdentity={props.onCreateIdentity} onReveal={props.onReveal} onUnlockResume={props.onUnlockResume} onCancelStage={props.onCancelStage} onBack={props.onBack} />;
+      return <ProfileReviewScreen onUpdateProfile={props.onUpdateProfile} onAcknowledgePublic={props.onAcknowledgePublic} publicAcknowledged={props.publicAcknowledged} canCreateProfile={props.canCreateProfile} view={view} onChooseProtection={props.onChooseProtection} onCreateIdentity={props.onCreateIdentity} onReveal={props.onReveal} onUnlockResume={props.onUnlockResume} onCancelStage={props.onCancelStage} onBack={props.onBack} />;
     case 'protection':
-      return <ProtectionScreen view={view} onChooseProtection={props.onChooseProtection} onCreateIdentity={props.onCreateIdentity} onReveal={props.onReveal} onUnlockResume={props.onUnlockResume} onCancelStage={props.onCancelStage} onBack={props.onBack} />;
+      return <ProtectionScreen onAcknowledgeSessionOnly={props.onAcknowledgeSessionOnly} view={view} onChooseProtection={props.onChooseProtection} onCreateIdentity={props.onCreateIdentity} onReveal={props.onReveal} onUnlockResume={props.onUnlockResume} onCancelStage={props.onCancelStage} onBack={props.onBack} />;
     case 'staging':
     case 'activating':
     case 'resumeGate':
@@ -103,7 +107,7 @@ export function CredentialFileFlow(props: CredentialFileFlowProps) {
     case 'locked':
       return null; // auth shell renders LockedUser
     case 'terminal':
-      return <TerminalScreen onBack={props.onBack} />;
+      return <TerminalScreen failureCode={view.failureCode} onBack={props.onBack} />;
   }
 }
 
@@ -153,10 +157,11 @@ export function QuarantineScreen({ onRetryCleanup }: { readonly onRetryCleanup: 
 }
 
 /** Fail-closed terminal screen (unknown/contradictory outcome). */
-export function TerminalScreen({ onBack }: { readonly onBack: () => void }) {
+export function TerminalScreen({ onBack, failureCode = null }: { readonly onBack: () => void; readonly failureCode?: string | null }) {
+  const message = failureCode === null ? COPY.errors.generic : errorCopy(failureCode);
   return (
-    <RestorePanel title={COPY.errors.generic}>
-      <RestoreErrorRegion>{COPY.errors.generic}</RestoreErrorRegion>
+    <RestorePanel title={message}>
+      <RestoreErrorRegion>{message}</RestoreErrorRegion>
       <div className="mt-4">
         <RestoreBackButton onBack={onBack} />
       </div>

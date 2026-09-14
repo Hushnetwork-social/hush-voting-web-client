@@ -84,6 +84,19 @@ describe('exact-byte/digest agreement (Task 2.4)', () => {
 });
 
 describe('bounds and malformed input (Task 2.4)', () => {
+  it.each([null, [], {}, { schemaVersion: 2 }, { schemaVersion: 2, transaction: null }])('rejects malformed persisted shapes without throwing', value => {
+    expect(validatePendingTransaction(value as never).ok).toBe(false);
+  });
+
+  it.each([
+    { lifecycle: 'authenticated' }, { rollbackState: 'unknown' },
+    { reviewedMetadata: { alias: 'alice', visibility: 'maybe' } },
+    { attemptEvidence: [{ at: 'invalid', outcome: 'accepted' }] },
+    { attemptEvidence: [{ at: '2026-08-06T18:00:00Z', outcome: 'unknown' }] },
+    { mnemonic: 'forbidden' }, { epochBinding: 'e'.repeat(257) },
+  ])('rejects undeclared state and unbounded metadata', value => {
+    expect(validatePendingTransaction({ ...makeRecord(), ...value } as never).ok).toBe(false);
+  });
   it('rejects exact transactions over the size bound', () => {
     const huge = makeRecord({
       transaction: { exactJson: 'x'.repeat(PENDING_TRANSACTION_MAX_JSON_BYTES + 1), digest: digestOf('x'.repeat(PENDING_TRANSACTION_MAX_JSON_BYTES + 1)) },

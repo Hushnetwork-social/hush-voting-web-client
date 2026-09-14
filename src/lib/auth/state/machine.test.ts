@@ -74,6 +74,39 @@ function createDriver(actors: AuthActors) {
   return machine;
 }
 
+it('rechecks durable state after onboarding cleanup instead of assuming that no vault was staged', async () => {
+  const machine = createDriver(makeActors({
+    localUserAuthority: createLocalUserAuthorityTestActor([
+      { code: 'INIT_NO_LOCAL_USER' },
+      { code: 'INIT_LOCKED_USER', safeIdentity: { alias: 'Restored identity', abbreviatedSigningAddress: '02aa…bb' } },
+    ]),
+  }));
+  await drive(machine, { type: 'CONNECTIVITY.CHANGE', state: 'online' });
+  await drive(machine, { type: 'INTENT.RESTORE_CREDENTIAL_FILE' });
+  expect(machine.getSnapshot().matches({ auth: 'locked' })).toBe(true);
+  expect(machine.getSnapshot().context.safeIdentity?.alias).toBe('Restored identity');
+  machine.stop();
+  completeAllPendingOperations();
+});
+
+it('revocation during onboarding invalidates its epoch and rereads local storage', async () => {
+  const machine = createDriver(makeActors({ localUserAuthority: createLocalUserAuthorityTestActor([
+    { code: 'INIT_NO_LOCAL_USER' },
+    { code: 'INIT_LOCKED_USER', safeIdentity: { alias: 'Staged identity', abbreviatedSigningAddress: '02aa…bb' } },
+  ]) }));
+  await drive(machine, { type: 'CONNECTIVITY.CHANGE', state: 'online' });
+  machine.send({ type: 'INTENT.CREATE_USER' });
+  const epoch = machine.getSnapshot().context.sessionEpoch;
+  expect(machine.getSnapshot().matches({ auth: 'onboarding' })).toBe(true);
+  machine.send({ type: 'SESSION.AUTHORITY_LOST' });
+  expect(machine.getSnapshot().matches({ auth: 'initializing' })).toBe(true);
+  expect(machine.getSnapshot().context.sessionEpoch).toBeGreaterThan(epoch);
+  await drive(machine, { type: 'CONNECTIVITY.CHANGE', state: 'online' });
+  expect(machine.getSnapshot().matches({ auth: 'locked' })).toBe(true);
+  machine.stop();
+  completeAllPendingOperations();
+});
+
 /** Small helper to await the actor's microtask queue after events. */
 async function settle(): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 0));
@@ -111,6 +144,25 @@ function snapshotCodes(snapshot: { value: unknown }): { auth: string; connectivi
 }
 
 describe('auth machine reachable states and transitions', () => {
+  it.each(['absent', 'saved'] as const)('reinspects %s custody after acknowledged worker Lock', async (custody) => {
+    const machine = createDriver(makeActors({
+      localUserAuthority: createLocalUserAuthorityTestActor([
+        { code: 'INIT_NO_LOCAL_USER' },
+        custody === 'absent' ? { code: 'INIT_NO_LOCAL_USER' }
+          : { code: 'INIT_LOCKED_USER', safeIdentity: { alias: 'Saved identity', abbreviatedSigningAddress: '02aa…bb' } },
+      ]),
+    }));
+    await flush(machine);
+    await drive(machine, { type: 'INTENT.CREATE_USER' });
+    expect(snapshotCodes(machine.getSnapshot()).auth).toBe('authenticated');
+    await drive(machine, { type: 'INTENT.LOCK' });
+    await drive(machine, { type: 'SESSION.CUSTODY_RECHECK' });
+    expect(snapshotCodes(machine.getSnapshot()).auth).toBe(custody === 'absent' ? 'noLocalUser' : 'locked');
+    expect(machine.getSnapshot().context.authenticatedIdentity).toBeNull();
+    if (custody === 'absent') expect(machine.getSnapshot().context.safeIdentity).toBeNull();
+    machine.stop();
+  });
+
   it('reaches every documented authentication state from scripted outcomes', async () => {
     const machine = createDriver(makeActors());
 

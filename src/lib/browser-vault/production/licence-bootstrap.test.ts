@@ -12,6 +12,12 @@
  *     admission never grants access, a later active query converges;
  *   - query-first restart reuses the exact sealed pending record;
  *   - page-visible progress never carries exact bytes/signatures.
+ *   - FEAT-017 Phase 3 (business logic) reconciliation outcomes are proven
+ *     through the SAME worker host: old-current preservation across ordinary
+ *     polls, exact sealed-UUID local success once with one-shot notification
+ *     eligibility, competing-activation retirement without a local-success
+ *     claim, and query-first restart preservation of a pending confirmed
+ *     upgrade through the encrypted durable journal.
  *
  * SECRET BOUNDARY: page-visible events/outcomes are asserted to never carry
  * exact signed bytes, raw signatures, private keys, or journal material.
@@ -28,7 +34,7 @@ import { success, failure } from '../../vault-core/contracts/results';
 import { ISOLATED_DEVNET_MANIFEST } from '../../runtime/manifests';
 import { LicenceBootstrapSession } from './licence-session';
 import { buildDirectFreeUnsignedTransaction } from '../../licensing/direct-free';
-import { LICENCE_CATALOGUE_VERSION_V1, LICENCE_PLAN_DIRECT_FREE, type LicenceQueryTransportResult } from '../../licensing/contracts';
+import { LICENCE_CATALOGUE_VERSION_V1, LICENCE_PLAN_DIRECT_FREE, type LicenceHigherOptionView, type LicenceQueryTransportResult } from '../../licensing/contracts';
 import { isLicenceSignedTransactionJson, base64ToHex, verifyLicenceSeal } from '../../licensing/sealing';
 import { verifyMessage } from '../../identity-compatibility/signature';
 import { sha256Hex, utf8Bytes } from '../../identity-compatibility/crypto';
@@ -112,7 +118,7 @@ class MemoryVaultStorage implements VaultStorageSession {
 interface FakeServer {
   signingAddress: string;
   encryptionAddress: string;
-  queryResponses: Array<() => LicenceQueryTransportResult>;
+  queryResponses: Array<() => LicenceQueryTransportResult | Promise<LicenceQueryTransportResult>>;
   submissionReplies: Array<{ status: string }>;
   queryCalls: number;
   submitCalls: number;
@@ -425,6 +431,99 @@ describe('LicenceBootstrapSession (worker host)', () => {
     host.teardown();
   });
 
+  // EPIC-002 -> FEAT-016 AC-016-018 -> Phase 6 Task 6.4.
+  // Isolated FEAT evidence, paired with the .NET compatibility fault journeys.
+  it.each(['catalogue-version', 'plan-family', 'plan-id', 'governance'] as const)(
+    'HushVotingApp TwinTest rejects incompatible active %s without baseline creation',
+    async (kind) => {
+      const { host, engine, server, storage, progress } = await createHostHarness();
+      try {
+        const reply = activeResponse('8c6a1b77-4d2e-4f91-a4c0-9e7b2d8f1a55');
+        if (!reply.ok || reply.state !== 'active') throw new Error('Invalid test arrangement');
+        server.queryResponses = [() => ({ ...reply, active: {
+          ...reply.active,
+          ...({
+            'catalogue-version': { AssignedCatalogueVersion: 'hushvoting-licence-catalogue/v2.0.0' },
+            'plan-family': { PlanFamily: 'future-governance-family' },
+            'plan-id': { PlanId: 'unsupported-test-plan' },
+            governance: { AllowedGovernanceOptionIds: ['no-customer-trustees', 'unsupported-test-governance'] },
+          }[kind]),
+        } })];
+        const result = await host.start(NETWORK_BINDING);
+        expect(result.ok).toBe(true);
+        expect(host.snapshot()?.phase).toBe('entitlementUnsupported');
+        expect(host.snapshot()?.projection).toBeNull();
+        expect(server.queryCalls).toBe(1);
+        expect(server.submitCalls).toBe(0);
+        expect(storage.rawLicenceSlots()).toHaveLength(0);
+        expect(progress.some(event => event.phase === 'entitlementReady')).toBe(false);
+        await host.pump();
+        expect(server.submitCalls).toBe(0);
+      } finally {
+        host.teardown();
+        engine.lock();
+      }
+    },
+  );
+
+  // EPIC-002 -> FEAT-016 AC-016-016/017 -> Phase 6 Tasks 6.4/6.7.
+  it.each(['unavailable', 'active', 'no-active'] as const)(
+    'HushVotingApp TwinTest revalidates at annual expiry with %s truth and no continuous active polling', async (outcome) => {
+    const { host, engine, server, progress } = await createHostHarness();
+    const expiry = Date.now() + 60_000;
+    let release: (result: LicenceQueryTransportResult) => void = () => undefined;
+    let arrived: () => void = () => undefined;
+    const queryArrived = new Promise<void>(resolve => { arrived = resolve; });
+    const heldQuery = new Promise<LicenceQueryTransportResult>(resolve => { release = resolve; });
+    try {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      const reply = activeResponse('8c6a1b77-4d2e-4f91-a4c0-9e7b2d8f1a55', 'hushvoting.veritas.2000', 'veritas');
+      if (!reply.ok || reply.state !== 'active') throw new Error('Invalid test arrangement');
+      const annual = { ...reply, active: {
+        ...reply.active, DisplayName: 'HushVoting! Veritas 2k',
+        EffectiveFromUtc: new Date(expiry - 365 * 86_400_000).toISOString(),
+        ExpiresAtUtc: new Date(expiry).toISOString(), TermKind: 'calendar_years', TermYears: 1,
+      } } as const;
+      server.queryResponses = [() => annual, () => { arrived(); return heldQuery; }];
+      await host.start(NETWORK_BINDING);
+      expect(host.snapshot()?.phase).toBe('entitlementReady');
+      vi.setSystemTime(expiry - 1);
+      await host.pump();
+      expect(server.queryCalls).toBe(1);
+      vi.setSystemTime(expiry);
+      const pumping = host.pump();
+      expect(host.snapshot()?.phase).toBe('resolving');
+      expect(host.snapshot()?.projection).toBeNull();
+      expect(progress.at(-1)?.phase).toBe('resolving');
+      await queryArrived;
+      expect(server.queryCalls).toBe(2);
+      expect(server.submitCalls).toBe(0);
+      await host.pump();
+      expect(server.queryCalls).toBe(2);
+      release(outcome === 'active' ? annual : outcome === 'no-active' ? noActiveResponse() : { ok: false, status: 'UNAVAILABLE' });
+      await pumping;
+      expect(host.snapshot()?.phase).toBe(outcome === 'active' ? 'entitlementReady' : outcome === 'no-active' ? 'awaitingIndex' : 'entitlementUnavailable');
+      expect(server.submitCalls).toBe(outcome === 'no-active' ? 1 : 0);
+      if (outcome === 'active') {
+        vi.setSystemTime(expiry + 10_000);
+        await host.pump();
+        expect(server.queryCalls).toBe(2);
+        expect(host.snapshot()?.projection?.planFamily).toBe('veritas');
+        vi.setSystemTime(expiry + 60_000);
+        await host.pump();
+        expect(server.queryCalls).toBe(3);
+        expect(server.submitCalls).toBe(0);
+      } else {
+        expect(host.snapshot()?.projection).toBeNull();
+      }
+    } finally {
+      release({ ok: false, status: 'UNAVAILABLE' });
+      host.teardown();
+      engine.lock();
+      vi.useRealTimers();
+    }
+  });
+
   it('rejects a wrong network binding and starts before authentication', async () => {
     const { host, engine } = await createHostHarness();
     const wrong = await host.start('other-network');
@@ -521,5 +620,268 @@ describe('LicenceBootstrapSession (worker host)', () => {
       ok: false,
       reason: 'not-authenticated',
     });
+  });
+});
+
+describe('FEAT-017 Phase 3 confirmed-upgrade reconciliation through the worker host', () => {
+  const OLD_DF_REF = '5f2d9e11-3c44-4a80-b8e7-6b2f1a0c9d3e';
+  const COMPETING_REF = '8c6a1b77-4d2e-4f91-a4c0-9e7b2d8f1a55';
+  const TARGET_500 = 'hushvoting.veritas.500';
+  const TARGET_2000 = 'hushvoting.veritas.2000';
+
+  /** One server-ordered higher Veritas option row (wire shape). */
+  function higherOption(planId: string, displayName: string, cap: number): LicenceHigherOptionView {
+    return {
+      PlanId: planId,
+      DisplayName: displayName,
+      SafeDescription: 'Annual Veritas licence',
+      EligibleVoterCap: cap,
+      UnlimitedElections: true,
+      TermKind: 'annual',
+      TermYears: 1,
+    };
+  }
+
+  /** Real wire-shaped active query result with the current detail + options. */
+  function activeResult(
+    licenceReference: string,
+    planId: string,
+    planFamily: 'direct' | 'veritas',
+    displayName: string,
+    higherOptions: readonly LicenceHigherOptionView[] = [],
+  ): LicenceQueryTransportResult {
+    const direct = planId === LICENCE_PLAN_DIRECT_FREE;
+    return {
+      ok: true,
+      state: 'active',
+      active: {
+        LicenceReference: licenceReference,
+        PlanId: planId,
+        PlanFamily: planFamily,
+        DisplayName: displayName,
+        SafeDescription: direct ? 'Free community licence' : 'Annual Veritas licence',
+        EligibleVoterCap: direct ? 100 : planId === TARGET_2000 ? 2000 : 500,
+        UnlimitedElections: true,
+        TermKind: direct ? 'perpetual' : 'annual',
+        TermYears: direct ? 0 : 1,
+        EffectiveFromUtc: '2026-09-06T00:00:00.000Z',
+        AssignedCatalogueVersion: LICENCE_CATALOGUE_VERSION_V1,
+        AllowedGovernanceOptionIds: [],
+        HigherOptions: higherOptions,
+      },
+    };
+  }
+
+  /** Direct Free truth offering Veritas 500 + 2k strictly higher (server order). */
+  function directFreeWithOptions(): LicenceQueryTransportResult {
+    return activeResult(OLD_DF_REF, LICENCE_PLAN_DIRECT_FREE, 'direct', 'HushVoting! Direct Free', [
+      higherOption(TARGET_500, 'HushVoting! Veritas 500', 500),
+      higherOption(TARGET_2000, 'HushVoting! Veritas 2k', 2000),
+    ]);
+  }
+
+  it('ordinary polls returning the old indexed licence preserve the pending upgrade under the old limits (never success, never resubmit)', async () => {
+    vi.useFakeTimers();
+    try {
+      const { host, server } = await createHostHarness();
+      // Query 1 (start) and query 2 (seal-time freshness re-query) both return
+      // the same old current truth; every later poll keeps returning it.
+      server.queryResponses = [() => directFreeWithOptions(), () => directFreeWithOptions()];
+      server.submissionReplies = [{ status: 'PENDING' }];
+      const start = await host.start(NETWORK_BINDING);
+      expect(start.ok).toBe(true);
+      if (!start.ok) return;
+      expect(start.snapshot.phase).toBe('entitlementReady');
+
+      const confirm = await host.confirmUpgrade(TARGET_2000);
+      expect(confirm.ok).toBe(true);
+      if (!confirm.ok) return;
+      expect(confirm.snapshot.upgradeOperation?.status).toBe('pending');
+      expect(confirm.snapshot.upgradeNotificationEligible).toBe(false);
+      expect(confirm.snapshot.projection?.planId).toBe(LICENCE_PLAN_DIRECT_FREE);
+      const sealedId = confirm.snapshot.pendingTransactionId;
+      expect(sealedId).not.toBeNull();
+      expect(server.submitCalls).toBe(1);
+
+      vi.setSystemTime(Date.now() + 4_000);
+      const poll = await host.pump();
+      expect(poll).not.toBeNull();
+      if (poll !== null) {
+        // Old licence still current: pending preserved, old limits effective,
+        // no local-success claim and no notification eligibility (D017-01).
+        expect(poll.phase).toBe('entitlementReady');
+        expect(poll.pendingTransactionId).toBe(sealedId);
+        expect(poll.upgradeOperation?.status).toBe('pending');
+        expect(poll.upgradeNotificationEligible).toBe(false);
+        expect(poll.projection?.planId).toBe(LICENCE_PLAN_DIRECT_FREE);
+        expect(poll.lastOutcomeCode).toBe('upgrade-pending-old-current');
+      }
+      // Ordinary three-second polls never resubmit the exact sealed upgrade.
+      expect(server.submitCalls).toBe(1);
+      host.teardown();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('only the exact indexed sealed transaction UUID confirms local success once, with one-shot notification eligibility', async () => {
+    vi.useFakeTimers();
+    try {
+      const { host, server } = await createHostHarness();
+      server.queryResponses = [() => directFreeWithOptions(), () => directFreeWithOptions()];
+      server.submissionReplies = [{ status: 'PENDING' }];
+      const start = await host.start(NETWORK_BINDING);
+      expect(start.ok).toBe(true);
+      if (!start.ok) return;
+
+      const confirm = await host.confirmUpgrade(TARGET_2000);
+      expect(confirm.ok).toBe(true);
+      if (!confirm.ok) return;
+      const sealedId = confirm.snapshot.pendingTransactionId;
+      expect(sealedId).not.toBeNull();
+      expect(server.submitCalls).toBe(1);
+
+      // Indexed truth now reports the EXACT sealed transaction id as the
+      // current licence (the higher plan activated through the real pipeline).
+      server.queryResponses.push(() =>
+        activeResult(String(sealedId), TARGET_2000, 'veritas', 'HushVoting! Veritas 2k', []),
+      );
+      vi.setSystemTime(Date.now() + 4_000);
+      const pumped = await host.pump();
+      expect(pumped).not.toBeNull();
+      if (pumped !== null) {
+        expect(pumped.phase).toBe('entitlementReady');
+        expect(pumped.pendingTransactionId).toBeNull();
+        expect(pumped.upgradeOperation?.status).toBe('local-success');
+        expect(pumped.upgradeNotificationEligible).toBe(true);
+        expect(pumped.projection?.planId).toBe(TARGET_2000);
+        expect(pumped.lastOutcomeCode).toBe('upgrade-local-success');
+      }
+
+      // A later ordinary poll must NOT re-arm the one-shot notification or
+      // duplicate the terminal success: with nothing pending the query loop is
+      // done, the retained local-success terminal and its one-shot eligibility
+      // persist untouched until the page acknowledges them.
+      vi.setSystemTime(Date.now() + 4_000);
+      const polled = await host.pump();
+      expect(polled).not.toBeNull();
+      if (polled !== null) {
+        expect(polled.upgradeOperation?.status).toBe('local-success');
+        expect(polled.upgradeNotificationEligible).toBe(true);
+        expect(polled.lastOutcomeCode).toBe('upgrade-local-success');
+      }
+      // The authority-owned loop is done (nothing pending): the post-success
+      // pump issues no fresh query and no second submission can ever be
+      // created after local success (start + seal-time re-query + the one
+      // reconciliation query that indexed the exact UUID = 3 total).
+      expect(server.queryCalls).toBe(3);
+      expect(server.submitCalls).toBe(1);
+
+      // Acknowledge clears the one-shot eligibility and the retained terminal.
+      const acked = await host.acknowledgeUpgradeOutcome();
+      expect(acked.ok).toBe(true);
+      if (acked.ok) {
+        expect(acked.snapshot.upgradeNotificationEligible).toBe(false);
+        expect(acked.snapshot.upgradeOperation).toBeNull();
+      }
+      host.teardown();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a competing activation on another device retires the obsolete pending upgrade without a local-success claim', async () => {
+    vi.useFakeTimers();
+    try {
+      const { host, server } = await createHostHarness();
+      server.queryResponses = [() => directFreeWithOptions(), () => directFreeWithOptions()];
+      server.submissionReplies = [{ status: 'PENDING' }];
+      const start = await host.start(NETWORK_BINDING);
+      expect(start.ok).toBe(true);
+      if (!start.ok) return;
+
+      const confirm = await host.confirmUpgrade(TARGET_2000);
+      expect(confirm.ok).toBe(true);
+      if (!confirm.ok) return;
+      expect(server.submitCalls).toBe(1);
+
+      // Another device indexed a DIFFERENT compatible activation first: the
+      // authoritative truth is accepted and the obsolete local pending is
+      // retired without any local-success claim or notification eligibility.
+      server.queryResponses.push(() =>
+        activeResult(COMPETING_REF, TARGET_500, 'veritas', 'HushVoting! Veritas 500', []),
+      );
+      vi.setSystemTime(Date.now() + 4_000);
+      const pumped = await host.pump();
+      expect(pumped).not.toBeNull();
+      if (pumped !== null) {
+        expect(pumped.phase).toBe('entitlementReady');
+        expect(pumped.pendingTransactionId).toBeNull();
+        expect(pumped.upgradeOperation?.status).toBe('competing-activation');
+        expect(pumped.upgradeNotificationEligible).toBe(false);
+        expect(pumped.projection?.planId).toBe(TARGET_500);
+        expect(pumped.lastOutcomeCode).toBe('upgrade-competing-activation');
+      }
+      host.teardown();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a query-first restart under the old current licence preserves the pending upgrade via the encrypted durable journal', async () => {
+    const { storage, server, host, signingAddress } = await createHostHarness();
+    server.queryResponses = [() => directFreeWithOptions(), () => directFreeWithOptions()];
+    server.submissionReplies = [{ status: 'PENDING' }];
+    const start = await host.start(NETWORK_BINDING);
+    expect(start.ok).toBe(true);
+    if (!start.ok) return;
+
+    const confirm = await host.confirmUpgrade(TARGET_2000);
+    expect(confirm.ok).toBe(true);
+    if (!confirm.ok) return;
+    const sealedId = confirm.snapshot.pendingTransactionId;
+    expect(sealedId).not.toBeNull();
+    expect(server.submitCalls).toBe(1);
+
+    // The durable licence journal now holds the sealed upgrade record: the
+    // stored blobs must never expose exact bytes, bindings, or plan material.
+    const raw = JSON.stringify(storage.rawLicenceSlots());
+    expect(raw).not.toContain('confirmed_upgrade');
+    expect(raw).not.toContain(TARGET_2000);
+    expect(raw).not.toContain('ExpectedCurrentPlanId');
+    expect(raw).not.toContain('UserSignature');
+
+    host.teardown();
+
+    // Query-first restart on the same storage under the STILL-CURRENT old
+    // licence: hydrate the bound upgrade record and reconcile it (preserve
+    // pending; a confirmed upgrade is never auto-resubmitted on ready truth).
+    const engine2 = await unlockAndVerify(storage, signingAddress, server.encryptionAddress);
+    const secondHost = new LicenceBootstrapSession({
+      engine: engine2,
+      nowMs: () => Date.now(),
+      expectedNetworkBinding: NETWORK_BINDING,
+      querySubmit: async () => {
+        server.queryCalls += 1;
+        return directFreeWithOptions();
+      },
+      transactionSubmit: async () => {
+        server.submitCalls += 1;
+        return 'pending';
+      },
+      onProgress: () => undefined,
+    });
+    const resumed = await secondHost.start(NETWORK_BINDING);
+    expect(resumed.ok).toBe(true);
+    if (resumed.ok) {
+      expect(resumed.snapshot.phase).toBe('entitlementReady');
+      expect(resumed.snapshot.pendingTransactionId).toBe(sealedId);
+      expect(resumed.snapshot.upgradeOperation?.status).toBe('pending');
+      expect(resumed.snapshot.upgradeNotificationEligible).toBe(false);
+      expect(resumed.snapshot.lastOutcomeCode).toBe('upgrade-pending-old-current');
+      expect(resumed.snapshot.projection?.planId).toBe(LICENCE_PLAN_DIRECT_FREE);
+    }
+    expect(server.submitCalls).toBe(1); // exact sealed record submitted once, never re-submitted
+    secondHost.teardown();
   });
 });

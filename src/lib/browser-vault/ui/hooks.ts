@@ -70,7 +70,7 @@ export interface ClipboardController {
   /** Explicit user-triggered copy with the standard warning copy. */
   readonly copy: (text: string) => Promise<boolean>;
   /** Best-effort empty overwrite (foreground only, never reads the clipboard). */
-  readonly cleanupAfter: (delayMs: number) => Promise<ClipboardCleanupResult>;
+  readonly cleanupAfter: (delayMs: number, foregroundOnly?: boolean) => Promise<ClipboardCleanupResult>;
 }
 
 /** Clipboard controller bound to injected navigator.clipboard (testable). */
@@ -91,12 +91,12 @@ export function useClipboardController(clipboard: Pick<Clipboard, 'writeText'> |
   );
 
   const cleanupAfter = useCallback(
-    async (delayMs: number): Promise<ClipboardCleanupResult> => {
+    async (delayMs: number, foregroundOnly = true): Promise<ClipboardCleanupResult> => {
       if (clipboard === null) {
         return 'skipped';
       }
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
-      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+      if (delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
+      if (foregroundOnly && typeof document !== 'undefined' && document.visibilityState !== 'visible') {
         return 'skipped'; // never write while backgrounded
       }
       try {

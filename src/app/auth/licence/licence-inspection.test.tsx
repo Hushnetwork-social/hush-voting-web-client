@@ -58,6 +58,32 @@ async function openAccountMenu() {
 }
 
 describe('Account licence summary (A0/A0P)', () => {
+  it('contains keyboard focus while open and restores the trigger on dismissal', async () => {
+    render(<AuthenticatedUserMenu identity={identity} onLock={() => undefined} licence={{ facts: accountFacts(presentationInput()), onLicenceAction: vi.fn() }} />);
+    const user = await openAccountMenu();
+    const close = screen.getByRole('button', { name: 'Close user information' });
+    expect(close).toHaveFocus();
+    await user.tab({ shift: true });
+    expect(screen.getByRole('button', { name: 'Lock' })).toHaveFocus();
+    await user.tab();
+    expect(close).toHaveFocus();
+    await user.keyboard('{Escape}');
+    expect(screen.getByRole('button', { name: 'Alice' })).toHaveFocus();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('requests fresh authority before opening a licence destination', async () => {
+    const order: string[] = [];
+    render(<AuthenticatedUserMenu identity={identity} onLock={() => undefined} licence={{
+      facts: accountFacts(presentationInput()),
+      onRefreshForEntry: () => order.push('refresh'),
+      onLicenceAction: () => order.push('open'),
+    }} />);
+    const user = await openAccountMenu();
+    await user.click(screen.getByRole('button', { name: 'Upgrade' }));
+    expect(order).toEqual(['refresh', 'open']);
+  });
+
   it('shows the exact indexed plan, concise cap/validity, shortened reference, and Upgrade action', async () => {
     const facts = accountFacts(presentationInput());
     const onLicenceAction = vi.fn();
@@ -211,6 +237,21 @@ describe('Licence inspection surfaces (L1/L2)', () => {
     expect(screen.getByTestId('licence-copy-feedback')).toHaveTextContent(
       'Couldn’t copy. Select the licence reference to copy it manually.',
     );
+    expect(screen.getByTestId('licence-reference-full')).toHaveTextContent('5f2d9e11-3c44-4a80-b8e7-6b2f1a0c9d3e');
+    void view;
+  });
+
+  it('full reference stays selectable with no Copy control until a clipboard adapter is injected', () => {
+    const reference: LicenceReferenceFacts = {
+      mode: 'full',
+      displayText: '5f2d9e11-3c44-4a80-b8e7-6b2f1a0c9d3e',
+      fullText: '5f2d9e11-3c44-4a80-b8e7-6b2f1a0c9d3e',
+      selectable: true,
+    };
+    const view = render(<LicenceReferenceFull facts={reference} />);
+    // Clipboard write is integration-owned (Phase 6): without an injected
+    // adapter there is no dead Copy button and the value stays visible.
+    expect(screen.queryByRole('button', { name: 'Copy' })).toBeNull();
     expect(screen.getByTestId('licence-reference-full')).toHaveTextContent('5f2d9e11-3c44-4a80-b8e7-6b2f1a0c9d3e');
     void view;
   });

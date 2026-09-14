@@ -64,7 +64,8 @@ describe('FEAT-009 read bound enforcement (Task 3.1)', () => {
   });
 
   it('enforceReadBound accepts the exact maximum and rejects beyond', () => {
-    expect(enforceReadBound(1024 * 1024 + 1).ok).toBe(true);
+    expect(enforceReadBound(1024 * 1024).ok).toBe(true);
+    expect(enforceReadBound(1024 * 1024 + 1).ok).toBe(false);
     expect(enforceReadBound(0).ok).toBe(true);
     const over = enforceReadBound(1024 * 1024 + 2);
     expect(over.ok).toBe(false);
@@ -107,6 +108,13 @@ describe('FEAT-009 envelope gate (Task 3.1)', () => {
     const bytes = new Uint8Array(1024 * 1024 + 2);
     bytes.set([0x48, 0x55, 0x53, 0x48], 0);
     expect(evaluateEnvelopeGate(bytes)).toEqual({ kind: 'tooLarge' });
+  });
+
+  it('uses the extra read byte only to detect overflow, never as accepted ciphertext', () => {
+    const exact = validEnvelopeStub(1024 * 1024 - 36);
+    expect(evaluateEnvelopeGate(exact)).toEqual({ kind: 'valid', version: 1 });
+    const overflow = validEnvelopeStub(1024 * 1024 + 1 - 36);
+    expect(evaluateEnvelopeGate(overflow)).toEqual({ kind: 'tooLarge' });
   });
 });
 

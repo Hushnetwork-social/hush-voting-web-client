@@ -16,6 +16,17 @@ import { join } from 'node:path';
 const QUALITY = join(import.meta.dirname, 'quality.mjs');
 let failures = 0;
 
+// Exercise the same source classifiers used by the aggregate, including
+// positive prohibited seeds; a green baseline alone cannot validate a scanner.
+try {
+  execFileSync(process.execPath, ['--test', join(import.meta.dirname, 'source-policy.test.mjs')], {
+    stdio: 'pipe', encoding: 'utf8', timeout: 30_000,
+  });
+} catch {
+  console.error('SELFTEST FAIL: source-policy positive/negative regression suite');
+  failures += 1;
+}
+
 function runQuality(env) {
   try {
     const output = execFileSync('node', [QUALITY], { stdio: 'pipe', encoding: 'utf8', env: { ...process.env, ...env } });

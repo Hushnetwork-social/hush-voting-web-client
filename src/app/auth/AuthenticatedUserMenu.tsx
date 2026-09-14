@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { AuthenticatedIdentityMetadata } from '../../lib/auth/types';
 import type { LicenceAccountSummaryFacts } from '../../lib/licensing/upgrade-presentation';
 import { AccountLicenceSummary, type LicenceAccountActionKind } from './licence/account-licence-summary';
+import { SafeAlias } from './SafeAlias';
 
 interface AuthenticatedUserMenuProps {
   readonly identity: AuthenticatedIdentityMetadata;
@@ -16,6 +17,7 @@ interface AuthenticatedUserMenuProps {
   readonly licence?: {
     readonly facts: LicenceAccountSummaryFacts;
     readonly onLicenceAction: (action: LicenceAccountActionKind) => void;
+    readonly onRefreshForEntry?: () => void;
   } | null;
 }
 
@@ -35,6 +37,10 @@ export function AuthenticatedUserMenu({ identity, onLock, licence }: Authenticat
 
   useEffect(() => {
     if (!open) return;
+    const controls = () => Array.from(rootRef.current?.querySelectorAll<HTMLButtonElement>(
+      '[role="dialog"] button:not(:disabled), [role="dialog"] a[href], [role="dialog"] input:not(:disabled)',
+    ) ?? []);
+    controls()[0]?.focus();
 
     const onPointerDown = (event: PointerEvent) => {
       if (event.target instanceof Node && !rootRef.current?.contains(event.target)) {
@@ -42,6 +48,15 @@ export function AuthenticatedUserMenu({ identity, onLock, licence }: Authenticat
       }
     };
     const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Tab') {
+        const targets = controls();
+        const first = targets[0];
+        const last = targets.at(-1);
+        if (first && last && (event.shiftKey ? document.activeElement === first : document.activeElement === last)) {
+          event.preventDefault();
+          (event.shiftKey ? last : first).focus();
+        }
+      }
       if (event.key === 'Escape') {
         event.preventDefault();
         setOpen(false);
@@ -83,7 +98,7 @@ export function AuthenticatedUserMenu({ identity, onLock, licence }: Authenticat
         aria-controls="authenticated-user-popup"
         onClick={() => setOpen((current) => !current)}
       >
-        <span>{identity.alias}</span>
+        <SafeAlias alias={identity.alias} />
         <svg aria-hidden="true" viewBox="0 0 20 20" width="16" height="16">
           <path d="m5 7.5 5 5 5-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
@@ -93,7 +108,7 @@ export function AuthenticatedUserMenu({ identity, onLock, licence }: Authenticat
         <section id="authenticated-user-popup" className="authenticated-user-popup" role="dialog" aria-label="User information">
           <header className="authenticated-user-popup-header">
             <h2>User information</h2>
-            <button type="button" className="authenticated-user-close" aria-label="Close user information" onClick={() => setOpen(false)}>
+            <button type="button" className="authenticated-user-close" aria-label="Close user information" onClick={() => { setOpen(false); triggerRef.current?.focus(); }}>
               <span aria-hidden="true">×</span>
             </button>
           </header>
@@ -101,7 +116,7 @@ export function AuthenticatedUserMenu({ identity, onLock, licence }: Authenticat
           <dl className="authenticated-user-details">
             <div>
               <dt>Alias</dt>
-              <dd>{identity.alias}</dd>
+              <dd><SafeAlias alias={identity.alias} /></dd>
             </div>
             <div>
               <dt>Public signing key</dt>
@@ -136,6 +151,7 @@ export function AuthenticatedUserMenu({ identity, onLock, licence }: Authenticat
                 // A0/A0P action closes the flyout (the licence flow opens in
                 // the workspace via the Phase 6 root destination).
                 setOpen(false);
+                licence.onRefreshForEntry?.();
                 licence.onLicenceAction(action);
               }}
             />

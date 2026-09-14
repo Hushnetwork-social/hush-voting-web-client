@@ -117,8 +117,10 @@ export type BrowserOperationKind =
   | 'createCandidate'
   | 'revealCandidateWords'
   | 'concealCandidate'
+  | 'discardSecretTransfers'
   | 'destroyCandidate'
   | 'deriveWordsCandidate'
+  | 'deriveRecoveryCandidates'
   | 'importFileCandidate'
   | 'retainTransactionDigest'
   | 'submitIdentityTransaction'
@@ -321,7 +323,7 @@ export function validateClientMessage(value: unknown): BrowserClientMessage | nu
 
 /** Closed payload allowlist per v2 operation kind (public fields only). */
 const OPERATION_PAYLOAD_SCHEMAS: Readonly<Record<string, readonly string[]>> = {
-  provisionFromValidatedBundle: ['candidateRef', 'alias', 'visibility'],
+  provisionFromValidatedBundle: ['candidateRef', 'alias', 'visibility', 'protectionMode'],
   unlockPassword: [],
   changeDevicePassword: [],
   verifyOnlineIdentity: [],
@@ -332,9 +334,11 @@ const OPERATION_PAYLOAD_SCHEMAS: Readonly<Record<string, readonly string[]>> = {
   createCandidate: [],
   revealCandidateWords: ['candidateRef'],
   concealCandidate: ['candidateRef'],
+  discardSecretTransfers: ['transferOperationId'],
   destroyCandidate: ['candidateRef'],
   deriveWordsCandidate: ['producerId', 'wordCount'],
-  importFileCandidate: [],
+  deriveRecoveryCandidates: ['wordCount'],
+  importFileCandidate: ['emptyV1Confirmed'],
   retainTransactionDigest: ['digest'],
   submitIdentityTransaction: ['alias', 'visibility'],
   promoteLifecycle: ['status'],
@@ -490,8 +494,10 @@ const OPERATION_KINDS: ReadonlySet<string> = new Set<BrowserOperationKind>([
   'createCandidate',
   'revealCandidateWords',
   'concealCandidate',
+  'discardSecretTransfers',
   'destroyCandidate',
   'deriveWordsCandidate',
+  'deriveRecoveryCandidates',
   'importFileCandidate',
   'retainTransactionDigest',
   'submitIdentityTransaction',
@@ -516,13 +522,13 @@ function validateSecretTransfer(record: Record<string, unknown>): SecretTransfer
   if (record.purpose !== 'devicePassword' && record.purpose !== 'mnemonic' && record.purpose !== 'filePassword' && record.purpose !== 'fileBytes') {
     return null;
   }
-  if (typeof record.value !== 'string' || record.value.length === 0) {
+  if (typeof record.value !== 'string' || (record.value.length === 0 && record.purpose !== 'filePassword')) {
     return null;
   }
   // Bounded secret payloads (passwords/mnemonics ≤ 4 KiB; file bytes ≤ 1 MiB
   // base64url). Oversized transfers fail closed and never reach the engine.
   const maxBytes = record.purpose === 'fileBytes' ? 1_400_000 : 4096;
-  if (record.value.length > maxBytes) {
+  if ((record.purpose === 'fileBytes' ? record.value.length : new TextEncoder().encode(record.value).byteLength) > maxBytes) {
     return null;
   }
   return {

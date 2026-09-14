@@ -136,7 +136,7 @@ export const GOVERNANCE_OPTION_LABELS: Readonly<Record<string, string>> = {
   'trustees-8of13': '8-of-13 trustees',
 } as const;
 
-export const KNOWN_GOVERNANCE_OPTION_IDS = Object.keys(GOVERNANCE_OPTION_LABELS) as readonly string[];
+export { KNOWN_GOVERNANCE_OPTION_IDS } from './contracts';
 
 /** Resolve a canonical governance-option label; null when unknown (never fabricate). */
 export function governanceOptionLabel(optionId: string): string | null {

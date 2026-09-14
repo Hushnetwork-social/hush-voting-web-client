@@ -176,6 +176,32 @@ describe('parseEntitlementQueryResult', () => {
     }
   });
 
+  // EPIC-002 AT-LIC-012 -> FEAT-016 AC-016-018 -> Phase 6 Task 6.4.
+  it('rejects an unknown active plan ID despite a recognized family and version', () => {
+    expect(parse(activeResult({ PlanId: 'unsupported-test-plan' }))).toEqual({
+      outcome: 'unsupported', reason: 'unknown-plan-id',
+    });
+  });
+
+  it('rejects unknown active governance alongside a recognized governance ID', () => {
+    expect(parse(activeResult({ AllowedGovernanceOptionIds: ['trustees-3of5', 'unsupported-test-governance'] }))).toEqual({
+      outcome: 'unsupported', reason: 'unknown-governance-option',
+    });
+  });
+
+  it.each(['hushvoting.direct.free', 'hushvoting.veritas.500', 'hushvoting.veritas.2000',
+    'hushvoting.veritas.10000', 'hushvoting.enterprise'])(
+    'retains recognized active plan %s without inferring new activation availability', (PlanId) => {
+      expect(parse(activeResult({ PlanId })).outcome).toBe('ready');
+    },
+  );
+
+  it.each(['no-customer-trustees', 'trustees-3of5', 'trustees-7of10', 'trustees-8of13'])(
+    'retains recognized active governance %s', (option) => {
+      expect(parse(activeResult({ AllowedGovernanceOptionIds: [option] })).outcome).toBe('ready');
+    },
+  );
+
   it('fails closed on malformed/unknown states without throwing', () => {
     expect(parse({ ok: true, state: 'active', active: null as never }).outcome).toBe('malformed');
     expect(parse({ ok: true, state: 'unknownState' as never, template: undefined as never }).outcome).toBe('malformed');

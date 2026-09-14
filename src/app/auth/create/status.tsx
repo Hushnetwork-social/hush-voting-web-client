@@ -48,16 +48,20 @@ export function WaitingScreen({ onCheckAgain, onLock, abbreviatedSigningAddress,
 export interface DelayProps {
   readonly onCheckAgain: () => void;
   readonly onLock: () => void;
+  readonly localSaveFailed?: boolean;
+  readonly retrying?: boolean;
 }
 
 /** Three-minute abnormal delay — lookup-only Check again, no resubmit. */
-export function DelayScreen({ onCheckAgain, onLock }: DelayProps) {
+export function DelayScreen({ onCheckAgain, onLock, localSaveFailed = false, retrying = false }: DelayProps) {
   return (
-    <SurfacePanel title={STATUS.delay.title}>
-      <p className="text-sm text-[var(--text-muted)]">{STATUS.delay.detail}</p>
+    <SurfacePanel title={localSaveFailed ? STATUS.localSaveFailure.title : STATUS.delay.title}>
+      <p className="text-sm text-[var(--text-muted)]">{localSaveFailed
+        ? STATUS.localSaveFailure.detail
+        : STATUS.delay.detail}</p>
       <div className="mt-4 flex flex-wrap gap-3">
-        <ActionButton variant="secondary" onClick={onCheckAgain}>
-          {STATUS.delay.checkAgain}
+        <ActionButton variant="secondary" onClick={onCheckAgain} disabled={retrying}>
+          {localSaveFailed ? STATUS.localSaveFailure.retry : STATUS.delay.checkAgain}
         </ActionButton>
         <ActionButton variant="secondary" onClick={onLock}>
           {STATUS.delay.lock}

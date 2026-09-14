@@ -35,7 +35,8 @@ export type EntitlementQueryOutcome =
   | { readonly outcome: 'transportFailure' }
   | {
       readonly outcome: 'unsupported';
-      readonly reason: Extract<ProjectionRejectionReason, 'unknown-plan-family' | 'incompatible-catalogue-version'>;
+      readonly reason: Extract<ProjectionRejectionReason,
+        'unknown-plan-family' | 'unknown-plan-id' | 'unknown-governance-option' | 'incompatible-catalogue-version'>;
     }
   | { readonly outcome: 'malformed' };
 
@@ -113,6 +114,8 @@ export function parseEntitlementQueryResult(
       if (!built.ok) {
         if (
           built.reason === 'unknown-plan-family' ||
+          built.reason === 'unknown-plan-id' ||
+          built.reason === 'unknown-governance-option' ||
           built.reason === 'incompatible-catalogue-version'
         ) {
           return { outcome: 'unsupported', reason: built.reason };

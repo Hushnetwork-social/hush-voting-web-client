@@ -174,7 +174,8 @@ impl LicencePendingTransactionRecord {
         if !is_bounded_string(&self.transaction_id, 128) {
             return Err("transactionId out of bounds".into());
         }
-        if !is_bounded_string(&self.identity_binding, 128)
+        // Historical uncompressed secp256k1 addresses contain 130 hex characters.
+        if !is_bounded_string(&self.identity_binding, 130)
             || !is_bounded_string(&self.network_binding, 128)
         {
             return Err("binding out of bounds".into());
@@ -313,6 +314,23 @@ mod tests {
             index_observed_utc: None,
             upgrade_binding: None,
         }
+    }
+
+    #[test]
+    fn historical_identity_address_bound_is_distinct_from_network_identifier_bound() {
+        let mut record = fixture();
+        record.identity_binding = format!("04{}", "11".repeat(64));
+        assert!(record.validate().is_ok());
+        let json = serde_json::to_string(&record).expect("serialize historical identity binding");
+        assert_eq!(
+            parse_record_json(&json).expect("parse historical identity binding"),
+            record
+        );
+        record.identity_binding.push('0');
+        assert!(record.validate().is_err());
+        record.identity_binding.pop();
+        record.network_binding = "x".repeat(129);
+        assert!(record.validate().is_err());
     }
 
     #[test]

@@ -1,5 +1,5 @@
 /**
- * FEAT-007 Task 6.2/6.4/6.6 — BFF bounds, cross-adapter conformance, and
+ * FEAT-007 Task 6.2/6.4/6.6 — BFF bounds, Web normalization, and
  * downstream contract tests. Coverage: AC-007-022–024, 028–036, 061–067,
  * 070–076 (integration/contract portion).
  */
@@ -86,18 +86,19 @@ describe('Task 6.2 — BffTransport maps replies and errors', () => {
   });
 });
 
-describe('Task 6.4 — cross-adapter conformance (browser and native normalize identically)', () => {
-  it('the same server reply produces the same closed lookup outcome for any adapter', () => {
+// These isolated Web checks do not load Ubuntu/Rust or Android adapters.
+// Real Web/node conformance lives in the owned .NET HV-WEB-TRANSPORT-CONFORMANCE group.
+describe('Task 6.4 — Web normalization contract (native equivalence unproven)', () => {
+  it('normalizes an exact Web lookup without parsing diagnostic text', () => {
     const reply = { successfull: true, message: 'ok', profileName: 'Voter', publicSigningAddress: LOCAL_SIGNING, publicEncryptAddress: LOCAL_ENCRYPT, isPublic: false };
     const browserNormalized = normalizeGetIdentityReply(reply, LOCAL_SIGNING, LOCAL_ENCRYPT);
-    const nativeNormalized = normalizeGetIdentityReply(reply, LOCAL_SIGNING, LOCAL_ENCRYPT);
-    expect(browserNormalized).toEqual(nativeNormalized);
     expect(browserNormalized).toEqual({ kind: 'exactProfile', profileName: 'Voter', publicSigningAddress: LOCAL_SIGNING, publicEncryptAddress: LOCAL_ENCRYPT, isPublic: false });
+    expect(normalizeGetIdentityReply({ ...reply, message: 'profile absent; retry creation' }, LOCAL_SIGNING, LOCAL_ENCRYPT)).toEqual(browserNormalized);
   });
 
-  it('rejection semantics are adapter-independent', () => {
+  it('uses the explicit Web rejection allowlist regardless of diagnostic text', () => {
     const allowlist = new Set(['ALIAS_INVALID']);
-    const reply = { successfull: true, message: 'alias invalid', status: 'REJECTED' as const, validationCode: 'ALIAS_INVALID' };
+    const reply = { successfull: false, message: 'alias invalid', status: 'REJECTED' as const, validationCode: 'ALIAS_INVALID' };
     expect(normalizeSubmitReply(reply, allowlist)).toEqual({ kind: 'editableRejection', validationCode: 'ALIAS_INVALID' });
     expect(normalizeSubmitReply(reply, allowlist)).toEqual(normalizeSubmitReply({ ...reply, message: 'different text' }, allowlist));
   });

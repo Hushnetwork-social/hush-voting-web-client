@@ -52,6 +52,8 @@ export const LICENCE_PENDING_SCHEMA_VERSION = 1 as const;
 export const LICENCE_PENDING_MAX_JSON_BYTES = 65_536 as const;
 export const LICENCE_PENDING_MAX_ATTEMPT_EVIDENCE = 64 as const;
 export const LICENCE_PENDING_ID_MAX_LENGTH = 128 as const;
+// Approved historical secp256k1 public addresses use 65 uncompressed bytes.
+export const LICENCE_PENDING_IDENTITY_MAX_LENGTH = 130 as const;
 
 /** Exact signed transaction (sealed): canonical JSON + sha-256 digest. */
 export interface LicenceExactSignedTransaction {
@@ -276,7 +278,7 @@ export function parsePendingLicenceRecord(value: unknown): LicencePendingTransac
   ) {
     return null;
   }
-  if (!isBoundedString(value.identityBinding, LICENCE_PENDING_ID_MAX_LENGTH) ||
+  if (!isBoundedString(value.identityBinding, LICENCE_PENDING_IDENTITY_MAX_LENGTH) ||
       !isBoundedString(value.networkBinding, LICENCE_PENDING_ID_MAX_LENGTH)) {
     return null;
   }

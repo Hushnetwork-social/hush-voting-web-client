@@ -238,6 +238,19 @@ describe('pure .dat v1 operations (3.5/3.6)', () => {
     if (!result.ok) expect(result.code).toBe('DAT_MALFORMED');
   });
 
+  it.each(['null', '[]', 'true', '12', '"scalar"'])('rejects non-object credential JSON %s without throwing', payload => {
+    const result = parsePortableCredentialsStrict(payload);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe('DAT_INVALID_FIELD');
+  });
+
+  it('detects duplicate property names after JSON escape decoding', () => {
+    const payload = '{"ProfileName":"first","\\u0050rofileName":"second","PublicSigningAddress":"s","PrivateSigningKey":"s","PublicEncryptAddress":"e","PrivateEncryptKey":"e","IsPublic":false,"Mnemonic":null}';
+    const result = parsePortableCredentialsStrict(payload);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe('DAT_DUPLICATE_FIELD');
+  });
+
   it('strictly rejects unknown, missing, duplicate, null, and wrong-type fields', () => {
     const cases = [
       { id: 'D-009', expect: 'DAT_MISSING_FIELD' },

@@ -7,7 +7,7 @@
  * security-relevant confirmation surface. Unknown payloads still fail
  * closed with the safe fallback, never a fabricated identity.
  */
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { BrowserVaultClient, type MessagePortLike } from '../../browser-vault/production/client';
 import { createWebOnboardingPorts, mapCredentialImportFailure } from './child-bridge';
 import { ISOLATED_DEVNET_MANIFEST } from '../../runtime/manifests';
@@ -165,5 +165,22 @@ describe('FEAT-010 child-bridge confirmMissingProfile', () => {
       expect(result.safeCandidate.alias).toBe('Unknown');
       expect(result.safeCandidate.abbreviatedSigningAddress).toBe('…');
     }
+  });
+});
+
+
+describe('onboarding cleanup ownership', () => {
+  it('lets the runtime clean up without cancelling an identifier that was never a worker operation', async () => {
+    const cancel = vi.fn();
+    const ports = createWebOnboardingPorts({ client: { cancel } as unknown as BrowserVaultClient,
+      manifest: ISOLATED_DEVNET_MANIFEST, lookupIdentity: async () => ({ kind: 'transportFailure' }), randomId: prefix => `${prefix}test` });
+    const port = ports.restoreCredentialFile;
+    const operation = port.start('restoreCredentialFile', 1 as never);
+    await Promise.resolve();
+    port.cancel(operation.operationId);
+    const cleanup = port.cleanup(1 as never);
+    await expect(cleanup.result).resolves.toEqual({ code: 'ONBOARDING_CLEANUP_COMPLETE' });
+    port.cancel(cleanup.operationId);
+    expect(cancel).not.toHaveBeenCalled();
   });
 });

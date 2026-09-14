@@ -180,6 +180,14 @@ export function createAtomicJournal(session: VaultStorageSession, ports: Journal
     if (readBack.value.record === null || readBack.value.record.generation !== params.candidateGeneration) {
       return failure('StorageUnavailable');
     }
+    // FEAT-004 atomic mutation / FEAT-009 AC-009-057: the persisted
+    // candidate must be the exact encrypted bytes supplied by the authority.
+    // Structural validation alone cannot detect changed ciphertext or bindings.
+    const persistedBytes = readBack.value.record.bytes;
+    if (persistedBytes.byteLength !== params.candidateBytes.byteLength
+      || !persistedBytes.every((byte, index) => byte === params.candidateBytes[index])) {
+      return failure('StorageUnavailable');
+    }
     const verified = await ports.verifyCandidate(readBack.value.record.bytes, params.candidateGeneration);
     if (!verified) {
       return failure('StorageUnavailable');

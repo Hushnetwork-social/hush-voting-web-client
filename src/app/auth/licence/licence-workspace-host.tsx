@@ -154,6 +154,11 @@ export function LicenceWorkspaceHost({
     if (option === undefined) {
       return; // never a client-invented plan
     }
+    if (restoredView === 'stale') {
+      // The old terminal must be acknowledged before a fresh selection can
+      // enter confirmation. It never activates the newly selected plan.
+      actions.onAcknowledgeOutcome();
+    }
     setDraft(draftFromHigherOption(option));
     setReviewingConfirmation(true);
   };

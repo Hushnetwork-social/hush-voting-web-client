@@ -3,7 +3,7 @@
  * FEAT-008 coverage-manifest validator (Task 7.1).
  *
  * Machine-checks the acceptance-coverage manifest (memory bank) AND the
- * executable Gherkin catalog (`features/recovery-words/*.feature`): every
+ * owned .NET Gherkin catalogue (including separate qualification gates): every
  * AC-008-NNN has exactly the manifest scenario ID in the catalog, every
  * scenario ID is unique, every scenario references a known criterion, and
  * every criterion references one of the 22 mandatory families. Unknown or
@@ -18,7 +18,7 @@ import { fileURLToPath } from 'node:url';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(SCRIPT_DIR, '..', '..');
-const FEATURES_DIR = join(REPO_ROOT, 'features', 'recovery-words');
+const FEATURES_DIR = process.env.FEAT008_COVERAGE_FEATURES ?? join(REPO_ROOT, '..', 'hush-server-node', 'Node', 'HushNode.IntegrationTests', 'HushVoting', 'Features', 'recovery-words');
 
 const FAMILIES = new Set([
   'HV-RW-ENTRY-GUARD', 'HV-RW-INPUT', 'HV-RW-PASTE', 'HV-RW-VALIDATE', 'HV-RW-CUSTODY', 'HV-RW-CANDIDATES',
@@ -45,6 +45,11 @@ function main() {
 
   const seenScenarioIds = new Set();
   const knownCriteria = Object.keys(criteria);
+  if (knownCriteria.length !== 85) errors.push('exactly 85 original criteria are required');
+  for (let number = 1; number <= 85; number++) {
+    const id = `AC-008-${String(number).padStart(3, '0')}`;
+    if (!Object.hasOwn(criteria, id)) errors.push(`missing original criterion ${id}`);
+  }
   const criteriaToScenario = new Map();
 
   for (const ac of knownCriteria) {
@@ -76,44 +81,34 @@ function main() {
     }
   }
 
-  // Parse the feature catalog: collect @AC-008-NNN and @HV-RW-* tags per scenario.
-  const featureFiles = readdirSync(FEATURES_DIR).filter((name) => name.endsWith('.feature'));
-  if (featureFiles.length === 0) {
-    errors.push('no feature files found under features/recovery-words');
-  }
-  const catalogScenarioTags = new Set();
-  const catalogCriterionTags = new Set();
+  // Validate each scenario's own AC/ID association, not independent global tag sets.
+  const featureFiles = readdirSync(FEATURES_DIR).filter(name => name.endsWith('.feature'));
+  if (featureFiles.length === 0) errors.push('no HushVoting .NET recovery feature files found');
+  const catalog = new Map();
   for (const name of featureFiles) {
     const path = join(FEATURES_DIR, name);
     if (!statSync(path).isFile()) continue;
-    const content = readFileSync(path, 'utf8');
-    for (const line of content.split('\n')) {
+    let pendingTags = [];
+    for (const line of readFileSync(path, 'utf8').split('\n')) {
       const trimmed = line.trim();
-      if (!trimmed.startsWith('@')) continue;
-      for (const tag of trimmed.split(/\s+/)) {
-        if (/^@AC-008-\d{3}$/.test(tag)) catalogCriterionTags.add(tag.slice(1));
-        if (/^@HV-RW-[A-Z-]+-\d{3}$/.test(tag)) catalogScenarioTags.add(tag.slice(1));
+      if (trimmed.startsWith('@')) { pendingTags.push(...trimmed.split(/\s+/)); continue; }
+      if (trimmed.startsWith('Feature:')) { pendingTags = []; continue; }
+      if (!/^Scenario(?: Outline)?:/.test(trimmed)) continue;
+      const ids = pendingTags.filter(tag => /^@HV-RW-[A-Z-]+-\d{3}$/.test(tag)).map(tag => tag.slice(1));
+      const acs = pendingTags.filter(tag => /^@AC-008-\d{3}$/.test(tag)).map(tag => tag.slice(1));
+      pendingTags = [];
+      if (ids.length !== 1 || acs.length !== 1) {
+        errors.push(`${name}: each scenario requires exactly one original scenario ID and AC`);
+        continue;
       }
+      const [id] = ids, [ac] = acs;
+      if (catalog.has(id)) errors.push(`duplicate scenario in .NET catalogue: ${id}`);
+      catalog.set(id, ac);
+      if (criteriaToScenario.get(id) !== ac) errors.push(`${id}: catalogue AC ${ac} does not match the acceptance manifest`);
     }
   }
-
-  // Every manifest scenario must exist in the catalog with its criterion tag.
-  for (const [sid, ac] of criteriaToScenario) {
-    if (!catalogScenarioTags.has(sid)) {
-      errors.push(`${ac}: scenario ${sid} missing from the Gherkin catalog`);
-    }
-  }
-  // Every catalog criterion must be a known manifest criterion.
-  for (const ac of catalogCriterionTags) {
-    if (!knownCriteria.includes(ac)) {
-      errors.push(`catalog references unknown criterion ${ac}`);
-    }
-  }
-  // Every manifest criterion must appear in the catalog.
-  for (const ac of knownCriteria) {
-    if (!catalogCriterionTags.has(ac)) {
-      errors.push(`manifest criterion ${ac} missing from the Gherkin catalog`);
-    }
+  for (const [id, ac] of criteriaToScenario) {
+    if (catalog.get(id) !== ac) errors.push(`${ac}: scenario ${id} missing or incorrectly mapped in .NET catalogue`);
   }
 
   if (errors.length > 0) {
@@ -121,7 +116,7 @@ function main() {
     for (const error of errors) console.error(`  - ${error}`);
     process.exit(1);
   }
-  console.log(`COVERAGE MANIFEST OK: ${knownCriteria.length}/85 criteria, ${criteriaToScenario.size} scenarios, ${featureFiles.length} feature files`);
+  console.log(`COVERAGE MAPPINGS OK: ${knownCriteria.length}/85 criteria, ${catalog.size} .NET scenarios, ${featureFiles.length} feature files (mapping only; runtime, semantic acceptance and qualification are separate)`);
 }
 
 main();

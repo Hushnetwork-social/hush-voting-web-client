@@ -182,6 +182,12 @@ function createAuthority(storage: VaultStorageSession, server: FakeServer): { au
 
 /** Dispatch one op on a port; resolves on the matching operation-outcome. */
 function dispatchOp(port: PortHarness, authority: WorkerAuthority, operation: string, payload?: Record<string, unknown>, opts: { freshCapabilityId?: string; operationId?: string; secret?: string } = {}): Promise<BrowserWorkerEvent> {
+  // Match BrowserVaultClient: global Lock invalidates every channel, so the
+  // next operation must perform a fresh authenticated-channel handshake.
+  if (!authority.snapshot().acceptedChannels.includes(port.channel)) {
+    authority.handle({ kind: 'handshake', protocolVersion: BROWSER_PROTOCOL_VERSION, appVersion: '0.1.0',
+      buildDigest: '0123456789ab', clientChannel: port.channel, runtimeConfigId: 'development-localhost' });
+  }
   const operationId = opts.operationId ?? `op-${Math.random().toString(36).slice(2, 10)}`;
   const message = {
     kind: 'operation' as const,
@@ -197,8 +203,8 @@ function dispatchOp(port: PortHarness, authority: WorkerAuthority, operation: st
     authority.handle({ kind: 'secret-transfer', operationId, clientChannel: port.channel, authorityEpoch: authority.snapshot().epoch, purpose: 'devicePassword', value: opts.secret });
   }
   authority.handle(message);
-  return new Promise<BrowserWorkerEvent>((resolve) => {
-    const deadline = Date.now() + 30_000;
+  return new Promise<BrowserWorkerEvent>((resolve, reject) => {
+    const deadline = Date.now() + 3_000;
     const poll = (): void => {
       const outcome = port.received.find((m) => m.kind === 'operation-outcome' && (m as { operationId?: string }).operationId === operationId);
       if (outcome) {
@@ -206,7 +212,8 @@ function dispatchOp(port: PortHarness, authority: WorkerAuthority, operation: st
         return;
       }
       if (Date.now() > deadline) {
-        throw new Error(`op timeout: ${operation}`);
+        reject(new Error(`op timeout: ${operation}`));
+        return;
       }
       setTimeout(poll, 10);
     };

@@ -1,13 +1,11 @@
 /**
  * FEAT-009 playwright-bdd configuration (Task 7.1/7.2).
  *
- * Executable Gherkin for the platform-neutral acceptance catalog. Full
- * production-composition execution requires the controlled pinned
- * HushServerNode fixture (external release gate EXT-009-003) and is RED
- * until that artifact is available — no mock or local reservation
- * substitutes. The coverage-manifest validator
- * (`credential-file-restore:coverage`) is the machine-checked gate that
- * runs in CI regardless.
+ * Remaining legacy sources awaiting replacement validation. Final browser/server
+ * E2E is owned by the isolated HushVoting .NET infrastructure. Validated
+ * replacements have dedicated test:credential-*:bdd commands.
+ * This config discovers only remaining TypeScript sources; coverage mapping
+ * independently validates all original .NET declarations.
  */
 import { defineConfig } from '@playwright/test';
 import { defineBddConfig } from 'playwright-bdd';

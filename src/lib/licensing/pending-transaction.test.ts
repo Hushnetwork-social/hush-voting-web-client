@@ -68,6 +68,14 @@ function fixture(): LicencePendingTransactionRecord {
 }
 
 describe('canonical record codec (shared TS/Rust parity)', () => {
+  it('round-trips an approved 130-character historical identity binding without relaxing other bounds', () => {
+    const identityBinding = '04' + '11'.repeat(64);
+    const record = { ...fixture(), identityBinding };
+    expect(parsePendingLicenceRecordJson(serializePendingLicenceRecord(record))).toEqual(record);
+    expect(parsePendingLicenceRecordJson(JSON.stringify({ ...record, identityBinding: identityBinding + '0' }))).toBeNull();
+    expect(parsePendingLicenceRecordJson(JSON.stringify({ ...record, networkBinding: 'x'.repeat(129) }))).toBeNull();
+  });
+
   it('serializes byte-identically to the shared fixture string', () => {
     expect(serializePendingLicenceRecord(fixture())).toBe(SHARED_FIXTURE_EXPECTED_JSON);
   });

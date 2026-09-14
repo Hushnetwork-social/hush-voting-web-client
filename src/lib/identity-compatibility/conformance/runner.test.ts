@@ -6,7 +6,9 @@
  * and per-producer timing with no credential values.
  */
 import { describe, it, expect, beforeAll } from 'vitest';
-import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
+import { writeFileSync, mkdirSync, readFileSync, cpSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { runConformance, writeReport, type ConformanceReport } from './runner';
 import { deriveCandidates } from '../candidates';
@@ -45,6 +47,31 @@ beforeAll(async () => {
 }, 60_000);
 
 describe('FEAT-001 TypeScript identity conformance', () => {
+  // FEAT-009 AC-009-073 -> Phase 6 Tasks 6.9/6.10. Refresh integrity
+  // metadata so this checks actual vector execution, not just file hashing.
+  it('rejects corrupted public DAT bytes even when the expected label and integrity metadata still claim success', async () => {
+    const temporary = mkdtempSync(join(tmpdir(), 'hv-dat-counterexample-'));
+    try {
+      cpSync(join(process.cwd(), 'conformance/identity/v1'), temporary, { recursive: true });
+      const relative = 'vectors/dat-vectors.json';
+      const vectorsPath = join(temporary, relative);
+      const vectors = JSON.parse(readFileSync(vectorsPath, 'utf8'));
+      const positive = vectors.vectors.find((vector: { id: string }) => vector.id === 'D-001');
+      positive.envelopeHex = '00';
+      writeFileSync(vectorsPath, JSON.stringify(vectors));
+      const manifestPath = join(temporary, 'manifest.json');
+      const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+      const bytes = readFileSync(vectorsPath);
+      const pin = manifest.files.find((file: { path: string }) => file.path === relative);
+      pin.bytes = bytes.length;
+      pin.sha256 = createHash('sha256').update(bytes).digest('hex');
+      writeFileSync(manifestPath, JSON.stringify(manifest));
+      const rejected = await runConformance(temporary);
+      expect(rejected.result).toBe('FAIL');
+      expect(rejected.records.some(record => record.fixtureId === 'D-001')).toBe(true);
+    } finally { rmSync(temporary, { recursive: true, force: true }); }
+  });
+
   it('executes the complete corpus with zero mismatches', () => {
     expect(report.result).toBe('PASS');
     expect(report.records).toHaveLength(0);

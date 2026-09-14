@@ -1,3 +1,4 @@
+import { hasBoundedHistoricalName, IDENTITY_RESPONSE_MAX_BYTES } from '../../lib/identity-compatibility/historical-profile';
 /**
  * FEAT-011 Task 6.1 — server-only binary gRPC transport for the unchanged
  * HushServerNode identity RPCs (GetIdentity / SubmitSignedTransaction).
@@ -10,7 +11,7 @@
  * map to closed outcomes — never absence, never fabricated success.
  */
 
-import { credentials, loadPackageDefinition, Metadata, type ChannelCredentials } from '@grpc/grpc-js';
+import { credentials, loadPackageDefinition, Metadata, type ChannelCredentials, type ChannelOptions } from '@grpc/grpc-js';
 import { loadSync } from '@grpc/proto-loader';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -47,7 +48,7 @@ export interface PinnedGrpcSurface {
 
 interface RpcHushPackage {
   rpcHush: {
-    HushIdentity: new (address: string, creds: ChannelCredentials) => unknown;
+    HushIdentity: new (address: string, creds: ChannelCredentials, options?: ChannelOptions) => unknown;
     HushBlockchain: new (address: string, creds: ChannelCredentials) => unknown;
   };
 }
@@ -68,7 +69,7 @@ export function loadPinnedGrpcSurface(endpoint: string, protoDir: string = PROTO
   const definition = loadSync([path.join(protoDir, 'hushIdentity.proto'), path.join(protoDir, 'hushBlockchain.proto')], LOADER_OPTIONS);
   const pkg = loadPackageDefinition(definition) as unknown as RpcHushPackage;
   return {
-    HushIdentity: new pkg.rpcHush.HushIdentity(endpoint, credentials.createInsecure()),
+    HushIdentity: new pkg.rpcHush.HushIdentity(endpoint, credentials.createInsecure(), { 'grpc.max_receive_message_length': IDENTITY_RESPONSE_MAX_BYTES }),
     HushBlockchain: new pkg.rpcHush.HushBlockchain(endpoint, credentials.createInsecure()),
   };
 }
@@ -116,7 +117,9 @@ export class BinaryGrpcTransport implements HushServerTransportPort {
   async lookupIdentity(request: { readonly publicSigningAddress: string }): Promise<LookupTransportResult> {
     try {
       const reply = await unaryCall<unknown>(this.surface.HushIdentity, 'GetIdentity', { PublicSigningAddress: request.publicSigningAddress }, RPC_TIMEOUT_MS);
-      return { ok: true, reply: normalizeGetIdentityReply(reply) };
+      const normalized = normalizeGetIdentityReply(reply);
+      if (normalized.successfull && !hasBoundedHistoricalName(normalized.profileName)) return { ok: false, failure: { kind: 'malformed' } };
+      return { ok: true, reply: normalized };
     } catch (error) {
       return { ok: false, failure: grpcErrorToFailure(error) };
     }

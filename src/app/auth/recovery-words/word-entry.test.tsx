@@ -60,6 +60,41 @@ describe('decidePaste (entry contract)', () => {
 });
 
 describe('WordEntryScreen (Task 5.2)', () => {
+  it('marks numbered unknown words immediately after paste and reports count mismatch without changing inputs', () => {
+    render(<WordEntryScreen grid={grid({ selectedWordCount: '12', canVerify: true })}
+      onSelectCount={vi.fn()} onPastePhrase={vi.fn()} onConfirmPasteReplacement={vi.fn()}
+      onClearAll={vi.fn()} onVerify={vi.fn()} onBack={vi.fn()} />);
+    const phrase = Array<string>(12).fill('abandon');
+    phrase[4] = 'notabipword';
+    fireEvent.paste(screen.getByLabelText('Recovery word 7 of 12'), { clipboardData: { getData: () => phrase.join(' ') } });
+    expect(screen.getByLabelText('Recovery word 5 of 12')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByLabelText('Recovery word 5 of 12')).toHaveValue('notabipword');
+    expect(document.body.textContent).not.toContain('notabipword');
+    fireEvent.paste(screen.getByLabelText('Recovery word 7 of 12'), { clipboardData: { getData: () => 'abandon ability' } });
+    expect(screen.getByText(/must contain exactly 12 or 24 words/)).toBeVisible();
+    expect(screen.getByLabelText('Recovery word 5 of 12')).toHaveValue('notabipword');
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+  });
+  it('shows only the focused word by default and conceals all words on lifecycle loss', async () => {
+    const user = userEvent.setup();
+    render(<WordEntryScreen grid={grid({ selectedWordCount: '12', allConcealed: false })}
+      onSelectCount={vi.fn()} onPastePhrase={vi.fn()} onConfirmPasteReplacement={vi.fn()}
+      onClearAll={vi.fn()} onVerify={vi.fn()} onBack={vi.fn()} />);
+    const first = screen.getByLabelText('Recovery word 1 of 12');
+    const second = screen.getByLabelText('Recovery word 2 of 12');
+    await user.type(first, 'abandon');
+    expect(first).toHaveAttribute('type', 'text');
+    await user.type(second, 'ability');
+    expect(first).toHaveAttribute('type', 'password');
+    expect(second).toHaveAttribute('type', 'text');
+    await user.click(screen.getByRole('button', { name: 'Show all words' }));
+    expect(first).toHaveAttribute('type', 'text');
+    fireEvent(window, new Event('pagehide'));
+    expect(first).toHaveAttribute('type', 'password');
+    expect(second).toHaveAttribute('type', 'password');
+    expect(first).toHaveValue('abandon');
+    expect(second).toHaveValue('ability');
+  });
   it('opens with all 24 indexed places visible while retaining the explicit 12-word option', () => {
     render(<WordEntryScreen grid={grid()} onSelectCount={vi.fn()} onPastePhrase={vi.fn()} onConfirmPasteReplacement={vi.fn()} onClearAll={vi.fn()} onVerify={vi.fn()} onBack={vi.fn()} />);
     expect(screen.getByLabelText('12 words')).not.toBeChecked();

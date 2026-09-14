@@ -57,8 +57,10 @@ export type ClientOperationKind =
   | 'createCandidate'
   | 'revealCandidateWords'
   | 'concealCandidate'
+  | 'discardSecretTransfers'
   | 'destroyCandidate'
   | 'deriveWordsCandidate'
+  | 'deriveRecoveryCandidates'
   | 'importFileCandidate'
   | 'retainTransactionDigest'
   | 'submitIdentityTransaction'
@@ -179,11 +181,14 @@ export class BrowserVaultClient {
   private readonly nowMs: () => number;
   private readonly workerFactory: (url: string) => { readonly port: MessagePortLike } | null;
 
+  private readonly onPageHide = () => this.lifecycle('pagehide');
   private port: MessagePortLike | null = null;
   private clientChannel: string | null = null;
   private authorityEpoch = 0;
   private connected = false;
   private readonly pending = new Map<string, (result: ClientOperationResult) => void>();
+  private readonly lockOperations = new Set<string>();
+  private readonly lockAcknowledgements = new Map<string, ClientOperationResult>();
   private pendingCapabilityResolvers: Array<(issued: CapabilityIssued) => void> = [];
   private invalidationHandler: ((reason: string) => void) | null = null;
   /** FEAT-016/017: safe licence-progress listeners (page side, multiple owners). */
@@ -213,6 +218,7 @@ export class BrowserVaultClient {
 
   /** Connect and handshake. Never falls back on failure. */
   connect(): Promise<HandshakeResult> {
+    if (typeof window !== 'undefined') window.addEventListener('pagehide', this.onPageHide);
     if (this.connected) {
       return Promise.resolve({ ok: true, authorityEpoch: this.authorityEpoch, session: { state: 'connected' } });
     }
@@ -238,6 +244,10 @@ export class BrowserVaultClient {
     if (created === null) {
       emitClientBeacon({ ok: false, reason: 'worker-creation-failed', stage: 'connect' });
       return { ok: false, reason: 'transport' };
+    }
+    if (this.port !== null) {
+      this.port.onmessage = null;
+      this.port.close?.();
     }
     this.port = created.port;
     this.clientChannel = this.randomId('chan-');
@@ -279,8 +289,11 @@ export class BrowserVaultClient {
   }
 
   /** Register the global-invalidation handler (Lock/removal/takeover). */
-  onInvalidation(handler: (reason: string) => void): void {
+  onInvalidation(handler: (reason: string) => void): () => void {
     this.invalidationHandler = handler;
+    return () => {
+      if (this.invalidationHandler === handler) this.invalidationHandler = null;
+    };
   }
 
   /** Register the safe entitlement-progress handler (FEAT-016/017). */
@@ -317,6 +330,7 @@ export class BrowserVaultClient {
     };
     return new Promise<ClientOperationResult>((resolve) => {
       this.pending.set(resolvedOperationId, resolve);
+      if (operation === 'lockAll') this.lockOperations.add(resolvedOperationId);
       this.port?.postMessage(message);
     });
   }
@@ -394,6 +408,7 @@ export class BrowserVaultClient {
 
   /** Close the connection (pagehide/disconnect). */
   close(): void {
+    if (typeof window !== 'undefined') window.removeEventListener('pagehide', this.onPageHide);
     this.lifecycle('disconnect');
     if (this.port?.close) {
       try {
@@ -423,8 +438,7 @@ export class BrowserVaultClient {
         }
         const resolve = this.pending.get(outcome.operationId);
         if (resolve) {
-          this.pending.delete(outcome.operationId);
-          resolve({
+          const result: ClientOperationResult = {
             operationId: outcome.operationId,
             outcome: outcome.outcome,
             retryable: outcome.retryable,
@@ -432,7 +446,14 @@ export class BrowserVaultClient {
             ...(outcome.retryDeadlineMs !== undefined ? { retryDeadlineMs: outcome.retryDeadlineMs } : {}),
             ...(outcome.supportCode !== undefined ? { supportCode: outcome.supportCode } : {}),
             ...(outcome.payload !== undefined ? { payload: outcome.payload } : {}),
-          });
+          };
+          // The worker sends Lock's result immediately before invalidation.
+          // Do not let cleanup start another operation using the revoked epoch.
+          if (this.lockOperations.has(outcome.operationId)) this.lockAcknowledgements.set(outcome.operationId, result);
+          else {
+            this.pending.delete(outcome.operationId);
+            resolve(result);
+          }
         }
         break;
       }
@@ -446,12 +467,15 @@ export class BrowserVaultClient {
         break;
       }
       case 'global-invalidation': {
+        if (!Number.isSafeInteger(message.authorityEpoch) || message.authorityEpoch <= this.authorityEpoch) return;
         this.authorityEpoch = message.authorityEpoch;
         this.connected = false;
-        for (const resolve of this.pending.values()) {
-          resolve({ operationId: '', outcome: 'AUTHORITY_INVALIDATED', retryable: false, allowedActions: [] });
+        for (const [id, resolve] of this.pending) {
+          resolve(this.lockAcknowledgements.get(id) ?? { operationId: '', outcome: 'AUTHORITY_INVALIDATED', retryable: false, allowedActions: [] });
         }
         this.pending.clear();
+        this.lockOperations.clear();
+        this.lockAcknowledgements.clear();
         this.invalidationHandler?.(message.reason);
         break;
       }

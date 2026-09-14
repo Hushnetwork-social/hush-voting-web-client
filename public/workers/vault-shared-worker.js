@@ -21774,60 +21774,60 @@ var require_wordlists = __commonJS({
   "node_modules/bip39/src/_wordlists.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    var wordlists3 = {};
-    exports.wordlists = wordlists3;
+    var wordlists4 = {};
+    exports.wordlists = wordlists4;
     var _default;
     exports._default = _default;
     try {
       exports._default = _default = require_czech();
-      wordlists3.czech = _default;
+      wordlists4.czech = _default;
     } catch (err2) {
     }
     try {
       exports._default = _default = require_chinese_simplified();
-      wordlists3.chinese_simplified = _default;
+      wordlists4.chinese_simplified = _default;
     } catch (err2) {
     }
     try {
       exports._default = _default = require_chinese_traditional();
-      wordlists3.chinese_traditional = _default;
+      wordlists4.chinese_traditional = _default;
     } catch (err2) {
     }
     try {
       exports._default = _default = require_korean();
-      wordlists3.korean = _default;
+      wordlists4.korean = _default;
     } catch (err2) {
     }
     try {
       exports._default = _default = require_french();
-      wordlists3.french = _default;
+      wordlists4.french = _default;
     } catch (err2) {
     }
     try {
       exports._default = _default = require_italian();
-      wordlists3.italian = _default;
+      wordlists4.italian = _default;
     } catch (err2) {
     }
     try {
       exports._default = _default = require_spanish();
-      wordlists3.spanish = _default;
+      wordlists4.spanish = _default;
     } catch (err2) {
     }
     try {
       exports._default = _default = require_japanese();
-      wordlists3.japanese = _default;
-      wordlists3.JA = _default;
+      wordlists4.japanese = _default;
+      wordlists4.JA = _default;
     } catch (err2) {
     }
     try {
       exports._default = _default = require_portuguese();
-      wordlists3.portuguese = _default;
+      wordlists4.portuguese = _default;
     } catch (err2) {
     }
     try {
       exports._default = _default = require_english();
-      wordlists3.english = _default;
-      wordlists3.EN = _default;
+      wordlists4.english = _default;
+      wordlists4.EN = _default;
     } catch (err2) {
     }
   }
@@ -22044,7 +22044,7 @@ function validateClientMessage(value) {
   }
 }
 var OPERATION_PAYLOAD_SCHEMAS = {
-  provisionFromValidatedBundle: ["candidateRef", "alias", "visibility"],
+  provisionFromValidatedBundle: ["candidateRef", "alias", "visibility", "protectionMode"],
   unlockPassword: [],
   changeDevicePassword: [],
   verifyOnlineIdentity: [],
@@ -22055,9 +22055,11 @@ var OPERATION_PAYLOAD_SCHEMAS = {
   createCandidate: [],
   revealCandidateWords: ["candidateRef"],
   concealCandidate: ["candidateRef"],
+  discardSecretTransfers: ["transferOperationId"],
   destroyCandidate: ["candidateRef"],
   deriveWordsCandidate: ["producerId", "wordCount"],
-  importFileCandidate: [],
+  deriveRecoveryCandidates: ["wordCount"],
+  importFileCandidate: ["emptyV1Confirmed"],
   retainTransactionDigest: ["digest"],
   submitIdentityTransaction: ["alias", "visibility"],
   promoteLifecycle: ["status"],
@@ -22201,8 +22203,10 @@ var OPERATION_KINDS = /* @__PURE__ */ new Set([
   "createCandidate",
   "revealCandidateWords",
   "concealCandidate",
+  "discardSecretTransfers",
   "destroyCandidate",
   "deriveWordsCandidate",
+  "deriveRecoveryCandidates",
   "importFileCandidate",
   "retainTransactionDigest",
   "submitIdentityTransaction",
@@ -22226,11 +22230,11 @@ function validateSecretTransfer(record) {
   if (record.purpose !== "devicePassword" && record.purpose !== "mnemonic" && record.purpose !== "filePassword" && record.purpose !== "fileBytes") {
     return null;
   }
-  if (typeof record.value !== "string" || record.value.length === 0) {
+  if (typeof record.value !== "string" || record.value.length === 0 && record.purpose !== "filePassword") {
     return null;
   }
   const maxBytes = record.purpose === "fileBytes" ? 14e5 : 4096;
-  if (record.value.length > maxBytes) {
+  if ((record.purpose === "fileBytes" ? record.value.length : new TextEncoder().encode(record.value).byteLength) > maxBytes) {
     return null;
   }
   return {
@@ -22338,8 +22342,10 @@ var FRESH_CAPABILITY_REQUIRED_BY_OPERATION = {
   createCandidate: null,
   revealCandidateWords: null,
   concealCandidate: null,
+  discardSecretTransfers: null,
   destroyCandidate: null,
   deriveWordsCandidate: null,
+  deriveRecoveryCandidates: null,
   importFileCandidate: null,
   retainTransactionDigest: null,
   submitIdentityTransaction: null,
@@ -22469,6 +22475,14 @@ var WorkerAuthority = class {
     if (!this.isKnownChannel(request.clientChannel)) {
       return { accepted: false, outcome: "OPERATION_UNKNOWN_CHANNEL" };
     }
+    if (request.operation === "lockAll") {
+      this.epoch += 1;
+      this.freshCapabilities.clear();
+      this.env.onInvalidate?.();
+      this.activeOperationId = request.operationId;
+      void this.runOperation(request);
+      return { accepted: true, outcome: "OPERATION_STARTED" };
+    }
     if (this.activeOperationId !== null) {
       this.deliverOperationRejection(request, "AUTHORITY_BUSY");
       return { accepted: false, outcome: "OPERATION_BUSY" };
@@ -22518,6 +22532,15 @@ var WorkerAuthority = class {
         ...result.supportCode !== void 0 ? { supportCode: result.supportCode } : {},
         ...result.payload !== void 0 ? { payload: result.payload } : {}
       });
+      if (request.operation === "lockAll") {
+        this.phase = "locked";
+        this.acceptedChannels.clear();
+        this.env.broadcast({
+          kind: "global-invalidation",
+          authorityEpoch: this.epoch,
+          reason: result.outcome === "OK" || result.outcome === "SUCCESS" ? "lock" : "cleanup-failed"
+        });
+      }
     } finally {
       if (this.activeOperationId === request.operationId) {
         this.activeOperationId = null;
@@ -22534,6 +22557,10 @@ var WorkerAuthority = class {
   handleLifecycle(request) {
     if (!this.isKnownChannel(request.clientChannel) || request.authorityEpoch !== this.epoch) {
       return { accepted: false, outcome: "LIFECYCLE_REJECTED" };
+    }
+    if (this.env.shouldInvalidateOnLifecycle?.(request.signal)) {
+      this.invalidate("authority-loss");
+      return { accepted: true, outcome: "LIFECYCLE_ACCEPTED" };
     }
     if (request.signal === "disconnect") {
       this.acceptedChannels.delete(request.clientChannel);
@@ -22565,6 +22592,7 @@ var WorkerAuthority = class {
     this.activeOperationId = null;
     this.freshCapabilities.clear();
     this.acceptedChannels.clear();
+    this.env.onInvalidate?.();
     this.env.broadcast({ kind: "global-invalidation", authorityEpoch: this.epoch, reason });
   }
   /** Update-mismatch handling: no new capability, safe abort, global lock. */
@@ -22755,6 +22783,11 @@ async function openVaultStorage(factory, options = {}) {
       onVersionChange: () => void 0
     });
     const opened = { db, session: createSession(db) };
+    const probe = await opened.session.probeStorage();
+    if (!probe.ok) {
+      opened.session.close();
+      return probe;
+    }
     return success({ session: opened.session });
   } catch (error) {
     return storageFailureToVaultResult(classifyStorageError(error));
@@ -22796,6 +22829,80 @@ function runTransaction(db, store, mode, work) {
   });
 }
 function createSession(db) {
+  const probeStorage = () => new Promise((resolve) => {
+    let transaction;
+    try {
+      transaction = db.transaction("operationalSidecars", "readwrite");
+    } catch (error) {
+      resolve(storageFailureToVaultResult(classifyStorageError(error)));
+      return;
+    }
+    const store = transaction.objectStore("operationalSidecars");
+    const key = "persistenceAck";
+    assertAllowedStorageKey("operationalSidecars", key);
+    let verified = false;
+    let failureResult = failure("StorageUnavailable");
+    const abort = (error) => {
+      if (error !== void 0) failureResult = storageFailureToVaultResult(classifyStorageError(error));
+      try {
+        transaction.abort();
+      } catch {
+      }
+    };
+    const timeout = setTimeout(() => abort(), 5e3);
+    transaction.onabort = () => {
+      clearTimeout(timeout);
+      resolve(failureResult);
+    };
+    transaction.onerror = () => {
+    };
+    transaction.oncomplete = () => {
+      clearTimeout(timeout);
+      resolve(verified ? success({ ok: true }) : failure("StorageUnavailable"));
+    };
+    const guarded = (action) => {
+      try {
+        action();
+      } catch (error) {
+        abort(error);
+      }
+    };
+    guarded(() => {
+      const original = store.get(key);
+      original.onsuccess = () => guarded(() => {
+        const prior = original.result;
+        const write = store.put("hushvoting-storage-preflight-v1", key);
+        write.onsuccess = () => guarded(() => {
+          const read = store.get(key);
+          read.onsuccess = () => guarded(() => {
+            const value = read.result;
+            if (value !== "hushvoting-storage-preflight-v1") {
+              abort();
+              return;
+            }
+            const remove = store.delete(key);
+            remove.onsuccess = () => guarded(() => {
+              const absent = store.get(key);
+              absent.onsuccess = () => guarded(() => {
+                if (absent.result !== void 0) {
+                  abort();
+                  return;
+                }
+                if (prior === void 0) {
+                  verified = true;
+                  return;
+                }
+                const restore = store.put(prior, key);
+                restore.onsuccess = () => {
+                  verified = true;
+                };
+              });
+            });
+          });
+        });
+      });
+    });
+  });
   const readRecord = async (store, key) => {
     try {
       assertAllowedStorageKey(store, key);
@@ -22926,6 +23033,7 @@ function createSession(db) {
   const session = {
     databaseName: db.name,
     schemaVersion: db.version,
+    probeStorage,
     readRecord,
     writeRecord,
     deleteRecord,
@@ -24246,6 +24354,52 @@ function createBrowserSuiteExecutor(env = BROWSER_CRYPTO_ENVIRONMENT) {
   };
 }
 
+// src/lib/identity-compatibility/historical-profile.ts
+var HISTORICAL_ALIAS_MAX_UTF8_BYTES = 4096;
+var IDENTITY_RESPONSE_MAX_BYTES = 65536;
+function hasBoundedHistoricalName(value) {
+  if (typeof value !== "string" || value.length > HISTORICAL_ALIAS_MAX_UTF8_BYTES) return false;
+  const bytes = new TextEncoder().encode(value);
+  return bytes.byteLength <= HISTORICAL_ALIAS_MAX_UTF8_BYTES && new TextDecoder().decode(bytes) === value;
+}
+async function readIdentityResponse(response, signal) {
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error("IDENTITY_RESPONSE_UNAVAILABLE");
+  const chunks = [];
+  let total = 0;
+  let done = false;
+  let abort;
+  const aborted = new Promise((_, reject) => {
+    abort = () => reject(new DOMException("Identity response canceled", "AbortError"));
+  });
+  signal?.addEventListener("abort", abort, { once: true });
+  try {
+    if (signal?.aborted) throw new DOMException("Identity response canceled", "AbortError");
+    if (Number(response.headers.get("content-length")) > IDENTITY_RESPONSE_MAX_BYTES) throw new Error("IDENTITY_RESPONSE_TOO_LARGE");
+    while (true) {
+      const part = await Promise.race([reader.read(), aborted]);
+      if (part.done) {
+        done = true;
+        break;
+      }
+      total += part.value.byteLength;
+      if (total > IDENTITY_RESPONSE_MAX_BYTES) throw new Error("IDENTITY_RESPONSE_TOO_LARGE");
+      chunks.push(part.value);
+    }
+    const bytes = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+  } finally {
+    signal?.removeEventListener("abort", abort);
+    if (!done) void reader.cancel().catch(() => void 0);
+    reader.releaseLock();
+  }
+}
+
 // src/lib/runtime/deployment.ts
 var ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 var ENDPOINT_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
@@ -25561,83 +25715,65 @@ function entropyToMnemonicWorker(entropy) {
   }
   return words.join(" ");
 }
-function mnemonicToEntropyWorker(mnemonic) {
-  const normalized = mnemonic.toLowerCase().split(/[ \t\n\r]+/).filter((word) => word.length > 0).join(" ");
-  const words = normalized.split(" ");
-  const validCounts = /* @__PURE__ */ new Set([12, 15, 18, 21, 24]);
-  if (!validCounts.has(words.length)) {
-    return null;
-  }
-  const indexByWord = /* @__PURE__ */ new Map();
-  WORDLIST.forEach((word, index) => {
-    indexByWord.set(word, index);
-  });
-  let binary = "";
-  for (const word of words) {
-    const index = indexByWord.get(word);
-    if (index === void 0) {
-      return null;
-    }
-    binary += index.toString(2).padStart(11, "0");
-  }
-  const CS = words.length / 3;
-  const ENT = binary.length - CS;
-  const entropyBits = binary.slice(0, ENT);
-  const checksumBits = binary.slice(ENT);
-  const entropy = new Uint8Array(ENT / 8);
-  for (let i = 0; i < entropy.length; i += 1) {
-    entropy[i] = parseInt(entropyBits.slice(i * 8, i * 8 + 8), 2);
-  }
-  const hash = sha256(entropy);
-  const expected = toBinaryString(hash).slice(0, CS);
-  if (expected !== checksumBits) {
-    return null;
-  }
-  return entropy;
-}
-function validateMnemonicWorker(mnemonic) {
-  return mnemonicToEntropyWorker(mnemonic) !== null;
-}
 function mnemonicToSeedWorker(mnemonic, passphrase = "") {
   const encoder = new TextEncoder();
   return pbkdf2(sha512, encoder.encode(mnemonic), encoder.encode(`mnemonic${passphrase}`), { c: 2048, dkLen: 64 });
 }
 function deriveP01KeysWorker(mnemonic) {
   const seed = mnemonicToSeedWorker(mnemonic);
-  const signingPrivateKey = bytesToHexLower(hkdfSha256(seed, "signing"));
-  const encryptionPrivateKey = bytesToHexLower(hkdfSha256(seed, "encryption"));
-  if (!isUsableScalar(signingPrivateKey) || !isUsableScalar(encryptionPrivateKey)) {
-    return null;
+  let signingBytes;
+  let encryptionBytes;
+  try {
+    signingBytes = hkdfSha256(seed, "signing");
+    encryptionBytes = hkdfSha256(seed, "encryption");
+    const signingPrivateKey = bytesToHexLower(signingBytes);
+    const encryptionPrivateKey = bytesToHexLower(encryptionBytes);
+    if (!isUsableScalar(signingPrivateKey) || !isUsableScalar(encryptionPrivateKey)) return null;
+    return {
+      signingPrivateKey,
+      encryptionPrivateKey,
+      signingAddress: derivePublicKey(signingPrivateKey, "COMPRESSED"),
+      encryptionAddress: derivePublicKey(encryptionPrivateKey, "COMPRESSED"),
+      publicKeyEncoding: "COMPRESSED"
+    };
+  } finally {
+    seed.fill(0);
+    signingBytes?.fill(0);
+    encryptionBytes?.fill(0);
   }
-  return {
-    signingPrivateKey,
-    encryptionPrivateKey,
-    signingAddress: derivePublicKey(signingPrivateKey, "COMPRESSED"),
-    encryptionAddress: derivePublicKey(encryptionPrivateKey, "COMPRESSED"),
-    publicKeyEncoding: "COMPRESSED"
-  };
 }
 function deriveP02KeysWorker(mnemonic) {
   const seed = mnemonicToSeedWorker(mnemonic);
   const deriveWithRetry = (info) => {
     let attempt = 0;
-    let keyMaterial = hkdfSha256(seed, info);
-    while (!isUsableScalar(bytesToHexLower(keyMaterial))) {
+    while (true) {
+      const keyMaterial = hkdfSha256(seed, attempt === 0 ? info : `${info}/${attempt}`);
+      try {
+        const key = bytesToHexLower(keyMaterial);
+        if (isUsableScalar(key)) return key;
+      } finally {
+        keyMaterial.fill(0);
+      }
       attempt += 1;
-      keyMaterial = hkdfSha256(seed, `${info}/${attempt}`);
     }
-    return bytesToHexLower(keyMaterial);
   };
-  const signingPrivateKey = deriveWithRetry("hush/signing/secp256k1/v1");
-  const encryptionPrivateKey = deriveWithRetry("hush/encrypt/secp256k1/v1");
-  return {
-    signingPrivateKey,
-    encryptionPrivateKey,
-    signingAddress: derivePublicKey(signingPrivateKey, "UNCOMPRESSED"),
-    encryptionAddress: derivePublicKey(encryptionPrivateKey, "UNCOMPRESSED"),
-    publicKeyEncoding: "UNCOMPRESSED"
-  };
+  try {
+    const signingPrivateKey = deriveWithRetry("hush/signing/secp256k1/v1");
+    const encryptionPrivateKey = deriveWithRetry("hush/encrypt/secp256k1/v1");
+    return {
+      signingPrivateKey,
+      encryptionPrivateKey,
+      signingAddress: derivePublicKey(signingPrivateKey, "UNCOMPRESSED"),
+      encryptionAddress: derivePublicKey(encryptionPrivateKey, "UNCOMPRESSED"),
+      publicKeyEncoding: "UNCOMPRESSED"
+    };
+  } finally {
+    seed.fill(0);
+  }
 }
+
+// src/lib/browser-vault/production/sealed-vault.ts
+var import_bip393 = __toESM(require_src(), 1);
 
 // src/lib/browser-vault/lifecycle/journal.ts
 var DEFAULT_ROLLBACK_CLEANUP_MS = 24 * 60 * 60 * 1e3;
@@ -25736,6 +25872,10 @@ function createAtomicJournal(session, ports) {
       return readBack;
     }
     if (readBack.value.record === null || readBack.value.record.generation !== params.candidateGeneration) {
+      return failure("StorageUnavailable");
+    }
+    const persistedBytes = readBack.value.record.bytes;
+    if (persistedBytes.byteLength !== params.candidateBytes.byteLength || !persistedBytes.every((byte, index) => byte === params.candidateBytes[index])) {
       return failure("StorageUnavailable");
     }
     const verified = await ports.verifyCandidate(readBack.value.record.bytes, params.candidateGeneration);
@@ -25921,8 +26061,80 @@ function checkSupportedVersion(version) {
   return { ok: false, code: "UNSUPPORTED_CRITICAL_VERSION" };
 }
 
+// src/lib/identity-convergence/pending-transaction.ts
+var PENDING_TRANSACTION_SCHEMA_VERSION = 2;
+var PENDING_TRANSACTION_MAX_JSON_BYTES = 65536;
+var PENDING_TRANSACTION_MAX_ATTEMPT_EVIDENCE = 64;
+var PENDING_TRANSACTION_ID_MAX_LENGTH = 128;
+function isRetryEligible(record) {
+  if (record.rollbackState !== "postSeal" && record.rollbackState !== "postSubmit") {
+    return false;
+  }
+  return record.lifecycle === "sealed" || record.lifecycle === "waitingAccepted" || record.lifecycle === "waitingPending";
+}
+function verifyDigest(record) {
+  return digestOf(record.transaction.exactJson) === record.transaction.digest;
+}
+function digestOf(exactJson) {
+  return sha256Hex(new TextEncoder().encode(exactJson));
+}
+function validatePendingTransaction(record) {
+  const objectWithKeys = (value, keys) => typeof value === "object" && value !== null && !Array.isArray(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
+  const boundedText = (value, max) => typeof value === "string" && value.length > 0 && new TextEncoder().encode(value).length <= max;
+  if (!objectWithKeys(record, ["schemaVersion", "transaction", "transactionId", "reviewedMetadata", "lifecycle", "attemptEvidence", "epochBinding", "networkBinding", "rollbackState"]) || !objectWithKeys(record.transaction, ["exactJson", "digest"]) || !boundedText(record.transaction.exactJson, PENDING_TRANSACTION_MAX_JSON_BYTES) || typeof record.transaction.digest !== "string" || !/^[0-9a-f]{64}$/.test(record.transaction.digest) || !boundedText(record.transactionId, PENDING_TRANSACTION_ID_MAX_LENGTH) || !objectWithKeys(record.reviewedMetadata, ["alias", "visibility"]) || !boundedText(record.reviewedMetadata.alias, 256) || !["private", "public"].includes(record.reviewedMetadata.visibility) || !["sealed", "waitingAccepted", "waitingPending", "confirmed", "rejectedEditable", "discarded"].includes(record.lifecycle) || !["preSeal", "postSeal", "postSubmit"].includes(record.rollbackState) || !boundedText(record.epochBinding, 256) || !boundedText(record.networkBinding, 256) || !Array.isArray(record.attemptEvidence) || record.attemptEvidence.length > PENDING_TRANSACTION_MAX_ATTEMPT_EVIDENCE) {
+    return { ok: false, reason: "invalid pending record shape" };
+  }
+  for (const attempt of record.attemptEvidence) {
+    if (!objectWithKeys(attempt, ["at", "outcome"]) || typeof attempt.at !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{3})?)?Z$/.test(attempt.at) || !Number.isFinite(Date.parse(attempt.at)) || typeof attempt.outcome !== "string" || !["accepted", "pending", "alreadyExists", "rejectedEditable", "rejectedTerminal", "transportUncertain"].includes(attempt.outcome)) {
+      return { ok: false, reason: "invalid attempt evidence" };
+    }
+  }
+  if (record.schemaVersion !== PENDING_TRANSACTION_SCHEMA_VERSION) {
+    return { ok: false, reason: "unsupported schema version" };
+  }
+  if (new TextEncoder().encode(record.transaction.exactJson).length > PENDING_TRANSACTION_MAX_JSON_BYTES) {
+    return { ok: false, reason: "exact transaction exceeds size bound" };
+  }
+  if (record.transactionId.length === 0 || record.transactionId.length > PENDING_TRANSACTION_ID_MAX_LENGTH) {
+    return { ok: false, reason: "transaction id out of bounds" };
+  }
+  if (record.attemptEvidence.length > PENDING_TRANSACTION_MAX_ATTEMPT_EVIDENCE) {
+    return { ok: false, reason: "attempt evidence exceeds bound" };
+  }
+  if (record.epochBinding.length === 0 || record.networkBinding.length === 0) {
+    return { ok: false, reason: "epoch/network binding missing" };
+  }
+  if (!verifyDigest(record)) {
+    return { ok: false, reason: "digest mismatch" };
+  }
+  return { ok: true };
+}
+
 // src/lib/identity-compatibility/producers.ts
 var failure2 = (code, message) => ({ ok: false, code, message });
+var APPROVED_DERIVATION_PRODUCERS = [
+  {
+    producerId: "P-01",
+    name: "Hush Feeds Web Client (TypeScript)",
+    precedence: 1,
+    mnemonicSupport: "12_AND_24",
+    publicKeyEncoding: "COMPRESSED"
+  },
+  {
+    producerId: "P-02",
+    name: "Olimpo.KeyDerivation (.NET)",
+    precedence: 2,
+    mnemonicSupport: "24",
+    publicKeyEncoding: "UNCOMPRESSED"
+  },
+  {
+    producerId: "P-03",
+    name: "Hush Desktop Client (Avalonia, historical HushClient)",
+    precedence: 5,
+    mnemonicSupport: "24",
+    publicKeyEncoding: "UNCOMPRESSED"
+  }
+];
 function normalizeMnemonicOlimpo(mnemonic) {
   return mnemonic.toLowerCase().split(/[ \t\n\r]+/).filter((w) => w.length > 0).join(" ");
 }
@@ -25973,6 +26185,16 @@ function bytesToHexString(bytes) {
   return bytesToHexLower(bytes);
 }
 
+// src/lib/credential-file-restore/contracts/import.ts
+var BACKOFF_SCHEDULE_SECONDS = [0, 0, 2, 4, 8, 16, 30];
+function backoffDelaySeconds(failedAttempts) {
+  if (failedAttempts <= 0) return 0;
+  if (failedAttempts <= BACKOFF_SCHEDULE_SECONDS.length) {
+    return BACKOFF_SCHEDULE_SECONDS[failedAttempts - 1] ?? 0;
+  }
+  return BACKOFF_SCHEDULE_SECONDS[BACKOFF_SCHEDULE_SECONDS.length - 1] ?? 0;
+}
+
 // src/lib/identity-compatibility/dat.ts
 var DAT_MAGIC = "HUSH";
 var DAT_VERSION = 1;
@@ -26011,7 +26233,13 @@ function inspectDatEnvelope(envelope) {
   return { ok: true, value: { version } };
 }
 async function deriveDatKey(password, salt) {
-  const keyMaterial = await subtle2().importKey("raw", ENCODER2.encode(password), "PBKDF2", false, ["deriveKey"]);
+  const passwordBytes = ENCODER2.encode(password);
+  let keyMaterial;
+  try {
+    keyMaterial = await subtle2().importKey("raw", passwordBytes, "PBKDF2", false, ["deriveKey"]);
+  } finally {
+    passwordBytes.fill(0);
+  }
   const saltBuffer = salt.buffer.slice(salt.byteOffset, salt.byteOffset + salt.byteLength);
   return subtle2().deriveKey(
     { name: "PBKDF2", salt: saltBuffer, iterations: DAT_PBKDF2_ITERATIONS, hash: "SHA-256" },
@@ -26030,14 +26258,24 @@ async function decryptDatV1(envelope, password) {
   try {
     const key = await deriveDatKey(password, salt);
     const plaintext = await subtle2().decrypt({ name: "AES-GCM", iv: nonce, tagLength: 128 }, key, ciphertext);
-    return { ok: true, value: new TextDecoder().decode(plaintext) };
+    try {
+      return { ok: true, value: new TextDecoder().decode(plaintext) };
+    } finally {
+      new Uint8Array(plaintext).fill(0);
+    }
   } catch {
     return failure3("DAT_WRONG_PASSWORD", "AES-GCM authentication failed");
   }
 }
 function hasDuplicateKeys(jsonText) {
-  const keys = [...jsonText.matchAll(/"((?:[^"\\]|\\.)*)"\s*:/g)].map((m) => m[1]);
-  return new Set(keys).size !== keys.length;
+  const keys = /* @__PURE__ */ new Set();
+  for (const match of jsonText.matchAll(/"(?:[^"\\]|\\[\s\S])*"/g)) {
+    if (!/^\s*:/.test(jsonText.slice(match.index + match[0].length))) continue;
+    const key = JSON.parse(match[0]);
+    if (keys.has(key)) return true;
+    keys.add(key);
+  }
+  return false;
 }
 var ALLOWED_FIELDS = /* @__PURE__ */ new Set(["ProfileName", "PublicSigningAddress", "PrivateSigningKey", "PublicEncryptAddress", "PrivateEncryptKey", "IsPublic", "Mnemonic"]);
 function isWellFormedJson(jsonText) {
@@ -26052,14 +26290,16 @@ function parsePortableCredentialsStrict(jsonText) {
   if (!isWellFormedJson(jsonText)) return failure3("DAT_MALFORMED", "decrypted payload is not valid JSON");
   if (hasDuplicateKeys(jsonText)) return failure3("DAT_DUPLICATE_FIELD", "duplicate property in portable credentials");
   const parsed = JSON.parse(jsonText);
-  for (const key of Object.keys(parsed)) {
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return failure3("DAT_INVALID_FIELD", "credential payload must be an object");
+  const record = parsed;
+  for (const key of Object.keys(record)) {
     if (!ALLOWED_FIELDS.has(key)) return failure3("DAT_UNKNOWN_FIELD", `unknown property: ${key}`);
   }
   for (const key of ALLOWED_FIELDS) {
-    if (!(key in parsed)) return failure3("DAT_MISSING_FIELD", `missing required property: ${key}`);
+    if (!(key in record)) return failure3("DAT_MISSING_FIELD", `missing required property: ${key}`);
   }
   const s = (key) => {
-    const v = parsed[key];
+    const v = record[key];
     if (typeof v !== "string") return "";
     return v;
   };
@@ -26068,8 +26308,8 @@ function parsePortableCredentialsStrict(jsonText) {
   const signingPrivate = s("PrivateSigningKey");
   const encryptAddress = s("PublicEncryptAddress");
   const encryptPrivate = s("PrivateEncryptKey");
-  const mnemonic = parsed.Mnemonic;
-  const isPublic = parsed.IsPublic;
+  const mnemonic = record.Mnemonic;
+  const isPublic = record.IsPublic;
   if (profileName.length === 0 || profileName.length > PROFILE_NAME_MAX_LENGTH || /[\u0000-\u001f\u007f]/.test(profileName)) {
     return failure3("DAT_INVALID_FIELD", "ProfileName violates compatibility bounds");
   }
@@ -26265,6 +26505,52 @@ function corpusTimestamp(date = /* @__PURE__ */ new Date()) {
   return date.toISOString();
 }
 
+// src/lib/identity-creation/wire.ts
+var ALLOWED_TRANSACTION_STATUSES = ["UNSPECIFIED", "ACCEPTED", "ALREADY_EXISTS", "PENDING", "REJECTED"];
+function isTransactionStatus(value) {
+  return typeof value === "string" && ALLOWED_TRANSACTION_STATUSES.includes(value);
+}
+function normalizeSubmitReply(reply, editableCodeAllowlist) {
+  if (reply === null || reply === void 0 || typeof reply !== "object") {
+    return { kind: "compatibilityError" };
+  }
+  const status = reply.status ?? null;
+  if (status === null || status === "UNSPECIFIED") {
+    return { kind: "compatibilityError" };
+  }
+  if (!isTransactionStatus(status)) {
+    return { kind: "compatibilityError" };
+  }
+  if (reply.successfull !== true && reply.successfull !== false) {
+    return { kind: "compatibilityError" };
+  }
+  if (reply.validationCode !== null && reply.validationCode !== void 0 && typeof reply.validationCode !== "string") {
+    return { kind: "compatibilityError" };
+  }
+  if (status !== "REJECTED" && reply.validationCode) return { kind: "compatibilityError" };
+  switch (status) {
+    case "ACCEPTED":
+      return reply.successfull === true ? { kind: "accepted" } : { kind: "compatibilityError" };
+    case "PENDING":
+      return reply.successfull === true ? { kind: "pending" } : { kind: "compatibilityError" };
+    case "ALREADY_EXISTS":
+      return reply.successfull === true ? { kind: "alreadyExists" } : { kind: "compatibilityError" };
+    case "REJECTED": {
+      if (reply.successfull !== false) return { kind: "compatibilityError" };
+      const code = reply.validationCode ?? null;
+      if (code === null || code.length === 0) {
+        return { kind: "unknownRejection" };
+      }
+      if (editableCodeAllowlist.has(code)) {
+        return { kind: "editableRejection", validationCode: code };
+      }
+      return { kind: "terminalRejection", validationCode: code };
+    }
+    default:
+      return { kind: "compatibilityError" };
+  }
+}
+
 // src/lib/licensing/contracts.ts
 var LICENCE_QUERY_SIGNATORY_HEADER = "x-hush-licence-query-signatory";
 var LICENCE_QUERY_SIGNED_AT_HEADER = "x-hush-licence-query-signed-at";
@@ -26275,6 +26561,19 @@ var LICENCE_PLAN_DIRECT_FREE = "hushvoting.direct.free";
 var LICENCE_CATALOGUE_VERSION_V1 = "hushvoting-licence-catalogue/v1.0.0";
 var LICENCE_TRANSITION_INTENT_BASELINE_FREE = "baseline_free";
 var LICENCE_TRANSITION_INTENT_CONFIRMED_UPGRADE = "confirmed_upgrade";
+var KNOWN_LICENCE_PLAN_IDS = [
+  LICENCE_PLAN_DIRECT_FREE,
+  "hushvoting.veritas.500",
+  "hushvoting.veritas.2000",
+  "hushvoting.veritas.10000",
+  "hushvoting.enterprise"
+];
+var KNOWN_GOVERNANCE_OPTION_IDS = [
+  "no-customer-trustees",
+  "trustees-3of5",
+  "trustees-7of10",
+  "trustees-8of13"
+];
 function licenceQuerySignedJson(envelope) {
   return `{"actorAddress":"${envelope.actorAddress}","method":"${envelope.method}","request":{},"signedAt":"${envelope.signedAt}"}`;
 }
@@ -26400,6 +26699,7 @@ var LICENCE_PENDING_SCHEMA_VERSION = 1;
 var LICENCE_PENDING_MAX_JSON_BYTES = 65536;
 var LICENCE_PENDING_MAX_ATTEMPT_EVIDENCE = 64;
 var LICENCE_PENDING_ID_MAX_LENGTH = 128;
+var LICENCE_PENDING_IDENTITY_MAX_LENGTH = 130;
 function isConfirmedUpgradePendingRecord(record) {
   return record.upgradeBinding !== void 0;
 }
@@ -26488,7 +26788,7 @@ function parsePendingLicenceRecord(value) {
   if (!isBoundedString2(value.transactionId, LICENCE_PENDING_ID_MAX_LENGTH) || !UUID_RE.test(value.transactionId)) {
     return null;
   }
-  if (!isBoundedString2(value.identityBinding, LICENCE_PENDING_ID_MAX_LENGTH) || !isBoundedString2(value.networkBinding, LICENCE_PENDING_ID_MAX_LENGTH)) {
+  if (!isBoundedString2(value.identityBinding, LICENCE_PENDING_IDENTITY_MAX_LENGTH) || !isBoundedString2(value.networkBinding, LICENCE_PENDING_ID_MAX_LENGTH)) {
     return null;
   }
   const target = value.targetBinding;
@@ -26639,6 +26939,7 @@ var LICENCE_JOURNAL_STORE = "licenceJournal";
 var LICENCE_JOURNAL_POINTER_KEY = "pointer";
 var LICENCE_JOURNAL_SLOT_KEYS = ["slot-a", "slot-b"];
 var KDF_SALT_EXTENSION = "hush.vault.kdf-salt";
+var MAX_HIDDEN_GENERATION_ATTEMPTS = 3;
 function b64url(bytes) {
   let binary = "";
   for (let i = 0; i < bytes.byteLength; i++) {
@@ -26715,7 +27016,13 @@ function readThrottle(value) {
 var SealedVaultEngine = class {
   constructor(deps) {
     this.candidates = /* @__PURE__ */ new Map();
+    this.recoveryExpiryTimers = /* @__PURE__ */ new Map();
     this.session = null;
+    this.volatileLicenceJournal = null;
+    this.verifiedProfile = null;
+    this.secretGeneration = 0;
+    this.importFailures = 0;
+    this.importRetryDeadlineMs = 0;
     this.phase = "locked";
     this.storage = deps.storage;
     this.suite = deps.suite;
@@ -26735,9 +27042,16 @@ var SealedVaultEngine = class {
   }
   /** Wipe every in-worker secret (Lock/removal/authority loss). */
   wipeSecrets() {
+    this.secretGeneration += 1;
+    this.importFailures = 0;
+    this.importRetryDeadlineMs = 0;
+    for (const timer of this.recoveryExpiryTimers.values()) clearTimeout(timer);
+    this.recoveryExpiryTimers.clear();
     this.session?.dek.fill(0);
     this.session?.kek.fill(0);
     this.session = null;
+    this.volatileLicenceJournal = null;
+    this.verifiedProfile = null;
     for (const key of this.candidates.keys()) {
       this.candidates.delete(key);
     }
@@ -26751,38 +27065,45 @@ var SealedVaultEngine = class {
     if (this.candidates.size >= 4) {
       return { code: "INVALID_INPUT", reason: "candidate-limit" };
     }
-    const mnemonic = entropyToMnemonicWorker(this.suite.randomBytes(32));
-    const derived = deriveP01KeysWorker(mnemonic);
-    if (derived === null) {
-      return { code: "UNKNOWN_FAILURE", supportCode: this.randomId("sc-") };
+    for (let attempt = 0; attempt < MAX_HIDDEN_GENERATION_ATTEMPTS; attempt++) {
+      try {
+        const entropy = this.suite.randomBytes(32);
+        let mnemonic;
+        try {
+          mnemonic = entropyToMnemonicWorker(entropy);
+        } finally {
+          entropy.fill(0);
+        }
+        const derived = deriveP01KeysWorker(mnemonic);
+        if (derived === null) continue;
+        const ref = this.randomId("cand-");
+        this.candidates.set(ref, {
+          ref,
+          kind: "create",
+          mnemonic,
+          signingPrivateKey: derived.signingPrivateKey,
+          encryptionPrivateKey: derived.encryptionPrivateKey,
+          signingAddress: derived.signingAddress,
+          encryptionAddress: derived.encryptionAddress,
+          producerId: "P-01",
+          producerVersion: "1.0.0",
+          createdAtMs: this.nowMs(),
+          revealedWords: false
+        });
+        return { code: "OK", detail: { ref, signingAddress: derived.signingAddress, encryptionAddress: derived.encryptionAddress, wordCount: 24 } };
+      } catch {
+      }
     }
-    const ref = this.randomId("cand-");
-    this.candidates.set(ref, {
-      ref,
-      kind: "create",
-      mnemonic,
-      signingPrivateKey: derived.signingPrivateKey,
-      encryptionPrivateKey: derived.encryptionPrivateKey,
-      signingAddress: derived.signingAddress,
-      encryptionAddress: derived.encryptionAddress,
-      producerId: "P-01",
-      producerVersion: "1.0.0",
-      createdAtMs: this.nowMs(),
-      revealedWords: false
-    });
-    return { code: "OK", detail: { ref, signingAddress: derived.signingAddress, encryptionAddress: derived.encryptionAddress, wordCount: 24 } };
+    return { code: "UNKNOWN_FAILURE", supportCode: this.randomId("sc-") };
   }
-  /** Reveal the candidate's recovery words (user-facing; 60 s bound, one reveal). */
+  /** Each explicit reveal grants at most 60 seconds; concealment does not destroy the candidate. */
   revealWords(candidateRef) {
     const candidate = this.candidates.get(candidateRef);
-    if (!candidate || candidate.mnemonic === null) {
+    if (!candidate || candidate.kind !== "create" || candidate.mnemonic === null) {
       return { code: "INVALID_INPUT", reason: "unknown-candidate" };
     }
-    if (this.nowMs() - candidate.createdAtMs > 6e4) {
-      return { code: "INVALID_INPUT", reason: "reveal-window-expired" };
-    }
     candidate.revealedWords = true;
-    return { code: "OK", detail: { words: candidate.mnemonic.split(" ") } };
+    return { code: "OK", detail: { words: candidate.mnemonic.split(" "), expiresAtMs: this.nowMs() + 6e4 } };
   }
   /** Conceal (visual/accessibility conceal) — the candidate stays alive. */
   concealCandidate(candidateRef) {
@@ -26793,6 +27114,9 @@ var SealedVaultEngine = class {
   }
   /** Destructively destroy a candidate (regeneration/cancel). */
   destroyCandidate(candidateRef) {
+    const timer = this.recoveryExpiryTimers.get(candidateRef);
+    if (timer !== void 0) clearTimeout(timer);
+    this.recoveryExpiryTimers.delete(candidateRef);
     if (this.candidates.delete(candidateRef)) {
       return { code: "OK" };
     }
@@ -26800,10 +27124,7 @@ var SealedVaultEngine = class {
   }
   /** Validate a user-supplied mnemonic and derive the selected producer's keys (worker-held). */
   deriveWordsCandidate(input) {
-    const normalized = normalizeMnemonicOlimpo(input.mnemonic);
-    if (!validateMnemonicWorker(normalized)) {
-      return { code: "INVALID_INPUT", reason: "invalid-mnemonic" };
-    }
+    const normalized = normalizeMnemonicOlimpo(input.mnemonic.normalize("NFKD"));
     const words = normalized.split(" ");
     if (words.length !== input.wordCount) {
       return { code: "INVALID_INPUT", reason: "wrong-word-count" };
@@ -26811,9 +27132,10 @@ var SealedVaultEngine = class {
     const producer = input.producerId;
     const validation = validateMnemonicForProducer(normalized, producer);
     if (!validation.valid) {
-      return { code: "INVALID_INPUT", reason: validation.code };
+      const invalidPositions = validation.code === "UNKNOWN_WORD" ? words.flatMap((word, index) => import_bip393.wordlists.english.includes(word) ? [] : [index + 1]) : [];
+      return { code: "INVALID_INPUT", reason: validation.code, invalidPositions };
     }
-    const derived = producer === "P-02" ? deriveP02KeysWorker(normalized) : deriveP01KeysWorker(normalized);
+    const derived = producer === "P-02" || producer === "P-03" ? deriveP02KeysWorker(normalized) : deriveP01KeysWorker(normalized);
     if (derived === null) {
       return { code: "INVALID_INPUT", reason: "derivation-failed" };
     }
@@ -26831,20 +27153,63 @@ var SealedVaultEngine = class {
       createdAtMs: this.nowMs(),
       revealedWords: false
     });
+    this.recoveryExpiryTimers.set(ref, setTimeout(() => {
+      this.destroyCandidate(ref);
+    }, 10 * 6e4));
     return { code: "OK", detail: { ref, signingAddress: derived.signingAddress, encryptionAddress: derived.encryptionAddress, producerId: producer } };
+  }
+  /** One secret handoff derives the complete approved set; a partial set is never returned. */
+  deriveRecoveryCandidates(input) {
+    const candidates = [];
+    const ownedRefs = [];
+    let succeeded = false;
+    try {
+      for (const producer of APPROVED_DERIVATION_PRODUCERS) {
+        if (input.wordCount === 12 && producer.mnemonicSupport !== "12_AND_24") continue;
+        const result = this.deriveWordsCandidate({ ...input, producerId: producer.producerId });
+        if (result.code !== "OK") return { ...result, detail: void 0 };
+        if (!result.detail) return { code: "UNKNOWN_FAILURE", supportCode: "RECOVERY_DERIVATION_INCOMPLETE" };
+        const detail = result.detail;
+        ownedRefs.push(detail.ref);
+        const previous = candidates.findIndex((candidate) => candidate.signingAddress === detail.signingAddress && candidate.encryptionAddress === detail.encryptionAddress);
+        if (previous >= 0) {
+          candidates[previous] = { ...candidates[previous], producerIds: [...candidates[previous].producerIds, producer.producerId] };
+          this.destroyCandidate(detail.ref);
+        } else candidates.push({ ref: detail.ref, signingAddress: detail.signingAddress, encryptionAddress: detail.encryptionAddress, producerIds: [producer.producerId] });
+      }
+      if (candidates.length === 0) return { code: "INVALID_INPUT", reason: "UNSUPPORTED_PRODUCER" };
+      succeeded = true;
+      return { code: "OK", detail: { candidates } };
+    } catch {
+      return { code: "UNKNOWN_FAILURE", supportCode: "RECOVERY_DERIVATION_FAILED" };
+    } finally {
+      if (!succeeded) for (const ref of ownedRefs) this.destroyCandidate(ref);
+    }
   }
   /** Decrypt a HUSH .dat file inside the worker and hold the imported candidate. */
   async importFileCandidate(input) {
+    if (this.nowMs() < this.importRetryDeadlineMs) return { code: "THROTTLED", cooldownDeadlineMs: this.importRetryDeadlineMs };
+    const generation = this.secretGeneration;
     const decoded = await decodeDatV1(input.fileBytes, input.filePassword);
+    if (generation !== this.secretGeneration) return { code: "INVALID_INPUT", reason: "import-authority-revoked" };
     if (!decoded.ok) {
+      if (decoded.code === "DAT_WRONG_PASSWORD") {
+        this.importFailures += 1;
+        this.importRetryDeadlineMs = this.nowMs() + backoffDelaySeconds(this.importFailures) * 1e3;
+        return { code: "WRONG_PASSWORD_OR_DAMAGED", cooldownDeadlineMs: this.importRetryDeadlineMs };
+      }
       return { code: "INVALID_INPUT", reason: decoded.code };
     }
+    this.importFailures = 0;
+    this.importRetryDeadlineMs = 0;
     const { record } = decoded.value;
     const ref = this.randomId("cand-");
     this.candidates.set(ref, {
       ref,
       kind: "file",
-      mnemonic: typeof record.Mnemonic === "string" && record.Mnemonic.length > 0 ? record.Mnemonic : null,
+      // The optional legacy phrase has completed consistency validation. Only
+      // concrete keys belong to the import candidate and subsequent vault.
+      mnemonic: null,
       signingPrivateKey: record.PrivateSigningKey,
       encryptionPrivateKey: record.PrivateEncryptKey,
       signingAddress: record.PublicSigningAddress,
@@ -26862,11 +27227,63 @@ var SealedVaultEngine = class {
   // ---------------------------------------------------------------------
   // Provisioning (current no-mnemonic network-bound record)
   // ---------------------------------------------------------------------
-  /**
-   * Provision the encrypted current vault from a worker-held candidate.
-   * Builds the sealed envelope, commits it through the two-slot CAS journal,
-   * and initializes the throttle sidecar. Failure never leaves partial slots.
-   */
+  /** FEAT-008/009: selected recovered keys in worker memory, with no wrapping or vault write. */
+  async provisionSessionOnly(input) {
+    const candidate = this.candidates.get(input.candidateRef);
+    const generation = this.secretGeneration;
+    if (!candidate || candidate.kind === "create" || this.session !== null || !input.alias || input.configurationId !== this.manifest.configurationId || input.networkBinding.canonicalNetworkId !== this.manifest.canonicalNetworkId || input.networkBinding.networkMagic !== this.manifest.networkMagic) {
+      return { code: "INVALID_INPUT", reason: "session-input" };
+    }
+    const tombstone = await this.storage.readRecord("operationalSidecars", REMOVAL_TOMBSTONE_KEY);
+    if (!tombstone.ok || tombstone.value.record !== void 0) return { code: "INVALID_INPUT", reason: "local-authority-present" };
+    const state = await this.journal.readState();
+    if (!state.ok || state.value.activeGeneration !== 0) return { code: "INVALID_INPUT", reason: "local-authority-present" };
+    for (const slot of ["slot-a", "slot-b"]) {
+      const read = await this.storage.readRecord("vaultSlots", slot);
+      if (!read.ok || read.value.record !== void 0) return { code: "INVALID_INPUT", reason: "local-authority-present" };
+    }
+    if (generation !== this.secretGeneration || !this.candidates.has(input.candidateRef)) return { code: "INVALID_INPUT", reason: "stale-candidate" };
+    this.session = {
+      epoch: this.nowMs(),
+      signingPrivateKey: candidate.signingPrivateKey,
+      encryptionPrivateKey: candidate.encryptionPrivateKey,
+      // No wrapping authority is created for a volatile session.
+      dek: new Uint8Array(0),
+      kek: new Uint8Array(0),
+      record: {
+        schemaVersion: 1,
+        alias: input.alias,
+        visibility: input.visibility,
+        producerId: candidate.producerId,
+        producerVersion: candidate.producerVersion,
+        lifecycleStatus: "PendingRegistration",
+        networkBinding: input.networkBinding,
+        keyBinding: { signingAddress: candidate.signingAddress, encryptionAddress: candidate.encryptionAddress },
+        signingPrivateKey: candidate.signingPrivateKey,
+        encryptionPrivateKey: candidate.encryptionPrivateKey,
+        protectionModeClass: "session-only",
+        generation: 0,
+        transactionDigest: null
+      },
+      preview: {
+        alias: input.alias,
+        signingAddressPrefix: candidate.signingAddress.slice(0, PREVIEW_SIGNING_ADDRESS_PREFIX_LENGTH),
+        signingAddressSuffix: candidate.signingAddress.slice(-PREVIEW_SIGNING_ADDRESS_SUFFIX_LENGTH),
+        lifecycleStatus: "PendingRegistration",
+        envelopeFormatVersion: 1,
+        parameterSuiteVersion: 1,
+        recordSchemaVersion: 1
+      }
+    };
+    this.phase = "verificationOnly";
+    this.volatileLicenceJournal = null;
+    for (const ref of [...this.candidates.keys()]) this.destroyCandidate(ref);
+    return { code: "OK" };
+  }
+  isSessionOnly() {
+    return this.session?.record.protectionModeClass === "session-only";
+  }
+  /** Provision an encrypted vault through the existing two-slot CAS journal. */
   async provision(input) {
     const candidate = this.candidates.get(input.candidateRef);
     if (!candidate) {
@@ -26880,7 +27297,8 @@ var SealedVaultEngine = class {
     }
     const salt = this.suite.randomBytes(16);
     const passwordKey = await this.suite.derivePasswordKey({
-      passwordBytes: utf8Bytes(input.devicePassword),
+      // FEAT-003 Device-Password Contract: NFC, preserving case and whitespace.
+      passwordBytes: utf8Bytes(input.devicePassword.normalize("NFC")),
       salt,
       memoryKiB: SUITE_V1_KDF.memoryKiB,
       iterations: SUITE_V1_KDF.iterations,
@@ -27006,7 +27424,7 @@ var SealedVaultEngine = class {
       record: plaintext,
       preview
     };
-    this.candidates.delete(input.candidateRef);
+    this.destroyCandidate(input.candidateRef);
     return {
       code: "OK",
       detail: {
@@ -27043,7 +27461,8 @@ var SealedVaultEngine = class {
       recordSchemaVersion: envelope.recordSchemaVersion,
       platformWrapperVersion: envelope.platformWrapperVersion
     });
-    if (!versionCheck.ok) {
+    const supportedPendingVersion = envelope.envelopeFormatVersion === 1 && envelope.parameterSuiteVersion === 1 && envelope.recordSchemaVersion === 2 && envelope.platformWrapperVersion === 0;
+    if (!versionCheck.ok && !supportedPendingVersion) {
       return { code: "UNSUPPORTED_VAULT" };
     }
     const saltExtension = envelope.extensions?.extensions?.[KDF_SALT_EXTENSION] ?? null;
@@ -27092,7 +27511,7 @@ var SealedVaultEngine = class {
     let passwordKey;
     try {
       passwordKey = await this.suite.derivePasswordKey({
-        passwordBytes: utf8Bytes(input.devicePassword),
+        passwordBytes: utf8Bytes(input.devicePassword.normalize("NFC")),
         salt,
         memoryKiB: envelope.suite.kdf.minMemoryKiB,
         iterations: envelope.suite.kdf.iterations,
@@ -27108,7 +27527,7 @@ var SealedVaultEngine = class {
     try {
       dek = await this.suite.aes256GcmDecrypt({ key: kek, nonce: wrappingNonce, ciphertext: unwrapParts.ciphertext, tag: unwrapParts.tag, aad: aadBytes });
     } catch {
-      if (envelope.records.generation.active <= 1 || record.generation <= 1) {
+      if (envelope.recordSchemaVersion !== 1 || envelope.records.generation.active <= 1 || record.generation <= 1) {
         return recordFailure();
       }
       const provisioningPreview = {
@@ -27163,7 +27582,7 @@ var SealedVaultEngine = class {
       return recordFailure();
     }
     const parsed = parseCurrentRecord(utf8Text(plaintextBytes), record.generation);
-    if (!parsed.ok) {
+    if (!parsed.ok || parsed.record.schemaVersion !== envelope.recordSchemaVersion || record.schemaVersion !== envelope.recordSchemaVersion) {
       return { code: "CORRUPT_VAULT" };
     }
     const current = parsed.record;
@@ -27201,11 +27620,14 @@ var SealedVaultEngine = class {
   // ---------------------------------------------------------------------
   /** Fresh exact online verification: worker-owned BFF lookup, both keys equal. */
   async verifyOnline() {
+    this.verifiedProfile = null;
     if (this.session === null || this.phase === "locked" || this.phase === "noLocalUser") {
       return { code: "UNKNOWN_FAILURE", supportCode: this.randomId("sc-") };
     }
     const binding = this.session.record.keyBinding;
+    const generation = this.secretGeneration;
     const lookup = await this.lookupIdentity(binding.signingAddress);
+    if (generation !== this.secretGeneration || this.session === null) return { code: "UNKNOWN_FAILURE", supportCode: this.randomId("sc-") };
     switch (lookup.kind) {
       case "exact": {
         if (lookup.signingAddress !== binding.signingAddress) {
@@ -27214,13 +27636,18 @@ var SealedVaultEngine = class {
         if (lookup.encryptionAddress !== binding.encryptionAddress) {
           return { code: "ENCRYPTION_KEY_MISMATCH" };
         }
+        this.verifiedProfile = {
+          alias: lookup.profileName ?? this.session.record.alias,
+          visibility: lookup.visibility ?? this.session.record.visibility
+        };
         this.phase = "authenticated";
         return {
           code: "OK",
           detail: {
             profileName: lookup.profileName ?? this.session.record.alias,
             signingAddress: binding.signingAddress,
-            encryptionAddress: binding.encryptionAddress
+            encryptionAddress: binding.encryptionAddress,
+            requiresPromotion: this.session.record.lifecycleStatus === "PendingRegistration"
           }
         };
       }
@@ -27257,60 +27684,111 @@ var SealedVaultEngine = class {
     if (status === "Active" && this.phase !== "authenticated") {
       return { code: "UNKNOWN_FAILURE", supportCode: this.randomId("sc-") };
     }
-    const updated = { ...this.session.record, lifecycleStatus: status };
+    const updated = {
+      ...this.session.record,
+      lifecycleStatus: status,
+      ...status === "Active" ? {
+        ...this.verifiedProfile,
+        transactionDigest: null,
+        ...this.session.record.schemaVersion === 2 ? { pendingTransaction: null } : {}
+      } : {}
+    };
     return this.reencryptCurrentRecord(updated);
   }
   /**
    * Sign and submit the canonical FullIdentity transaction (worker-owned).
    * Returns the closed submission outcome; the exact signed transaction is
-   * retained in the record digest before the first network call.
+   * retained with its digest in encrypted record schema 2 before submission.
    */
   async submitIdentityTransaction(input) {
     if (this.session === null || this.phase === "locked" || this.phase === "noLocalUser") {
       return { code: "UNKNOWN_FAILURE", supportCode: this.randomId("sc-") };
     }
     const record = this.session.record;
-    const txId = createUuidV4();
-    const timestamp = corpusTimestamp();
-    const described = describeCanonicalTransaction({
-      normalizedAlias: input.alias,
-      publicSigningAddress: record.keyBinding.signingAddress,
-      publicEncryptAddress: record.keyBinding.encryptionAddress,
-      visibility: input.visibility,
-      transactionId: txId,
-      timestamp
-    });
-    if (!described.ok) {
-      return { code: "INVALID_INPUT", reason: described.code };
+    const generation = this.secretGeneration;
+    let pending = record.pendingTransaction ?? null;
+    if (pending !== null) {
+      if (!validatePendingTransaction(pending).ok || !isRetryEligible(pending) || pending.networkBinding !== this.manifest.configurationId || pending.reviewedMetadata.alias !== input.alias || pending.reviewedMetadata.visibility !== input.visibility) {
+        return { code: "INVALID_INPUT", reason: "pending-transaction-context" };
+      }
+      const lookup = await this.lookupIdentity(record.keyBinding.signingAddress);
+      if (generation !== this.secretGeneration || this.session === null) return { code: "UNKNOWN_FAILURE", supportCode: this.randomId("sc-") };
+      if (lookup.kind === "exact") {
+        if (lookup.signingAddress !== record.keyBinding.signingAddress || lookup.encryptionAddress !== record.keyBinding.encryptionAddress)
+          return { code: "ENCRYPTION_KEY_MISMATCH" };
+        return { code: "OK", detail: { status: "alreadyExists" } };
+      }
+      if (lookup.kind !== "missing") return { code: "OK", detail: { status: "transportFailure" } };
+    } else {
+      if (record.transactionDigest !== null) return { code: "INVALID_INPUT", reason: "legacy-pending-bytes-unavailable" };
+      const txId = createUuidV4();
+      const timestamp = corpusTimestamp();
+      const described = describeCanonicalTransaction({
+        normalizedAlias: input.alias,
+        publicSigningAddress: record.keyBinding.signingAddress,
+        publicEncryptAddress: record.keyBinding.encryptionAddress,
+        visibility: input.visibility,
+        transactionId: txId,
+        timestamp
+      });
+      if (!described.ok) {
+        return { code: "INVALID_INPUT", reason: described.code };
+      }
+      const unsignedJson = serializeUnsignedTransaction(described.value.unsignedTransaction);
+      const signed = signMessage(unsignedJson, this.session.signingPrivateKey);
+      if (!signed.ok) {
+        return { code: "UNKNOWN_FAILURE", supportCode: this.randomId("sc-") };
+      }
+      const signedTransaction = JSON.stringify({
+        ...described.value.unsignedTransaction,
+        UserSignature: { Signatory: record.keyBinding.signingAddress, Signature: signed.value.compactBase64 }
+      });
+      pending = {
+        schemaVersion: 2,
+        transaction: { exactJson: signedTransaction, digest: digestOf(signedTransaction) },
+        transactionId: txId,
+        reviewedMetadata: { alias: input.alias, visibility: input.visibility },
+        lifecycle: "sealed",
+        attemptEvidence: [],
+        epochBinding: String(generation),
+        networkBinding: this.manifest.configurationId,
+        rollbackState: "postSeal"
+      };
     }
-    const unsignedJson = serializeUnsignedTransaction(described.value.unsignedTransaction);
-    const signed = signMessage(unsignedJson, this.session.signingPrivateKey);
-    if (!signed.ok) {
-      return { code: "UNKNOWN_FAILURE", supportCode: this.randomId("sc-") };
-    }
-    const signedTransaction = JSON.stringify({
-      ...described.value.unsignedTransaction,
-      UserSignature: { Signatory: record.keyBinding.signingAddress, Signature: signed.value.compactBase64 }
+    pending = { ...pending, epochBinding: String(generation), rollbackState: "postSubmit" };
+    const retained = await this.reencryptCurrentRecord({
+      ...this.session.record,
+      schemaVersion: 2,
+      transactionDigest: pending.transaction.digest,
+      pendingTransaction: pending
     });
-    const digest = sha256Hex(utf8Bytes(signedTransaction));
-    const retained = await this.retainTransactionDigest(digest);
     if (retained.code !== "OK") {
       return { code: "UNKNOWN_FAILURE", supportCode: this.randomId("sc-") };
     }
-    const result = await input.submit(signedTransaction);
+    if (generation !== this.secretGeneration || this.session === null) return { code: "UNKNOWN_FAILURE", supportCode: this.randomId("sc-") };
+    const result = await input.submit(pending.transaction.exactJson);
+    if (generation !== this.secretGeneration || this.session === null) return { code: "UNKNOWN_FAILURE", supportCode: this.randomId("sc-") };
+    const normalized = result.ok ? normalizeSubmitReply({ ...result.reply, message: "" }, /* @__PURE__ */ new Set()) : { kind: "transportFailure" };
+    const outcome = normalized.kind === "transportFailure" ? "transportUncertain" : normalized.kind === "accepted" ? "accepted" : normalized.kind === "pending" ? "pending" : normalized.kind === "alreadyExists" ? "alreadyExists" : "rejectedTerminal";
+    const recorded = await this.reencryptCurrentRecord({ ...this.session.record, pendingTransaction: {
+      ...pending,
+      lifecycle: outcome === "accepted" ? "waitingAccepted" : outcome === "pending" ? "waitingPending" : pending.lifecycle,
+      attemptEvidence: [...pending.attemptEvidence.slice(-63), { at: new Date(this.nowMs()).toISOString(), outcome }]
+    } });
+    if (recorded.code !== "OK" || generation !== this.secretGeneration || this.session === null) return { code: "UNKNOWN_FAILURE", supportCode: this.randomId("sc-") };
     if (!result.ok) {
       return { code: "OK", detail: { status: "transportFailure" } };
     }
-    const reply = result.reply;
-    switch (reply.status) {
-      case "ACCEPTED":
+    switch (normalized.kind) {
+      case "accepted":
         return { code: "OK", detail: { status: "accepted" } };
-      case "PENDING":
+      case "pending":
         return { code: "OK", detail: { status: "pending" } };
-      case "ALREADY_EXISTS":
+      case "alreadyExists":
         return { code: "OK", detail: { status: "alreadyExists" } };
-      case "REJECTED":
-        return { code: "OK", detail: { status: "unknownRejection", validationCode: typeof reply.validationCode === "string" ? reply.validationCode : void 0 } };
+      case "terminalRejection":
+      case "unknownRejection":
+        return { code: "OK", detail: { status: "unknownRejection" } };
       default:
         return { code: "OK", detail: { status: "compatibilityError" } };
     }
@@ -27320,6 +27798,15 @@ var SealedVaultEngine = class {
     if (this.session === null) {
       return { code: "UNKNOWN_FAILURE", supportCode: this.randomId("sc-") };
     }
+    if (this.isSessionOnly()) {
+      this.session = {
+        ...this.session,
+        record: updated,
+        preview: { ...this.session.preview, lifecycleStatus: updated.lifecycleStatus }
+      };
+      return { code: "OK" };
+    }
+    const generation = this.secretGeneration;
     const envelope = await this.readActiveEnvelope();
     if (envelope === null) {
       return { code: "CORRUPT_VAULT" };
@@ -27333,12 +27820,12 @@ var SealedVaultEngine = class {
       lifecycleStatus: updated.lifecycleStatus,
       envelopeFormatVersion: 1,
       parameterSuiteVersion: 1,
-      recordSchemaVersion: 1
+      recordSchemaVersion: updated.schemaVersion
     };
     const aad = buildAadMetadata({
       envelopeFormatVersion: envelope.envelopeFormatVersion,
       parameterSuiteVersion: envelope.parameterSuiteVersion,
-      recordSchemaVersion: envelope.recordSchemaVersion,
+      recordSchemaVersion: updated.schemaVersion,
       platformWrapperVersion: envelope.platformWrapperVersion,
       suiteId: envelope.suite.id,
       kdfParameters: { algorithm: envelope.suite.kdf.algorithm, memoryKiB: envelope.suite.kdf.minMemoryKiB, iterations: envelope.suite.kdf.iterations, parallelism: envelope.suite.kdf.parallelism },
@@ -27369,12 +27856,14 @@ var SealedVaultEngine = class {
     });
     const nextEnvelope = {
       ...envelope,
+      recordSchemaVersion: updated.schemaVersion,
       preview: nextPreview,
       records: {
         ...envelope.records,
         generation: { active: nextGeneration },
         ordinary: {
           ...record,
+          schemaVersion: updated.schemaVersion,
           generation: nextGeneration,
           keyPackage: {
             wrappedDataKey: b64url(joinCipherAndTag(rewrapped.ciphertext, rewrapped.tag)),
@@ -27386,10 +27875,12 @@ var SealedVaultEngine = class {
       }
     };
     const serialized = canonicalizeJsonBytes(nextEnvelope);
+    if (generation !== this.secretGeneration || this.session === null) return { code: "UNKNOWN_FAILURE", supportCode: this.randomId("sc-") };
     const commit = await this.journal.commit({ expectedGeneration: envelope.records.generation.active, candidateGeneration: nextGeneration, candidateBytes: serialized });
     if (!commit.ok) {
       return { code: "UNKNOWN_FAILURE", supportCode: this.randomId("sc-") };
     }
+    if (generation !== this.secretGeneration || this.session === null) return { code: "UNKNOWN_FAILURE", supportCode: this.randomId("sc-") };
     this.session = { ...this.session, record: { ...updated, generation: nextGeneration }, preview: nextPreview };
     return { code: "OK" };
   }
@@ -27403,6 +27894,7 @@ var SealedVaultEngine = class {
   }
   /** Change the device password: rewrap the DEK under a fresh KEK, CAS new generation. */
   async changeDevicePassword(input) {
+    if (this.isSessionOnly()) return { code: "INVALID_INPUT", reason: "session-only" };
     if (this.session === null) {
       return { code: "UNKNOWN_FAILURE", supportCode: this.randomId("sc-") };
     }
@@ -27420,7 +27912,7 @@ var SealedVaultEngine = class {
     }
     const newSalt = this.suite.randomBytes(16);
     const newPasswordKey = await this.suite.derivePasswordKey({
-      passwordBytes: utf8Bytes(input.newPassword),
+      passwordBytes: utf8Bytes(input.newPassword.normalize("NFC")),
       salt: newSalt,
       memoryKiB: SUITE_V1_KDF.memoryKiB,
       iterations: SUITE_V1_KDF.iterations,
@@ -27461,7 +27953,7 @@ var SealedVaultEngine = class {
     let dek;
     try {
       const passwordKey = await this.suite.derivePasswordKey({
-        passwordBytes: utf8Bytes(input.currentPassword),
+        passwordBytes: utf8Bytes(input.currentPassword.normalize("NFC")),
         salt,
         memoryKiB: envelope.suite.kdf.minMemoryKiB,
         iterations: envelope.suite.kdf.iterations,
@@ -27533,41 +28025,43 @@ var SealedVaultEngine = class {
    * verify absence → clear tombstone. Never reports success before absence.
    */
   async removeLocalUser() {
-    const persist = async (stage) => {
-      await this.storage.writeRecord("operationalSidecars", REMOVAL_TOMBSTONE_KEY, { inProgress: true, startedAt: this.nowMs(), stage });
-    };
-    await persist("revoking-session");
+    if (this.isSessionOnly()) {
+      this.wipeSecrets();
+      return { code: "OK" };
+    }
+    const failed = () => ({ code: "UNKNOWN_FAILURE", supportCode: this.randomId("sc-") });
+    const persist = async (stage) => (await this.storage.writeRecord("operationalSidecars", REMOVAL_TOMBSTONE_KEY, { inProgress: true, startedAt: this.nowMs(), stage })).ok;
     this.wipeSecrets();
-    await persist("persisting-tombstone");
-    await persist("deleting-slots");
-    for (const slotKey of ["slot-a", "slot-b"]) {
-      await this.storage.deleteRecord("vaultSlots", slotKey);
+    if (!await persist("revoking-session")) return failed();
+    if (!await persist("persisting-tombstone")) return failed();
+    const slots = [
+      ...VAULT_SLOT_KEYS.map((key) => ["vaultSlots", key]),
+      ["vaultJournal", VAULT_JOURNAL_KEY],
+      ...[...LICENCE_JOURNAL_SLOT_KEYS, LICENCE_JOURNAL_POINTER_KEY].map((key) => [LICENCE_JOURNAL_STORE, key])
+    ];
+    const sidecars = ALLOWED_SIDECAR_KEYS.filter((key) => key !== REMOVAL_TOMBSTONE_KEY).map((key) => ["operationalSidecars", key]);
+    for (const [stage, records] of [["deleting-slots", slots], ["clearing-caches", sidecars]]) {
+      if (!await persist(stage)) return failed();
+      for (const [store, key] of records) {
+        if (!(await this.storage.deleteRecord(store, key)).ok) return failed();
+      }
     }
-    await this.storage.deleteRecord("vaultJournal", "current");
-    for (const key of [...LICENCE_JOURNAL_SLOT_KEYS, LICENCE_JOURNAL_POINTER_KEY]) {
-      await this.storage.deleteRecord(LICENCE_JOURNAL_STORE, key);
+    if (!await persist("verifying-absence")) return failed();
+    for (const [store, key] of [...slots, ...sidecars]) {
+      const result = await this.storage.readRecord(store, key);
+      if (!result.ok || result.value.record !== void 0) return failed();
     }
-    await persist("clearing-caches");
-    for (const key of ["throttle", "removalTombstone", "lease", "persistenceAck", "epoch"]) {
-      await this.storage.deleteRecord("operationalSidecars", key);
-    }
-    await persist("verifying-absence");
-    const journalCheck = await this.storage.readRecord("vaultJournal", "current");
-    const slotCheck = await this.storage.readRecord("vaultSlots", "slot-a");
-    if (journalCheck.ok && journalCheck.value.record !== void 0) {
-      return { code: "UNKNOWN_FAILURE", supportCode: this.randomId("sc-") };
-    }
-    if (slotCheck.ok && slotCheck.value.record !== void 0) {
-      return { code: "UNKNOWN_FAILURE", supportCode: this.randomId("sc-") };
-    }
-    await this.storage.deleteRecord("operationalSidecars", REMOVAL_TOMBSTONE_KEY);
+    if (!(await this.storage.deleteRecord("operationalSidecars", REMOVAL_TOMBSTONE_KEY)).ok) return failed();
+    const marker = await this.storage.readRecord("operationalSidecars", REMOVAL_TOMBSTONE_KEY);
+    if (!marker.ok || marker.value.record !== void 0) return failed();
     this.phase = "noLocalUser";
     return { code: "OK" };
   }
   /** Startup inspection: resolve the deterministic startup surface. */
   async inspectStartup() {
     const tombstone = await this.storage.readRecord("operationalSidecars", REMOVAL_TOMBSTONE_KEY);
-    if (tombstone.ok && tombstone.value.record !== void 0) {
+    if (!tombstone.ok) return { code: "UNKNOWN_FAILURE", supportCode: "STARTUP_STORAGE_UNAVAILABLE" };
+    if (tombstone.value.record !== void 0) {
       return { code: "OK", detail: { surface: "removalTombstone" } };
     }
     const state = await this.journal.readState();
@@ -27577,9 +28071,11 @@ var SealedVaultEngine = class {
     if (state.value.activeGeneration === 0) {
       const slotA = await this.storage.readRecord("vaultSlots", "slot-a");
       const slotB = await this.storage.readRecord("vaultSlots", "slot-b");
-      if (slotA.ok && slotA.value.record !== void 0 || slotB.ok && slotB.value.record !== void 0) {
+      if (!slotA.ok || !slotB.ok) return { code: "UNKNOWN_FAILURE", supportCode: "STARTUP_STORAGE_UNAVAILABLE" };
+      if (slotA.value.record !== void 0 || slotB.value.record !== void 0) {
         return { code: "OK", detail: { surface: "quarantine", reason: "incompleteRemoval" } };
       }
+      if (this.candidates.size > 0 || this.session !== null) return { code: "UNKNOWN_FAILURE", supportCode: "STARTUP_AUTHORITY_PRESENT" };
       return { code: "OK", detail: { surface: "verifiedAbsent" } };
     }
     const envelope = await this.readActiveEnvelope();
@@ -27590,7 +28086,7 @@ var SealedVaultEngine = class {
       alias: envelope.preview.alias,
       abbreviatedSigningAddress: `${envelope.preview.signingAddressPrefix}\u2026${envelope.preview.signingAddressSuffix}`
     };
-    return { code: "OK", detail: { surface: "lockedVault", safeIdentity } };
+    return { code: "OK", detail: { surface: envelope.preview.lifecycleStatus === "PendingRegistration" ? "staged" : "lockedVault", safeIdentity } };
   }
   // ---------------------------------------------------------------------
   // FEAT-016 licence authority operations (Phase 6)
@@ -27670,6 +28166,10 @@ var SealedVaultEngine = class {
     if (typeof recordJson !== "string" || recordJson.length === 0 || recordJson.length > 65536) {
       return { ok: false, reason: "malformed" };
     }
+    if (this.isSessionOnly()) {
+      this.volatileLicenceJournal = recordJson;
+      return { ok: true };
+    }
     const aad = this.licenceJournalAad();
     try {
       const nonce = this.suite.randomBytes(12);
@@ -27707,6 +28207,7 @@ var SealedVaultEngine = class {
     if (this.session === null || this.phase === "locked" || this.phase === "noLocalUser") {
       return { ok: false, reason: "not-authenticated" };
     }
+    if (this.isSessionOnly()) return { ok: true, recordJson: this.volatileLicenceJournal };
     try {
       const pointerResult = await this.storage.readRecord(LICENCE_JOURNAL_STORE, LICENCE_JOURNAL_POINTER_KEY);
       if (!pointerResult.ok) {
@@ -27738,6 +28239,10 @@ var SealedVaultEngine = class {
   }
   /** Clear the encrypted licence journal (identity removal / resolution). */
   async licenceJournalClear() {
+    if (this.isSessionOnly()) {
+      this.volatileLicenceJournal = null;
+      return { ok: true };
+    }
     try {
       for (const key of [...LICENCE_JOURNAL_SLOT_KEYS, LICENCE_JOURNAL_POINTER_KEY]) {
         const deleted = await this.storage.deleteRecord(LICENCE_JOURNAL_STORE, key);
@@ -27814,7 +28319,7 @@ var SealedVaultEngine = class {
   async verifyEnvelopeBytes(bytes, generation) {
     try {
       const parsed = JSON.parse(utf8Text(bytes));
-      if (parsed.envelopeFormatVersion !== 1 || parsed.parameterSuiteVersion !== 1 || parsed.recordSchemaVersion !== 1) {
+      if (parsed.envelopeFormatVersion !== 1 || parsed.parameterSuiteVersion !== 1 || ![1, 2].includes(parsed.recordSchemaVersion)) {
         return false;
       }
       const records = parsed.records;
@@ -27838,7 +28343,24 @@ var SealedVaultEngine = class {
 function parseCurrentRecord(text, expectedGeneration) {
   try {
     const value = JSON.parse(text);
-    if (value.schemaVersion !== 1) return { ok: false };
+    if (value.schemaVersion !== 1 && value.schemaVersion !== 2) return { ok: false };
+    const fields = [
+      "schemaVersion",
+      "alias",
+      "visibility",
+      "producerId",
+      "producerVersion",
+      "lifecycleStatus",
+      "networkBinding",
+      "keyBinding",
+      "signingPrivateKey",
+      "encryptionPrivateKey",
+      "protectionModeClass",
+      "generation",
+      "transactionDigest"
+    ];
+    if (value.schemaVersion === 2) fields.push("pendingTransaction");
+    if (Object.keys(value).length !== fields.length || fields.some((field) => !Object.hasOwn(value, field))) return { ok: false };
     if (value.generation !== expectedGeneration) return { ok: false };
     if (typeof value.alias !== "string" || value.alias.length < 1 || value.alias.length > 64) return { ok: false };
     if (value.visibility !== "private" && value.visibility !== "public") return { ok: false };
@@ -27855,14 +28377,17 @@ function parseCurrentRecord(text, expectedGeneration) {
     const encryptionPrivateKey = value.encryptionPrivateKey;
     if (typeof signingPrivateKey !== "string" || !/^[0-9a-f]{64}$/.test(signingPrivateKey)) return { ok: false };
     if (typeof encryptionPrivateKey !== "string" || !/^[0-9a-f]{64}$/.test(encryptionPrivateKey)) return { ok: false };
-    const serialized = JSON.stringify(value);
-    for (const marker of ["mnemonic", "seed", "phrase", "recovery", "wordlist", "bip39"]) {
-      if (serialized.toLowerCase().includes(marker)) return { ok: false };
+    if (Object.keys(nb).length !== 3 || Object.keys(kb).length !== 2) return { ok: false };
+    const pending = value.schemaVersion === 2 ? value.pendingTransaction : null;
+    if (pending !== null) {
+      if (!validatePendingTransaction(pending).ok || pending.networkBinding !== nb.configurationId || pending.transaction.digest !== value.transactionDigest) return { ok: false };
+      const transaction = JSON.parse(pending.transaction.exactJson);
+      if (transaction.TransactionId !== pending.transactionId || transaction.PayloadKind !== "351cd60b-3fdf-48d4-b608-e93c0100f7d0" || transaction.Payload?.PublicSigningAddress !== kb.signingAddress || transaction.Payload?.PublicEncryptAddress !== kb.encryptionAddress || transaction.UserSignature?.Signatory !== kb.signingAddress || transaction.Payload?.IdentityAlias !== pending.reviewedMetadata.alias || transaction.Payload?.IsPublic !== (pending.reviewedMetadata.visibility === "public")) return { ok: false };
     }
     return {
       ok: true,
       record: {
-        schemaVersion: 1,
+        schemaVersion: value.schemaVersion,
         alias: value.alias,
         visibility: value.visibility,
         producerId: value.producerId,
@@ -27874,7 +28399,8 @@ function parseCurrentRecord(text, expectedGeneration) {
         encryptionPrivateKey,
         protectionModeClass: "device-password",
         generation: value.generation,
-        transactionDigest: typeof value.transactionDigest === "string" ? value.transactionDigest : null
+        transactionDigest: typeof value.transactionDigest === "string" ? value.transactionDigest : null,
+        ...value.schemaVersion === 2 ? { pendingTransaction: pending } : {}
       }
     };
   } catch {
@@ -27973,6 +28499,9 @@ function buildLicenceSafeProjection(actorBinding, networkBinding, active) {
   if (active.AssignedCatalogueVersion !== "hushvoting-licence-catalogue/v1.0.0") {
     return { ok: false, reason: "incompatible-catalogue-version" };
   }
+  if (!KNOWN_LICENCE_PLAN_IDS.includes(active.PlanId)) {
+    return { ok: false, reason: "unknown-plan-id" };
+  }
   if (!isBoundedText(active.DisplayName)) {
     return { ok: false, reason: "malformed-required-field" };
   }
@@ -28010,6 +28539,9 @@ function buildLicenceSafeProjection(actorBinding, networkBinding, active) {
   }
   if (active.HigherOptions.length > 0 && typeof active.HigherOptions[0] === "string") {
     return { ok: false, reason: "malformed-required-field" };
+  }
+  if (!active.AllowedGovernanceOptionIds.every((option) => KNOWN_GOVERNANCE_OPTION_IDS.includes(option))) {
+    return { ok: false, reason: "unknown-governance-option" };
   }
   if (active.HigherOptions.some((option) => !isRecordValue2(option) || !isStructurallyValidOption(option))) {
     return { ok: false, reason: "malformed-required-field" };
@@ -28098,7 +28630,7 @@ function parseEntitlementQueryResult(result, actorBinding, networkBinding) {
       }
       const built = buildLicenceSafeProjection(actorBinding, networkBinding, result.active);
       if (!built.ok) {
-        if (built.reason === "unknown-plan-family" || built.reason === "incompatible-catalogue-version") {
+        if (built.reason === "unknown-plan-family" || built.reason === "unknown-plan-id" || built.reason === "unknown-governance-option" || built.reason === "incompatible-catalogue-version") {
           return { outcome: "unsupported", reason: built.reason };
         }
         return { outcome: "malformed" };
@@ -28334,7 +28866,7 @@ function isLicenceConnectivityInput(value) {
 
 // src/lib/licensing/coordinator.ts
 var WEB_TARGET_BINDING = "web-sharedworker";
-var LicenceEntitlementCoordinator = class {
+var LicenceEntitlementCoordinator = class _LicenceEntitlementCoordinator {
   constructor(actorBinding, networkBinding, ports) {
     this.actorBinding = actorBinding;
     this.networkBinding = networkBinding;
@@ -28353,6 +28885,9 @@ var LicenceEntitlementCoordinator = class {
     this.lastReachableAtMs = null;
     this.confirmationStartedReachableMs = null;
     this.lastOutcomeCode = null;
+    /** Deduplicate a due boundary and rate-limit clock-skew rechecks. */
+    this.lastExpiryWakeup = null;
+    this.nextExpiryRecheckAtMs = 0;
     /** FEAT-017: one-shot local-success notification eligibility (Task 3.3). */
     this.upgradeNotificationEligible = false;
     /**
@@ -28365,6 +28900,10 @@ var LicenceEntitlementCoordinator = class {
     this.upgradeTerminal = null;
     /** FEAT-017: consume-after-submit flag for the authoritative-rejection requery. */
     this.upgradeRejectedRequery = false;
+  }
+  static {
+    /** Conservative retry after a due expiry query still returns active (FEAT-016 annual expiry). */
+    this.EXPIRY_RECHECK_INTERVAL_MS = 6e4;
   }
   snapshot() {
     return {
@@ -28381,6 +28920,8 @@ var LicenceEntitlementCoordinator = class {
   /** Query-first start: restart, after-auth, and explicit bootstrap recovery. */
   async start() {
     this.cancelled = false;
+    this.lastExpiryWakeup = null;
+    this.nextExpiryRecheckAtMs = 0;
     this.attemptCount = 0;
     this.consecutiveUnauthenticated = 0;
     this.projection = null;
@@ -28402,6 +28943,16 @@ var LicenceEntitlementCoordinator = class {
     this.advanceReachable(eligibility);
     if (!eligibility.authenticated || !eligibility.foregrounded || !eligibility.reachable || this.inFlight) {
       return this.snapshot();
+    }
+    if (this.phase === "entitlementReady" && this.projection?.expiresAtUtc) {
+      const boundary = this.projection.expiresAtUtc;
+      const wakeup = `${this.projection.licenceReference}:${boundary}`;
+      const nowMs = this.ports.nowMs();
+      if (nowMs >= Date.parse(boundary) && (this.lastExpiryWakeup !== wakeup || nowMs >= this.nextExpiryRecheckAtMs)) {
+        this.lastExpiryWakeup = wakeup;
+        this.nextExpiryRecheckAtMs = nowMs + _LicenceEntitlementCoordinator.EXPIRY_RECHECK_INTERVAL_MS;
+        return this.revalidate("expiry");
+      }
     }
     if (this.phase !== "awaitingIndex" && this.phase !== "confirmationDelayed" && this.phase !== "entitlementUnavailable" && // FEAT-017 D017-01: while a confirmed-upgrade operation is unresolved
     // the old indexed licence remains current; the authority must keep its
@@ -28472,6 +29023,7 @@ var LicenceEntitlementCoordinator = class {
    * account entry, authoritative rejection): gate first, then fresh query.
    */
   async revalidate(trigger) {
+    this.phase = "resolving";
     this.projection = null;
     this.lastOutcomeCode = `revalidate:${trigger}`;
     await this.runFreshQuery(trigger);
@@ -28665,7 +29217,7 @@ var LicenceEntitlementCoordinator = class {
       case "unsupported":
         this.projection = null;
         this.phase = "entitlementUnsupported";
-        this.lastOutcomeCode = outcome.outcome === "unsupported" ? outcome.reason === "unknown-plan-family" ? "plan-family-unknown" : "catalogue-incompatible" : "unsupported";
+        this.lastOutcomeCode = outcome.outcome === "unsupported" ? outcome.reason === "unknown-plan-family" ? "plan-family-unknown" : outcome.reason === "incompatible-catalogue-version" ? "catalogue-incompatible" : "unsupported" : "unsupported";
         return;
       case "authenticationFailure":
         this.phase = "lockedOut";
@@ -29294,12 +29846,14 @@ var LicenceBootstrapSession = class {
       this.teardown();
       return { ok: false, reason: "not-authenticated" };
     }
-    const snapshot = await this.coordinator.tick({
+    const pending = this.coordinator.tick({
       authenticated: true,
       foregrounded: this.eligibility.foregrounded,
       reachable: this.eligibility.reachable,
       paused: this.eligibility.paused
     });
+    this.emitProgress(snapshotFromCoordinator(this.coordinator.snapshot()));
+    const snapshot = await pending;
     const safe = snapshotFromCoordinator(snapshot);
     await this.flushDurable();
     this.emitProgress(safe);
@@ -29526,7 +30080,7 @@ function outcomeFromSealed(result) {
     case "OK":
       return { outcome: "OK", payload: result.detail };
     case "WRONG_PASSWORD_OR_DAMAGED":
-      return { outcome: "WRONG_PASSWORD_OR_DAMAGED" };
+      return { outcome: "WRONG_PASSWORD_OR_DAMAGED", retryDeadlineMs: result.cooldownDeadlineMs };
     case "THROTTLED":
       return { outcome: "THROTTLED", retryDeadlineMs: result.cooldownDeadlineMs };
     case "NETWORK_MISMATCH":
@@ -29546,7 +30100,7 @@ function outcomeFromSealed(result) {
     case "NETWORK_UNAVAILABLE":
       return { outcome: "NETWORK_UNAVAILABLE" };
     case "INVALID_INPUT":
-      return { outcome: "INVALID_INPUT", payload: { reason: result.reason } };
+      return { outcome: "INVALID_INPUT", payload: { reason: result.reason, ...result.invalidPositions ? { invalidPositions: result.invalidPositions } : {} } };
     case "UNKNOWN_FAILURE":
       return { outcome: "UNKNOWN_FAILURE", payload: { supportCode: result.supportCode } };
   }
@@ -29613,15 +30167,14 @@ function createWorkerBffIdentityLookup(fetchImpl = fetch) {
       if (!response.ok) {
         return { kind: "unavailable" };
       }
-      const payload = await response.json();
+      const payload = await readIdentityResponse(response, controller.signal);
       const reply = payload.reply;
-      if (reply === null || reply === void 0 || reply.successfull === false) {
-        return { kind: "missing" };
-      }
+      if (reply?.successfull === false) return { kind: "missing" };
+      if (reply?.successfull !== true) return { kind: "unavailable" };
       const signing = reply.publicSigningAddress;
       const encryption = reply.publicEncryptAddress;
-      if (typeof signing !== "string" || typeof encryption !== "string") {
-        return { kind: "missing" };
+      if (!hasBoundedHistoricalName(reply.profileName) || typeof signing !== "string" || signing.length === 0 || typeof encryption !== "string" || encryption.length === 0 || typeof reply.isPublic !== "boolean") {
+        return { kind: "unavailable" };
       }
       return {
         kind: "exact",
@@ -29658,7 +30211,19 @@ function createSecretTransferBook() {
     if (operation.size === 0) operations.delete(operationId);
     return transfer.value;
   };
-  return { store, take };
+  const discard = (operationId) => {
+    const operation = operations.get(operationId);
+    if (!operation) return;
+    for (const transfer of operation.values()) {
+      if (transfer.value instanceof Uint8Array) transfer.value.fill(0);
+      transfer.consumed = true;
+    }
+    operations.delete(operationId);
+  };
+  const clear = () => {
+    for (const operationId of operations.keys()) discard(operationId);
+  };
+  return { store, take, clear, discard };
 }
 function createProductionWorkerEnvironment(params) {
   const manifestResolution = resolveManifestForRuntimeConfig(params.runtimeConfigId);
@@ -29690,6 +30255,7 @@ function createProductionWorkerEnvironment(params) {
         executeOperation: failClosedOutcome,
         deliver: params.deliver,
         broadcast: params.broadcast,
+        onInvalidate: secretBook.clear,
         cleanupBoundMs: 1e3,
         onForceCleanup: params.onForceCleanup
       },
@@ -29866,10 +30432,22 @@ function createProductionWorkerEnvironment(params) {
         const outcome = engine.concealCandidate(candidateRef);
         return toAuthorityResult(outcomeFromSealed(outcome));
       }
+      case "discardSecretTransfers": {
+        if (typeof payload.transferOperationId !== "string" || payload.transferOperationId.length === 0) return toAuthorityResult({ outcome: "INVALID_INPUT" });
+        secretBook.discard(payload.transferOperationId);
+        return toAuthorityResult({ outcome: "OK" });
+      }
       case "destroyCandidate": {
         const candidateRef = typeof payload.candidateRef === "string" ? payload.candidateRef : "";
         const outcome = engine.destroyCandidate(candidateRef);
         return toAuthorityResult(outcomeFromSealed(outcome));
+      }
+      case "deriveRecoveryCandidates": {
+        const mnemonic = take(request.operationId, "mnemonic");
+        if (typeof mnemonic !== "string" || payload.wordCount !== 12 && payload.wordCount !== 24) {
+          return toAuthorityResult({ outcome: "INVALID_INPUT", payload: { reason: "UNSUPPORTED_INPUT" } });
+        }
+        return toAuthorityResult(outcomeFromSealed(engine.deriveRecoveryCandidates({ mnemonic, wordCount: payload.wordCount })));
       }
       case "deriveWordsCandidate": {
         const mnemonic = take(request.operationId, "mnemonic");
@@ -29887,18 +30465,32 @@ function createProductionWorkerEnvironment(params) {
         if (typeof filePassword !== "string" || typeof fileBytesValue !== "string") {
           return toAuthorityResult({ outcome: "INVALID_INPUT", payload: { reason: "missing-file-material" } });
         }
+        if (filePassword.length === 0 && payload.emptyV1Confirmed !== true) {
+          return toAuthorityResult({ outcome: "INVALID_INPUT", payload: { reason: "empty-v1-confirmation-required" } });
+        }
         const fileBytes = decodeBase64Url(fileBytesValue);
         if (fileBytes === null) {
           return toAuthorityResult({ outcome: "INVALID_INPUT", payload: { reason: "file-encoding" } });
         }
-        const outcome = await engine.importFileCandidate({ fileBytes, filePassword });
-        return toAuthorityResult(outcomeFromSealed(outcome));
+        try {
+          const outcome = await engine.importFileCandidate({ fileBytes, filePassword });
+          if (outcome.code === "WRONG_PASSWORD_OR_DAMAGED" || outcome.code === "THROTTLED") {
+            store({ operationId: request.operationId, kind: "fileBytes", value: fileBytesValue, consumed: false });
+          }
+          return toAuthorityResult(outcomeFromSealed(outcome));
+        } finally {
+          fileBytes.fill(0);
+        }
       }
       case "provisionFromValidatedBundle": {
+        const sessionOnly = payload.protectionMode === "sessionOnly";
+        if (payload.protectionMode !== void 0 && !sessionOnly && payload.protectionMode !== "devicePassword") {
+          return toAuthorityResult({ outcome: "INVALID_INPUT", payload: { reason: "unsupported-protection-mode" } });
+        }
         const devicePassword = take(request.operationId, "devicePassword");
         const candidateRef = typeof payload.candidateRef === "string" ? payload.candidateRef : "";
         emitDiagnosticBeacon({ kind: "provision-inputs", operation: request.operationId, outcome: `pw=${typeof devicePassword === "string"} ref=${candidateRef.length > 0}` });
-        if (typeof devicePassword !== "string" || candidateRef.length === 0) {
+        if (!sessionOnly && typeof devicePassword !== "string" || candidateRef.length === 0) {
           return toAuthorityResult({ outcome: "INVALID_INPUT", payload: { reason: "missing-provision-input" } });
         }
         const alias = typeof payload.alias === "string" ? payload.alias : "";
@@ -29906,15 +30498,15 @@ function createProductionWorkerEnvironment(params) {
         if (alias.length === 0 || visibility === null) {
           return toAuthorityResult({ outcome: "INVALID_INPUT", payload: { reason: "profile-input" } });
         }
-        const outcome = await engine.provision({
+        const input = {
           candidateRef,
-          devicePassword,
           alias,
           visibility,
           configurationId: manifest.configurationId,
           networkBinding: { canonicalNetworkId: manifest.canonicalNetworkId, networkMagic: manifest.networkMagic, configurationId: manifest.configurationId },
           producerId: "P-01"
-        });
+        };
+        const outcome = sessionOnly ? await engine.provisionSessionOnly(input) : await engine.provision({ ...input, devicePassword });
         return toAuthorityResult(outcomeFromSealed(outcome));
       }
       case "unlockPassword": {
@@ -30066,6 +30658,12 @@ function createProductionWorkerEnvironment(params) {
       executeOperation,
       deliver: params.deliver,
       broadcast: params.broadcast,
+      shouldInvalidateOnLifecycle: (signal) => engine.isSessionOnly() && (signal === "pagehide" || signal === "disconnect"),
+      onInvalidate: () => {
+        secretBook.clear();
+        stopLicenceSession();
+        engine.wipeSecrets();
+      },
       cleanupBoundMs: 1e3,
       onForceCleanup: params.onForceCleanup
     },
@@ -30078,7 +30676,7 @@ function toAuthorityResult(outcome) {
     case "OK":
       return { outcome: "OK", retryable: false, allowedActions: [], supportCode: void 0, payload: outcome.payload };
     case "WRONG_PASSWORD_OR_DAMAGED":
-      return { outcome: "WRONG_PASSWORD_OR_DAMAGED", retryable: true, allowedActions: ["retry"], supportCode: void 0 };
+      return { outcome: "WRONG_PASSWORD_OR_DAMAGED", retryable: true, allowedActions: ["retry"], retryDeadlineMs: outcome.retryDeadlineMs, supportCode: void 0 };
     case "THROTTLED":
       return { outcome: "THROTTLED", retryable: false, allowedActions: ["retry"], retryDeadlineMs: outcome.retryDeadlineMs, supportCode: void 0 };
     case "NETWORK_MISMATCH":
@@ -30115,6 +30713,89 @@ function decodeBase64Url(value) {
   }
 }
 
+// src/lib/browser-vault/production/primitive-preflight.ts
+function currentEnvironment() {
+  const manager = globalThis.navigator?.storage;
+  return {
+    secureContext: globalThis.isSecureContext === true,
+    // This first-party entry is emitted as ESM. Reaching it in the actual
+    // SharedWorker realm proves module-worker construction/execution.
+    sharedModuleWorker: globalThis.constructor?.name === "SharedWorkerGlobalScope",
+    crypto: globalThis.crypto ?? null,
+    encode: (text) => new TextEncoder().encode(text),
+    decode: (bytes) => new TextDecoder("utf-8", { fatal: true }).decode(bytes),
+    transfer: (bytes) => structuredClone(bytes, { transfer: [bytes.buffer] }),
+    persisted: manager?.persisted ? () => manager.persisted() : void 0,
+    estimate: manager?.estimate ? () => manager.estimate() : void 0
+  };
+}
+async function advisory(read) {
+  if (!read) return null;
+  let timer;
+  try {
+    return await Promise.race([Promise.resolve().then(read), new Promise((resolve) => {
+      timer = setTimeout(() => resolve(null), 500);
+    })]);
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+async function probeWorkerPrimitives(env = currentEnvironment()) {
+  if (!env.secureContext) return { ok: false, reason: "insecure-context" };
+  if (!env.sharedModuleWorker) return { ok: false, reason: "worker-unavailable" };
+  let timer;
+  const probe = async () => {
+    try {
+      const source = new Uint8Array(env.encode("HushVoting \u2713"));
+      const expected = Array.from(source);
+      const transferred = env.transfer(source);
+      if (source.byteLength !== 0 || transferred.byteLength !== expected.length || !expected.every((value, index) => transferred[index] === value) || env.decode(transferred) !== "HushVoting \u2713") return { ok: false, reason: "transfer-unavailable" };
+    } catch {
+      return { ok: false, reason: "transfer-unavailable" };
+    }
+    const keyBytes = new Uint8Array(32), nonce = new Uint8Array(12);
+    try {
+      const provider = env.crypto;
+      if (!provider?.subtle) return { ok: false, reason: "crypto-unavailable" };
+      provider.getRandomValues(keyBytes);
+      provider.getRandomValues(nonce);
+      const hkdf2 = await provider.subtle.importKey("raw", keyBytes, "HKDF", false, ["deriveBits"]);
+      const derived = await provider.subtle.deriveBits({ name: "HKDF", hash: "SHA-256", salt: new Uint8Array(16), info: new Uint8Array([72, 86]) }, hkdf2, 256);
+      const derivedBytes = new Uint8Array(derived);
+      const correctLength = derivedBytes.byteLength === 32;
+      derivedBytes.fill(0);
+      if (!correctLength) return { ok: false, reason: "crypto-unavailable" };
+      const aes = await provider.subtle.importKey("raw", keyBytes, "AES-GCM", false, ["encrypt", "decrypt"]);
+      const plaintext = new Uint8Array([72, 86, 1]);
+      const ciphertext = await provider.subtle.encrypt({ name: "AES-GCM", iv: nonce, tagLength: 128 }, aes, plaintext);
+      const restored = new Uint8Array(await provider.subtle.decrypt({ name: "AES-GCM", iv: nonce, tagLength: 128 }, aes, ciphertext));
+      const valid = restored.length === plaintext.length && plaintext.every((value, index) => restored[index] === value);
+      restored.fill(0);
+      if (!valid) return { ok: false, reason: "crypto-unavailable" };
+    } catch {
+      return { ok: false, reason: "crypto-unavailable" };
+    } finally {
+      keyBytes.fill(0);
+      nonce.fill(0);
+    }
+    const [persisted, estimate] = await Promise.all([advisory(env.persisted), advisory(env.estimate)]);
+    return {
+      ok: true,
+      persisted: typeof persisted === "boolean" ? persisted : null,
+      estimateAvailable: typeof estimate?.quota === "number" && Number.isFinite(estimate.quota) && typeof estimate.usage === "number" && Number.isFinite(estimate.usage)
+    };
+  };
+  try {
+    return await Promise.race([probe(), new Promise((resolve) => {
+      timer = setTimeout(() => resolve({ ok: false, reason: "preflight-timeout" }), 5e3);
+    })]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // src/lib/browser-vault/production/worker-entry.ts
 var EXPECTED_RUNTIME_CONFIG = "development-localhost";
 async function bootVaultWorker(params) {
@@ -30122,6 +30803,13 @@ async function bootVaultWorker(params) {
   if (runtimeConfigId !== EXPECTED_RUNTIME_CONFIG) {
     return { ok: false, reason: "unapproved-runtime-config" };
   }
+  let preflight;
+  try {
+    preflight = await (params.probePrimitives ?? probeWorkerPrimitives)();
+  } catch {
+    return { ok: false, reason: "preflight-unavailable" };
+  }
+  if (!preflight.ok) return preflight;
   const factory = params.indexedDBFactory;
   let storageResult;
   try {
@@ -30282,6 +30970,14 @@ async function bootAndAttach(params) {
   return { ok: true, registerPort: result.registerPort };
 }
 var workerScope = typeof self !== "undefined" ? self : null;
+function rejectUnbootedPort(port) {
+  port.onmessage = () => {
+    port.postMessage({ kind: "handshake-rejected", protocolVersion: BROWSER_PROTOCOL_VERSION, reason: "unsupported-config" });
+    port.onmessage = null;
+    port.close();
+  };
+  port.start();
+}
 function emitBootBeacon(status) {
   try {
     if (workerScope?.BroadcastChannel) {
@@ -30311,17 +31007,14 @@ if (workerScope !== null) {
     emitBootBeacon({ ok: false, reason: "boot-start" });
     void bootAndAttach().then((result) => {
       emitBootBeacon(result);
-      if (result.ok) {
-        wired = result.registerPort;
-        for (const queued of pendingPorts.splice(0)) {
-          wired(queued);
-        }
+      wired = result.ok ? result.registerPort : rejectUnbootedPort;
+      for (const queued of pendingPorts.splice(0)) {
+        wired(queued);
       }
-    }).catch((error) => {
-      emitBootBeacon({ ok: false, reason: `boot-error: ${String(error)}` });
-      setTimeout(() => {
-        throw error;
-      }, 0);
+    }).catch(() => {
+      emitBootBeacon({ ok: false, reason: "boot-unavailable" });
+      wired = rejectUnbootedPort;
+      for (const queued of pendingPorts.splice(0)) wired(queued);
     });
   }
 }
@@ -30329,7 +31022,8 @@ export {
   attachProductionWorkerConnect,
   bootAndAttach,
   bootVaultWorker,
-  computeWorkerBuildDigest
+  computeWorkerBuildDigest,
+  rejectUnbootedPort
 };
 /*! Bundled license information:
 

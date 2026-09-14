@@ -7,7 +7,7 @@
  * are rejected.
  */
 import { describe, expect, it } from 'vitest';
-import { entropyToMnemonicWorker, mnemonicToEntropyWorker, validateMnemonicWorker, mnemonicToSeedWorker, deriveP01KeysWorker } from './bip39-worker';
+import { entropyToMnemonicWorker, mnemonicToEntropyWorker, validateMnemonicWorker, mnemonicToSeedWorker, deriveP01KeysWorker, deriveP02KeysWorker } from './bip39-worker';
 import { entropyToMnemonic, validateMnemonic } from 'bip39';
 
 describe('worker-safe BIP-39', () => {
@@ -54,7 +54,7 @@ describe('worker-safe BIP-39', () => {
 
 describe('worker-safe derivation equivalence', () => {
   it('matches identity-compatibility P-01/P-02 derivation exactly', async () => {
-    const { deriveP01Keys } = await import('../../identity-compatibility/producers');
+    const { deriveP01Keys, deriveP02Keys } = await import('../../identity-compatibility/producers');
     const { mnemonicToSeed } = await import('../../identity-compatibility/crypto');
     const words = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon art';
     const reference = deriveP01Keys(words);
@@ -65,7 +65,11 @@ describe('worker-safe derivation equivalence', () => {
       expect(worker.signingPrivateKey).toBe(reference.value.signingPrivateKey);
       expect(worker.encryptionPrivateKey).toBe(reference.value.encryptionPrivateKey);
       expect(worker.signingAddress).toBe(reference.value.signingAddress);
+      expect(worker.encryptionAddress).toBe(reference.value.encryptionAddress);
     }
+    const p02 = deriveP02Keys(words);
+    expect(p02.ok).toBe(true);
+    if (p02.ok) expect(deriveP02KeysWorker(words)).toEqual(p02.value);
     // Seed equivalence.
     const seedWorker = mnemonicToSeedWorker(words);
     expect(Buffer.from(seedWorker).equals(Buffer.from(mnemonicToSeed(words)))).toBe(true);

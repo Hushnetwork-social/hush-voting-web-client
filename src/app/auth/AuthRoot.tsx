@@ -13,6 +13,8 @@ import type { AuthMachineInput } from '../../lib/auth/state/machine';
 import type { TrustedTargetDescriptor } from '../../lib/runtime/target';
 import type { TargetAwareActorRegistration, TargetClass } from '../../lib/auth/composition-target';
 import { AuthGate } from './AuthGate';
+import { resolveOnboardingChild } from './onboarding/onboarding-registry';
+import { RestorationAnnouncement } from './RestorationAnnouncement';
 import { AuthenticatedUserMenu } from './AuthenticatedUserMenu';
 import { AuthenticatedLicenceRoot } from './AuthenticatedLicenceRoot';
 import { useLicenceRootFacts } from '../../lib/auth/web/use-licence-root';
@@ -227,11 +229,13 @@ export default function AuthRoot({ machineInputProvider }: AuthRootProps = {}) {
   // history entry rebuilds the authority so it re-detects the correct entry
   // state without persisting authentication state in browser history.
   const [adapter, setAdapter] = useState<AuthAdapter | null>(null);
+  const activeAdapterRef = useRef<AuthAdapter | null>(null);
+  useEffect(() => { activeAdapterRef.current = adapter; }, [adapter]);
 
   const [authorityGeneration, setAuthorityGeneration] = useState(0);
   const entryHistoryTokenRef = useRef<string | null>(null);
   const authenticatedGuardTokenRef = useRef<string | null>(null);
-  const protectedAccessRef = useRef(false);
+  const authenticatedSessionRef = useRef(false);
   const flowHistoryTokensRef = useRef(new Set<string>());
 
   const rebuildAuthority = useCallback(() => {
@@ -252,6 +256,7 @@ export default function AuthRoot({ machineInputProvider }: AuthRootProps = {}) {
     }
     if (await activeLockSink()) {
       adapter?.send({ type: 'INTENT.LOCK' });
+      adapter?.sendEvent({ type: 'SESSION.CUSTODY_RECHECK' });
     }
   }, []);
 
@@ -259,12 +264,18 @@ export default function AuthRoot({ machineInputProvider }: AuthRootProps = {}) {
     let cancelled = false;
     let createdAdapter: AuthAdapter | null = null;
     let createdBridge: EntitlementBridge | null = null;
+    let unsubscribeInvalidation: (() => void) | null = null;
     void (machineInputProvider ?? buildMachineInput)().then((input) => {
       if (cancelled) {
         return;
       }
       createdAdapter = new AuthAdapter(input, { secretSink: activeSecretSink ?? undefined });
       setAdapter(createdAdapter);
+      if (activeWebComposition !== null) {
+        unsubscribeInvalidation = activeWebComposition.client.onInvalidation(() => {
+          createdAdapter?.sendEvent({ type: 'SESSION.AUTHORITY_LOST' });
+        });
+      }
       if (
         activeWebComposition !== null &&
         input.entitlementRequired !== false &&
@@ -290,6 +301,7 @@ export default function AuthRoot({ machineInputProvider }: AuthRootProps = {}) {
     });
     return () => {
       cancelled = true;
+      unsubscribeInvalidation?.();
       createdBridge?.stop();
       createdAdapter?.stop();
     };
@@ -299,26 +311,33 @@ export default function AuthRoot({ machineInputProvider }: AuthRootProps = {}) {
   const { input: licenceInput, account: licenceAccount } = useLicenceRootFacts(entitlementBridge, projection);
   const [licenceOpen, setLicenceOpen] = useState(false);
   useEffect(() => {
-    protectedAccessRef.current = projection?.protectedAccess === true;
-  }, [projection?.protectedAccess]);
+    authenticatedSessionRef.current = projection?.authState === 'authenticated';
+  }, [projection?.authState]);
 
   useEffect(() => {
     const entryToken = entryHistoryTokenRef.current ?? createOpaqueHistoryToken(1);
     entryHistoryTokenRef.current = entryToken;
-    window.history.replaceState({ hvToken: entryToken }, '', '/');
+    // Preserve router-owned markers so same-URL Back remains client navigation.
+    window.history.replaceState({ ...window.history.state, hvToken: entryToken }, '', '/');
 
     const handlePopState = (event: PopStateEvent) => {
-      if (protectedAccessRef.current) {
+      if (authenticatedSessionRef.current) {
+        setLicenceOpen(false);
         // Browser Back is not a security action. While authenticated, restore
         // an opaque same-URL guard entry without rebuilding or locking the
         // authority. Only the explicit Lock command destroys the session.
         const guardToken = authenticatedGuardTokenRef.current ?? createOpaqueHistoryToken(3);
         authenticatedGuardTokenRef.current = guardToken;
-        window.history.pushState({ hvToken: guardToken }, '', '/');
+        window.history.pushState({ ...window.history.state, hvToken: guardToken }, '', '/');
         return;
       }
       if (historyToken(event.state) === entryHistoryTokenRef.current) {
-        rebuildAuthority();
+        const current = activeAdapterRef.current;
+        if (current?.snapshot().authState === 'onboarding') {
+          current.send({ type: 'INTENT.BACK_FROM_ONBOARDING' });
+        } else {
+          rebuildAuthority();
+        }
       }
     };
 
@@ -327,16 +346,27 @@ export default function AuthRoot({ machineInputProvider }: AuthRootProps = {}) {
   }, [rebuildAuthority]);
 
   useEffect(() => {
-    if (projection?.protectedAccess !== true) {
+    // The root may restart empty file selection after verified child cleanup.
+    // Give that fresh child its own opaque Back entry, as for explicit entry.
+    if (projection?.authState !== 'onboarding' || projection.onboardingKind !== 'restoreCredentialFile'
+      || resolveOnboardingChild('restoreCredentialFile') === null
+      || historyToken(window.history.state) !== entryHistoryTokenRef.current) return;
+    const flowToken = createOpaqueHistoryToken(2);
+    flowHistoryTokensRef.current.add(flowToken);
+    window.history.pushState({ ...window.history.state, hvToken: flowToken }, '', '/');
+  }, [projection]);
+
+  useEffect(() => {
+    if (projection?.authState !== 'authenticated') {
       authenticatedGuardTokenRef.current = null;
       return;
     }
     const guardToken = authenticatedGuardTokenRef.current ?? createOpaqueHistoryToken(3);
     authenticatedGuardTokenRef.current = guardToken;
     if (historyToken(window.history.state) !== guardToken) {
-      window.history.pushState({ hvToken: guardToken }, '', '/');
+      window.history.pushState({ ...window.history.state, hvToken: guardToken }, '', '/');
     }
-  }, [projection?.protectedAccess]);
+  }, [projection?.authState]);
 
   // Real HushServerNode connectivity: a successful GetBlockchainHeight call
   // is online; three consecutive observations of the same index are paused.
@@ -395,7 +425,7 @@ export default function AuthRoot({ machineInputProvider }: AuthRootProps = {}) {
         if (FIRST_RUN_INTENTS.has(intent.type)) {
           const flowToken = createOpaqueHistoryToken(2);
           flowHistoryTokensRef.current.add(flowToken);
-          window.history.pushState({ hvToken: flowToken }, '', '/');
+          window.history.pushState({ ...window.history.state, hvToken: flowToken }, '', '/');
         } else if (
           intent.type === 'INTENT.BACK_FROM_ONBOARDING' &&
           flowHistoryTokensRef.current.has(historyToken(window.history.state) ?? '')
@@ -432,6 +462,7 @@ export default function AuthRoot({ machineInputProvider }: AuthRootProps = {}) {
       licenceInput !== null && licenceAccount !== null && identity !== null
         ? {
             facts: licenceAccount,
+            onRefreshForEntry: () => entitlementBridge?.handleLicenceWorkspaceIntent({ type: 'LICENCE.REFRESH_ACCOUNT_ENTRY' }),
             onLicenceAction: (_action: LicenceAccountActionKind) => {
               setLicenceOpen(true);
             },
@@ -463,6 +494,8 @@ export default function AuthRoot({ machineInputProvider }: AuthRootProps = {}) {
     );
 
     return (
+      <>
+      <RestorationAnnouncement projection={projection} />
       <main className="app-shell antialiased" data-testid="authenticated-shell">
         <header className="topbar">
           <span className="brand">
@@ -502,6 +535,7 @@ export default function AuthRoot({ machineInputProvider }: AuthRootProps = {}) {
           defaultWorkspace
         )}
       </main>
+      </>
     );
   }
 
@@ -509,5 +543,5 @@ export default function AuthRoot({ machineInputProvider }: AuthRootProps = {}) {
     return null;
   }
 
-  return <AuthGate projection={projection} handlers={handlers} />;
+  return <><RestorationAnnouncement projection={projection} /><AuthGate projection={projection} handlers={handlers} /></>;
 }

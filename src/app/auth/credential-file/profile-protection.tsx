@@ -13,11 +13,17 @@ import { useRef, useState } from 'react';
 import type { RestoreViewState } from '../../../lib/credential-file-restore/presentation/view';
 import type { RestoreProtectionChoice } from '../../../lib/credential-file-restore/contracts/projection';
 import { COPY, RestoreBackButton, RestoreErrorRegion, RestorePanel, RestorePrimaryButton, RestoreStatusRegion } from './surfaces';
+import { SafeAlias } from '../SafeAlias';
 
 export interface ProfileProtectionProps {
+  readonly onAcknowledgeSessionOnly?: (acknowledged?: boolean) => void;
   readonly view: RestoreViewState;
   readonly onChooseProtection: (mode: RestoreProtectionChoice, devicePassword?: string) => void;
   readonly onCreateIdentity: () => void;
+  readonly onUpdateProfile?: (alias: string, visibility: 'private' | 'public') => void;
+  readonly onAcknowledgePublic?: (acknowledged: boolean) => void;
+  readonly publicAcknowledged?: boolean;
+  readonly canCreateProfile?: boolean;
   readonly onReveal: () => void;
   readonly onUnlockResume: () => void;
   readonly onCancelStage: () => void;
@@ -25,10 +31,24 @@ export interface ProfileProtectionProps {
 }
 
 /** Missing-profile review (explicit Create only; abbreviated addresses). */
-export function ProfileReviewScreen({ view, onCreateIdentity, onReveal, onBack }: ProfileProtectionProps) {
+export function ProfileReviewScreen({ view, onCreateIdentity, onReveal, onBack, onUpdateProfile, onAcknowledgePublic, publicAcknowledged, canCreateProfile }: ProfileProtectionProps) {
   const profile = view.profile;
+  const [revealRequested, setRevealRequested] = useState(false);
+  const revealed = revealRequested ? view.reveal : null;
   return (
     <RestorePanel title={COPY.profile.missing}>
+      <p className="mt-3 text-sm text-[var(--text-muted)]">This may happen after a blockchain reset or if the identity was never registered. Creating its profile uses the same recovered keys.</p>
+      {profile?.aliasEditable && <div className="mt-4 space-y-3">
+        <label htmlFor="file-profile-alias" className="block text-sm">Profile name</label>
+        <input id="file-profile-alias" data-testid="file-profile-alias" className="text-input" maxLength={256} value={profile.alias}
+          onChange={event => onUpdateProfile?.(event.currentTarget.value, profile.isPublic ? 'public' : 'private')} />
+        <fieldset className="flex gap-4"><legend className="text-sm">Visibility</legend>
+          <label><input type="radio" name="file-profile-visibility" checked={!profile.isPublic} onChange={() => onUpdateProfile?.(profile.alias, 'private')} /> Private</label>
+          <label><input type="radio" name="file-profile-visibility" checked={profile.isPublic} onChange={() => onUpdateProfile?.(profile.alias, 'public')} /> Public</label>
+        </fieldset>
+        {profile.isPublic && <label className="flex items-start gap-2 text-sm"><input type="checkbox" data-testid="file-profile-public-ack" checked={publicAcknowledged ?? false}
+          onChange={event => onAcknowledgePublic?.(event.currentTarget.checked)} /> I understand this profile will be publicly discoverable.</label>}
+      </div>}
       {profile !== null && (
         <dl className="mt-3 space-y-2 text-sm text-[var(--text)]">
           <div className="flex items-center justify-between gap-3">
@@ -46,22 +66,27 @@ export function ProfileReviewScreen({ view, onCreateIdentity, onReveal, onBack }
         </dl>
       )}
       <div className="mt-4 flex flex-wrap items-center gap-3">
-        <RestorePrimaryButton testId="create-identity" onClick={onCreateIdentity}>
+        <RestorePrimaryButton testId="create-identity" disabled={canCreateProfile === false} onClick={onCreateIdentity}>
           {COPY.profile.create}
         </RestorePrimaryButton>
-        <button type="button" onClick={onReveal} className="min-h-11 rounded-xl px-3 text-sm font-medium text-[var(--text-muted)]" data-testid="reveal-addresses">
-          {COPY.profile.reveal}
+        <button type="button" onClick={() => { setRevealRequested(!revealRequested); onReveal(); }} className="min-h-11 rounded-xl px-3 text-sm font-medium text-[var(--text-muted)]" data-testid="reveal-addresses">
+          {revealed ? 'Hide full addresses' : COPY.profile.reveal}
         </button>
         <RestoreBackButton onBack={onBack} />
       </div>
-      {view.failureCode !== null && <RestoreErrorRegion>{errorCopyForProfile(view.failureCode)}</RestoreErrorRegion>}
+      {revealed && <div className="mt-4 space-y-3 text-sm">
+        <p>Signing address</p><code className="block break-all" data-testid="file-full-signing-address">{revealed.fullSigningAddress}</code>
+        <p>Encryption address</p><code className="block break-all" data-testid="file-full-encryption-address">{revealed.fullEncryptionAddress}</code>
+      </div>}
+      {view.failureCode !== null && <RestoreErrorRegion>Enter a valid profile name before continuing.</RestoreErrorRegion>}
     </RestorePanel>
   );
 }
 
 /** Separate protection choice — Device password default; no co-mounted backup state. */
-export function ProtectionScreen({ view, onChooseProtection, onBack }: ProfileProtectionProps) {
+export function ProtectionScreen({ view, onChooseProtection, onBack, onAcknowledgeSessionOnly }: ProfileProtectionProps) {
   const choices = view.protectionChoices ?? [];
+  const [sessionAcknowledged, setSessionAcknowledged] = useState(false);
   const [selectedMode, setSelectedMode] = useState<RestoreProtectionChoice>(choices[0] ?? 'devicePassword');
   const [confirmationError, setConfirmationError] = useState<string | null>(null);
   const [canSubmitPassword, setCanSubmitPassword] = useState(false);
@@ -77,6 +102,7 @@ export function ProtectionScreen({ view, onChooseProtection, onBack }: ProfilePr
 
   const submitProtection = () => {
     if (selectedMode !== 'devicePassword') {
+      if (selectedMode !== 'sessionOnly' || !sessionAcknowledged) return;
       onChooseProtection(selectedMode);
       return;
     }
@@ -103,7 +129,7 @@ export function ProtectionScreen({ view, onChooseProtection, onBack }: ProfilePr
               type="radio"
               name="restore-protection"
               checked={selectedMode === mode}
-              onChange={() => setSelectedMode(mode)}
+              onChange={() => { setSelectedMode(mode); setSessionAcknowledged(false); onAcknowledgeSessionOnly?.(false); }}
               data-testid={`protection-${mode}`}
             />
             <span>{protectionLabel(mode)}</span>
@@ -143,8 +169,15 @@ export function ProtectionScreen({ view, onChooseProtection, onBack }: ProfilePr
             {confirmationError !== null && <div id="restore-device-password-error"><RestoreErrorRegion>{confirmationError}</RestoreErrorRegion></div>}
           </div>
         )}
+        {selectedMode === 'sessionOnly' && <label className="mt-3 flex min-h-11 items-center gap-2 text-sm">
+          <input type="checkbox" checked={sessionAcknowledged} onChange={event => {
+            setSessionAcknowledged(event.target.checked);
+            onAcknowledgeSessionOnly?.(event.target.checked);
+          }} data-testid="file-session-ack" />
+          I understand that nothing is saved on this device and I must restore my identity again after this session ends.
+        </label>}
         <div className="mt-5">
-          <RestorePrimaryButton testId="submit-protection" type="submit" disabled={selectedMode === 'devicePassword' && !canSubmitPassword} fullWidth>
+          <RestorePrimaryButton testId="submit-protection" type="submit" disabled={selectedMode === 'devicePassword' ? !canSubmitPassword : !sessionAcknowledged} fullWidth>
             Protect this device and continue
           </RestorePrimaryButton>
         </div>
@@ -190,7 +223,7 @@ export function SuccessScreen({ view }: { readonly view: RestoreViewState }) {
   return (
     <RestorePanel title={COPY.success.title}>
       <RestoreStatusRegion role="status">{COPY.success.title}</RestoreStatusRegion>
-      {profile !== null && <p className="mt-2 text-sm text-[var(--text)]">{profile.alias}</p>}
+      {profile !== null && <p className="mt-2 text-sm text-[var(--text)]"><SafeAlias alias={profile.alias} /></p>}
       <p className="mt-4 rounded-xl bg-[var(--surface-strong)] p-3 text-sm text-[var(--text-muted)]" data-testid="mnemonic-notice">
         {COPY.success.mnemonicNotice}
       </p>
@@ -208,11 +241,4 @@ function protectionLabel(mode: RestoreProtectionChoice): string {
     case 'sessionOnly':
       return COPY.protection.sessionOnly;
   }
-}
-
-function errorCopyForProfile(code: string): string {
-  if (code === 'SERVER_PROOF_REJECTED') {
-    return COPY.errors.serverProof;
-  }
-  return COPY.errors.generic;
 }

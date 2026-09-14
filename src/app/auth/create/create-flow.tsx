@@ -7,6 +7,7 @@
  * screens are self-contained and driven only by safe projections.
  */
 
+import type { RecoveryWordDisplay } from '../../../lib/auth/web/recovery-word-display';
 import type { CreationViewState } from '../../../lib/identity-creation/presentation';
 import { CancellingScreen, ConnectionScreen, CorrectingScreen, DelayScreen, FinishCreatingScreen, TerminalScreen, WaitingScreen } from './status';
 import { EntryScreen, PreflightScreen } from './entry';
@@ -23,7 +24,7 @@ export interface CreateUserCallbacks {
   readonly onGenerate: () => void;
   readonly onRecoveryContinue: () => void;
   readonly onRecoveryCopy: () => void;
-  readonly onRegenerateRequest: () => void;
+  readonly onRegenerateRequest: (confirmed?: true) => void;
   readonly onAcknowledge: (value: boolean) => void;
   readonly onConfirmVerify: (answers: ReadonlyMap<number, string>) => void;
   readonly onReviewAll: () => void;
@@ -42,7 +43,8 @@ export interface CreateUserCallbacks {
 export interface CreateUserFlowProps {
   readonly view: CreationViewState;
   /** Safe projections passed down per screen (bounded reveal words). */
-  readonly recoveryWords: readonly string[] | null;
+  readonly recoveryDisplay: RecoveryWordDisplay;
+  readonly recoveryVisible: boolean;
   readonly recoveryAcknowledged: boolean;
   readonly recoveryTimeoutMessage: string | null;
   readonly confirmPositions: readonly number[];
@@ -79,9 +81,11 @@ export function CreateUserFlow(props: CreateUserFlowProps) {
     case 'recovery':
       return (
         <RecoveryScreen
-          words={props.recoveryWords}
+          display={props.recoveryDisplay}
+          visible={props.recoveryVisible}
           onCopy={c.onRecoveryCopy}
           onRegenerateRequest={c.onRegenerateRequest}
+          onReveal={c.onReviewAll}
           onContinue={c.onRecoveryContinue}
           onBack={c.onBack}
           acknowledged={props.recoveryAcknowledged}
@@ -108,7 +112,8 @@ export function CreateUserFlow(props: CreateUserFlowProps) {
     case 'waiting':
       return <WaitingScreen onCheckAgain={c.onCheckAgain} onLock={c.onLock} abbreviatedSigningAddress={props.waitingAddress} blockHeight={props.blockHeight} />;
     case 'delay':
-      return <DelayScreen onCheckAgain={c.onCheckAgain} onLock={c.onLock} />;
+      return <DelayScreen onCheckAgain={c.onCheckAgain} onLock={c.onLock}
+        localSaveFailed={view.error?.code === 'PROVISION_FAILED'} retrying={view.primaryAction === 'inProgress'} />;
     case 'connection':
       return <ConnectionScreen onRetry={c.onRetryConnection} onLock={c.onLock} />;
     case 'finishCreating':
