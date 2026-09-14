@@ -111,9 +111,17 @@ export function compactToDer(rBytes: Uint8Array, sBytes: Uint8Array): Uint8Array
 }
 
 function padTo32(bytes: Uint8Array): Uint8Array {
-  if (bytes.length === 32) return bytes;
-  if (bytes.length === 33 && bytes[0] === 0x00) return bytes.slice(1);
-  throw new Error('unexpected integer length');
+  if (bytes.length < 1 || bytes.length > 33 || (bytes[0] & 0x80) !== 0) {
+    throw new Error('invalid DER integer');
+  }
+  if (bytes.length > 1 && bytes[0] === 0 && (bytes[1] & 0x80) === 0) {
+    throw new Error('non-minimal DER integer');
+  }
+  if (bytes.length === 33 && bytes[0] !== 0) throw new Error('oversized DER integer');
+  const unsigned = bytes.length === 33 ? bytes.slice(1) : bytes;
+  const padded = new Uint8Array(32);
+  padded.set(unsigned, 32 - unsigned.length);
+  return padded;
 }
 
 /**
@@ -121,7 +129,7 @@ function padTo32(bytes: Uint8Array): Uint8Array {
  * well-formed ECDSA signature SEQUENCE of two INTEGERs.
  */
 export function derToCompact(der: Uint8Array): Uint8Array {
-  if (der.length < 8 || der[0] !== 0x30) throw new Error('not a DER sequence');
+  if (der.length < 8 || der.length > 72 || der[0] !== 0x30) throw new Error('not a DER sequence');
   const seqLen = der[1];
   if (seqLen !== der.length - 2) throw new Error('DER sequence length mismatch');
   if (der[2] !== 0x02) throw new Error('missing INTEGER tag for r');
