@@ -54,6 +54,14 @@ import type {
   VerificationResult,
 } from '../results';
 
+import { ELECTION_CAPTURED_OPERATIONS, ELECTION_ENTITLEMENT_REASONS, isElectionId, type ElectionScopedAccess } from '../../elections/entitlement';
+
+export interface ScopedElectionSessionAccess extends ElectionScopedAccess {
+  readonly actorSigningAddress: string;
+  readonly epoch: number;
+}
+interface ElectionAccessRequest { readonly electionId: string; readonly requestId: number; readonly epoch: number; readonly actorSigningAddress: string }
+
 /** Actor kinds the machine can start. */
 export type OperationKind =
   | 'initialize'
@@ -73,6 +81,7 @@ export type AuthMachineEvent =
   | { readonly type: 'ACTOR.ONBOARDING_RESULT'; readonly operationId: OperationId; readonly epoch: SessionEpoch; readonly result: OnboardingResult }
   | { readonly type: 'ACTOR.REMOVAL_RESULT'; readonly operationId: OperationId; readonly epoch: SessionEpoch; readonly result: RemovalResult }
   | { readonly type: 'CONNECTIVITY.CHANGE'; readonly state: ConnectivityStateCode }
+  | { readonly type: 'ELECTION.ACCESS.CLEAR' }
   | { readonly type: 'SESSION.AUTHORITY_LOST' }
   | { readonly type: 'SESSION.CUSTODY_RECHECK' }
   | { readonly type: 'SESSION.INVALIDATED'; readonly reason: InvalidationReason }
@@ -83,7 +92,9 @@ export type AuthMachineEvent =
       readonly stage: EntitlementStageCode;
       readonly epoch: SessionEpoch;
     }
-  | { readonly type: 'ENTITLEMENT.RESET' };
+  | { readonly type: 'ENTITLEMENT.RESET' }
+  | ({ readonly type: 'ELECTION.ACCESS.REQUEST' } & ElectionAccessRequest)
+  | ({ readonly type: 'ELECTION.ACCESS.RESULT'; readonly access: ElectionScopedAccess } & ElectionAccessRequest);
 
 /** Machine context = allowlisted auth context + injected actor ports. */
 export type AuthMachineContextWithActors = AuthMachineContext & {
@@ -97,6 +108,8 @@ export type AuthMachineContextWithActors = AuthMachineContext & {
   readonly localUserRef: LocalUserRef | null;
   /** Parallel connectivity region state (mirrors the region for guards). */
   readonly connectivity: ConnectivityStateCode;
+  readonly electionAccess: ScopedElectionSessionAccess | null;
+  readonly electionAccessRequest: ElectionAccessRequest | null;
 };
 
 /** Input: validated production actors + registered capability flags. */
@@ -325,6 +338,11 @@ export const authMachine = setup({
         (args.event as { stage?: EntitlementStageCode }).stage ?? null,
     }),
     clearEntitlementStage: assign({ entitlementStage: () => null as EntitlementStageCode | null }),
+    clearElectionAccess: assign({ electionAccess: () => null, electionAccessRequest: () => null }),
+    requestElectionAccess: assign(({ event }) => event.type === 'ELECTION.ACCESS.REQUEST'
+      ? { electionAccess: null, electionAccessRequest: { electionId: event.electionId, requestId: event.requestId, epoch: event.epoch, actorSigningAddress: event.actorSigningAddress } } : {}),
+    assignElectionAccess: assign(({ event }) => event.type === 'ELECTION.ACCESS.RESULT'
+      ? { electionAccess: { ...event.access, allowedOperations: [...event.access.allowedOperations], epoch: event.epoch, actorSigningAddress: event.actorSigningAddress }, electionAccessRequest: null } : {}),
     assignOutcome: assign({
       outcomeCode: (args) =>
         (args.event as { result?: { code: AuthMachineContext['outcomeCode'] } }).result?.code ?? null,
@@ -366,6 +384,7 @@ export const authMachine = setup({
     completedRestorationKind: null,
     localUserRef: null as LocalUserRef | null,
     connectivity: 'unknown' as ConnectivityStateCode,
+    electionAccess: null, electionAccessRequest: null,
   }),
   type: 'parallel',
   states: {
@@ -721,7 +740,7 @@ export const authMachine = setup({
         },
         authenticated: {
           entry: ['clearActiveOperation', 'clearOutcome', 'clearSupportCode', 'clearEntitlementStage'],
-          exit: ['clearAuthenticatedIdentity', 'clearEntitlementStage'],
+          exit: ['clearAuthenticatedIdentity', 'clearEntitlementStage', 'clearElectionAccess'],
           initial: 'entitlementResolving',
           on: {
             'INTENT.LOCK': { target: 'locked', actions: ['incrementEpoch', 'clearOutcome'] },
@@ -731,6 +750,24 @@ export const authMachine = setup({
             'SESSION.AUTHORITY_LOST': { target: 'locked', actions: ['incrementEpoch', 'clearOutcome'] },
             'INTENT.REMOVE_LOCAL_USER': { target: 'removingLocalUser', actions: 'incrementEpoch' },
             'INTENT.REAUTHENTICATION_REQUIRED': { target: 'locked', actions: ['incrementEpoch', 'clearOutcome'] },
+            'ELECTION.ACCESS.CLEAR': { actions: 'clearElectionAccess' },
+            'ELECTION.ACCESS.REQUEST': {
+              guard: ({ context, event }) => context.connectivity === 'online'
+                && event.epoch === context.sessionEpoch && Number.isSafeInteger(event.requestId)
+                && event.actorSigningAddress === context.authenticatedIdentity?.publicSigningKey && isElectionId(event.electionId),
+              actions: 'requestElectionAccess',
+            },
+            'ELECTION.ACCESS.RESULT': {
+              guard: ({ context, event }) => context.connectivity === 'online'
+                && event.epoch === context.sessionEpoch && event.requestId === context.electionAccessRequest?.requestId
+                && event.actorSigningAddress === context.authenticatedIdentity?.publicSigningKey
+                && event.electionId === context.electionAccessRequest?.electionId && event.access.electionId === event.electionId
+                && (event.access.reason === null || ELECTION_ENTITLEMENT_REASONS.includes(event.access.reason))
+                && (event.access.reason === null || event.access.allowedOperations.length === 0)
+                && event.access.allowedOperations.length <= ELECTION_CAPTURED_OPERATIONS.length
+                && event.access.allowedOperations.every(op => ELECTION_CAPTURED_OPERATIONS.includes(op)),
+              actions: 'assignElectionAccess',
+            },
             // FEAT-016: one closed coordinator drives the entitlement stage via
             // epoch-scoped events. A stale epoch (old session/identity/network)
             // completion is ignored and can never restore protected access.
@@ -887,6 +924,7 @@ export const authMachine = setup({
       initial: 'unknown',
       states: {
         unknown: {
+          entry: [assign({ connectivity: () => 'unknown' as ConnectivityStateCode }), 'clearElectionAccess'],
           on: {
             'CONNECTIVITY.CHANGE': [
               { target: 'online', guard: ({ event }) => event.state === 'online' },
@@ -897,6 +935,7 @@ export const authMachine = setup({
           },
         },
         online: {
+          entry: [assign({ connectivity: () => 'online' as ConnectivityStateCode }), 'clearElectionAccess'],
           on: {
             'CONNECTIVITY.CHANGE': [
               { target: 'paused', guard: ({ event }) => event.state === 'paused' },
@@ -906,6 +945,7 @@ export const authMachine = setup({
           },
         },
         paused: {
+          entry: [assign({ connectivity: () => 'paused' as ConnectivityStateCode }), 'clearElectionAccess'],
           on: {
             'CONNECTIVITY.CHANGE': [
               { target: 'online', guard: ({ event }) => event.state === 'online' },
@@ -915,6 +955,7 @@ export const authMachine = setup({
           },
         },
         offline: {
+          entry: [assign({ connectivity: () => 'offline' as ConnectivityStateCode }), 'clearElectionAccess'],
           on: {
             'CONNECTIVITY.CHANGE': [
               { target: 'online', guard: ({ event }) => event.state === 'online' },
@@ -924,6 +965,7 @@ export const authMachine = setup({
           },
         },
         reconnecting: {
+          entry: [assign({ connectivity: () => 'reconnecting' as ConnectivityStateCode }), 'clearElectionAccess'],
           on: {
             'CONNECTIVITY.CHANGE': [
               { target: 'online', guard: ({ event }) => event.state === 'online' },

@@ -370,3 +370,34 @@ describe('authentication, connectivity, and cancellation', () => {
     expect(h.coordinator.snapshot().projection).toBeNull();
   });
 });
+
+// EPIC-002 AT-LIC-010/014 -> AC-018-008/009 -> P018-4-01 -> T018-4-01.
+describe('authoritative election rejection refresh', () => {
+  it('never constructs or resubmits a baseline from rejection, repeated refresh or reconnect', async () => {
+    const h = makeHarness();
+    h.queryQueue.push(activeResult(), noActiveResult(), noActiveResult(), noActiveResult());
+    await h.coordinator.start();
+    await h.coordinator.revalidate('authoritative-rejection');
+    await h.coordinator.revalidate('authoritative-rejection');
+    await h.coordinator.onConnectivity('offline');
+    await h.coordinator.onConnectivity('online');
+    expect(h.coordinator.snapshot().projection).toBeNull();
+    expect(h.coordinator.snapshot().phase).toBe('entitlementUnavailable');
+    expect(h.identityCounter).toBe(0);
+    expect(h.submitCalls).toHaveLength(0);
+    expect(h.journal.size).toBe(0);
+  });
+
+  it('keeps unavailable distinct and accepts only fresh active truth', async () => {
+    const h = makeHarness();
+    h.queryQueue.push(activeResult(), { ok: false, status: 'UNAVAILABLE' }, activeResult());
+    await h.coordinator.start();
+    await h.coordinator.revalidate('authoritative-rejection');
+    expect(h.coordinator.snapshot().phase).toBe('entitlementUnavailable');
+    expect(h.coordinator.snapshot().projection).toBeNull();
+    await h.coordinator.revalidate('authoritative-rejection');
+    expect(h.coordinator.snapshot().phase).toBe('entitlementReady');
+    expect(h.identityCounter).toBe(0);
+    expect(h.submitCalls).toHaveLength(0);
+  });
+});

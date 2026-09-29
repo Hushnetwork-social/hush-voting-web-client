@@ -186,6 +186,8 @@ export class LicenceEntitlementCoordinator {
   private upgradeTerminal: UpgradeTerminalContext | null = null;
   /** FEAT-017: consume-after-submit flag for the authoritative-rejection requery. */
   private upgradeRejectedRequery = false;
+  /** An election rejection requests observation, never licence issuance/resubmission. */
+  private rejectionRefreshOnly = false;
 
   constructor(
     private readonly actorBinding: string,
@@ -335,6 +337,7 @@ export class LicenceEntitlementCoordinator {
 
   /** Manual/UI Retry after recoverable error states (fresh query first). */
   async recoverFromError(): Promise<CoordinatorSnapshot> {
+    this.rejectionRefreshOnly = false; // explicit user recovery, still query-first
     if (this.pendingRecord !== null && this.pendingTransactionId !== null) {
       await this.retryExact();
       return this.snapshot();
@@ -348,6 +351,7 @@ export class LicenceEntitlementCoordinator {
    * account entry, authoritative rejection): gate first, then fresh query.
    */
   async revalidate(trigger: string): Promise<CoordinatorSnapshot> {
+    if (trigger === 'authoritative-rejection') this.rejectionRefreshOnly = true;
     this.phase = 'resolving';
     this.projection = null;
     this.lastOutcomeCode = `revalidate:${trigger}`;
@@ -621,6 +625,12 @@ export class LicenceEntitlementCoordinator {
   }
 
   private async handleNoActive(template: LicenceDirectFreeTemplate, reason: string): Promise<void> {
+    if (this.rejectionRefreshOnly) {
+      this.phase = 'entitlementUnavailable';
+      this.projection = null;
+      this.lastOutcomeCode = 'authoritative-rejection-query-only';
+      return;
+    }
     // Query-first restart rule: resubmit a bound pending record only when
     // truth remains no-active; never fabricate a second transaction. Polling
     // cycles NEVER resubmit automatically (query-only reconciliation).

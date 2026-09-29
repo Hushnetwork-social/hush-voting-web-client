@@ -32,6 +32,7 @@ import type { ConnectivityStateCode, EntitlementStageCode } from '../types';
 import type { AuthIntent } from '../types';
 import type { LicenceRevalidationTrigger } from '../../licensing/session-contract';
 import { isLicenceRevalidationTrigger } from '../../licensing/session-contract';
+import { electionEntitlementReason, isElectionId, parseElectionScopedAccess, type ElectionScopedAccess } from '../../elections/entitlement';
 
 /**
  * FEAT-017 page-safe licence workspace intents the root composition may
@@ -201,6 +202,8 @@ const parseStepOutcome = (result: ClientOperationResult): EntitlementStepOutcome
  * authority session and never create a second query/submission loop.
  */
 export class EntitlementBridge {
+  private electionRequestId = 0;
+  private electionInFlight: { key: string; promise: Promise<boolean> } | null = null;
   private running = false;
   private starting: Promise<void> | null = null;
   private lastConnectivity: BridgeConnectivityInput | null = null;
@@ -215,6 +218,48 @@ export class EntitlementBridge {
 
   get isRunning(): boolean {
     return this.running;
+  }
+
+  /** Consumer seam for the downstream election view: uses the existing worker/root,
+   * independent of current licence readiness. Repeated concurrent requests coalesce. */
+  refreshElectionAccess(electionId: string): Promise<boolean> {
+    const projection = this.deps.adapter.snapshot();
+    const actor = projection.authenticatedIdentity?.publicSigningKey;
+    if (!isElectionId(electionId) || !this.running || projection.authState !== 'authenticated'
+      || projection.connectivity !== 'online' || actor === undefined) return Promise.resolve(false);
+    const key = JSON.stringify([electionId, actor, projection.sessionEpoch]);
+    if (this.electionInFlight?.key === key) return this.electionInFlight.promise;
+    const request = { electionId, actorSigningAddress: actor, epoch: projection.sessionEpoch, requestId: ++this.electionRequestId };
+    this.deps.adapter.sendEvent({ type: 'ELECTION.ACCESS.REQUEST', ...request });
+    const promise = this.resolveElectionAccess(request).finally(() => {
+      if (this.electionInFlight?.promise === promise) this.electionInFlight = null;
+    });
+    this.electionInFlight = { key, promise };
+    return promise;
+  }
+
+  private async resolveElectionAccess(request: { electionId: string; actorSigningAddress: string; epoch: number; requestId: number }): Promise<boolean> {
+    let access: ElectionScopedAccess = { electionId: request.electionId, allowedOperations: [], reason: 'ENTITLEMENT_AUTHORITY_UNAVAILABLE' };
+    try {
+      const result = await this.deps.client.dispatch('electionAccessQuery', { electionId: request.electionId });
+      const payload = result.payload as { kind?: unknown; ok?: unknown; actorSigningAddress?: unknown; access?: ElectionScopedAccess; reason?: unknown } | undefined;
+      if (result.outcome === 'OK' && payload?.kind === 'election-scoped-access') {
+        if (payload.ok === true && payload.actorSigningAddress === request.actorSigningAddress) {
+          access = parseElectionScopedAccess({ ElectionId: payload.access?.electionId, SchemaVersion: 1,
+            AllowedOperations: payload.access?.allowedOperations, EntitlementReason: payload.access?.reason ?? '' }, request.electionId);
+        } else access = { ...access, reason: electionEntitlementReason(payload.reason) ?? 'ENTITLEMENT_AUTHORITY_UNAVAILABLE' };
+      }
+    } catch { /* Only closed availability state crosses the root boundary. */ }
+    const current = this.deps.adapter.snapshot();
+    if (!this.running || current.authState !== 'authenticated' || current.connectivity !== 'online'
+      || current.sessionEpoch !== request.epoch || current.authenticatedIdentity?.publicSigningKey !== request.actorSigningAddress
+      || request.requestId !== this.electionRequestId) return false;
+    this.deps.adapter.sendEvent({ type: 'ELECTION.ACCESS.RESULT', ...request, access });
+    const accepted = this.deps.adapter.snapshot().electionAccess;
+    if (accepted === null || accepted === undefined || accepted.electionId !== request.electionId
+      || accepted.epoch !== request.epoch || accepted.actorSigningAddress !== request.actorSigningAddress) return false;
+    if (accepted.reason !== null) this.handleLicenceWorkspaceIntent({ type: 'LICENCE.AUTHORITATIVE_REJECTION_REFRESH' });
+    return accepted.reason === null && accepted.allowedOperations.length > 0;
   }
 
   /**
@@ -290,6 +335,9 @@ export class EntitlementBridge {
   }
 
   stop(): void {
+    this.electionRequestId++;
+    this.electionInFlight = null;
+    this.deps.adapter.sendEvent({ type: 'ELECTION.ACCESS.CLEAR' });
     this.unsubProgress?.();
     this.unsubProgress = null;
     this.unsubVisibility?.();

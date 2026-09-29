@@ -138,7 +138,8 @@ export type BrowserOperationKind =
   // authority; these page requests only drive safe steps and receive safe
   // snapshots/progress (same rule as the FEAT-016 bootstrap ops).
   | 'licenceUpgradeConfirm'
-  | 'licenceUpgradeAcknowledge';
+  | 'licenceUpgradeAcknowledge'
+  | 'electionAccessQuery';
 
 /**
  * Operation request. Carries NO secret payload: password/mnemonic/file bytes are
@@ -351,6 +352,7 @@ const OPERATION_PAYLOAD_SCHEMAS: Readonly<Record<string, readonly string[]>> = {
   // server plan handle; acknowledge carries no payload.
   licenceUpgradeConfirm: ['targetPlanId'],
   licenceUpgradeAcknowledge: [],
+  electionAccessQuery: ['electionId'],
 };
 
 /** Secret-shaped field names that may never appear in operation payloads. */
@@ -510,6 +512,7 @@ const OPERATION_KINDS: ReadonlySet<string> = new Set<BrowserOperationKind>([
   // FEAT-017 additive: closed confirmed-upgrade op kinds.
   'licenceUpgradeConfirm',
   'licenceUpgradeAcknowledge',
+  'electionAccessQuery',
 ]);
 
 function validateSecretTransfer(record: Record<string, unknown>): SecretTransferMessage | null {

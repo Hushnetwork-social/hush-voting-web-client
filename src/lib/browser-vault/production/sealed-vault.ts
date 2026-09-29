@@ -55,6 +55,9 @@ import { serializeUnsignedTransaction } from '../../identity-compatibility/canon
 import { createUuidV4, corpusTimestamp, describeCanonicalTransaction } from '../../identity-creation/profile';
 import { normalizeSubmitReply, type SubmitSignedTransactionReply } from '../../identity-creation/wire';
 import { sealLicenceTransaction, signLicenceQueryEnvelope, licenceFreshTimestampUtc, type LicenceQuerySignature } from '../../licensing/sealing';
+import { electionQuerySignedJson, type ElectionAccessQueryResult, type ElectionQueryHeaders } from '../../elections/query';
+import { isElectionId } from '../../elections/entitlement';
+import { signMessage as signElectionQueryMessage } from '../../identity-compatibility/signature';
 import type { LicenceQueryTransportResult } from '../../licensing/contracts';
 import { LICENCE_PENDING_AAD_LABEL, LICENCE_PENDING_STORE_NAMESPACE } from '../../licensing/pending-transaction';
 import type { CurrentNetworkBinding, CurrentKeyBinding, CurrentProtectionModeClass } from '../../vault-core/contracts/current-binding';
@@ -1496,6 +1499,22 @@ export class SealedVaultEngine {
       return null;
     }
     return { signingAddress: this.session.record.keyBinding.signingAddress };
+  }
+
+  /** Same authenticated signer, read-only election query. No durable grant or new key store. */
+  async electionAccessQuery(electionId: string, submit: (id: string, headers: ElectionQueryHeaders) => Promise<ElectionAccessQueryResult>): Promise<ElectionAccessQueryResult & { readonly actorSigningAddress?: string }> {
+    const session = this.session;
+    const unavailable = { ok: false, reason: 'ENTITLEMENT_AUTHORITY_UNAVAILABLE' } as const;
+    if (session === null || this.phase !== 'authenticated' || !isElectionId(electionId)) return unavailable;
+    const actorSigningAddress = session.record.keyBinding.signingAddress;
+    try {
+      const signedAt = licenceFreshTimestampUtc(this.nowMs());
+      const signature = signElectionQueryMessage(electionQuerySignedJson(actorSigningAddress, electionId, signedAt), session.signingPrivateKey);
+      if (!signature.ok) return unavailable;
+      const result = await submit(electionId, { signatory: actorSigningAddress, signedAt, signature: signature.value.compactBase64 });
+      if (this.session !== session || this.phase !== 'authenticated') return unavailable;
+      return { ...result, actorSigningAddress };
+    } catch { return unavailable; }
   }
 
   /**
