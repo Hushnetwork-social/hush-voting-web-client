@@ -354,6 +354,13 @@ export class EntitlementBridge {
       return false;
     }
     if (intent.type === 'INTENT.ENTITLEMENT_RETRY') {
+      const current = this.deps.adapter.snapshot();
+      const scope = current.electionAccess;
+      if (scope?.reason && current.authState === 'authenticated' && current.connectivity === 'online'
+        && scope.epoch === current.sessionEpoch && scope.actorSigningAddress === current.authenticatedIdentity?.publicSigningKey) {
+        void this.refreshElectionAccess(scope.electionId);
+        return true;
+      }
       const stage = this.deps.adapter.snapshot().entitlementStage;
       const control = controlKindForStage(stage);
       if (control !== null) {

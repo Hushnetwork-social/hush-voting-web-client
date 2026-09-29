@@ -23,6 +23,7 @@ import type { AuthRenderProjection } from '../../lib/auth/react/adapter';
 import { entitlementGatePresentation, safeRedactedSupportCode } from '../../lib/auth/presentation/entitlement-presentation';
 import type { AuthIntent } from '../../lib/auth/types';
 import { SafeAlias } from './SafeAlias';
+import { electionEntitlementFeedback } from '../../lib/auth/presentation/election-entitlement-feedback';
 
 export interface EntitlementGateHandlers {
   readonly dispatch: (intent: AuthIntent) => void;
@@ -35,7 +36,8 @@ interface EntitlementGateProps {
 
 export function EntitlementGate({ projection, handlers }: EntitlementGateProps) {
   const headingRef = useRef<HTMLHeadingElement | null>(null);
-  const presentation = entitlementGatePresentation(projection.entitlementStage, projection.connectivity);
+  const presentation = electionEntitlementFeedback(projection)
+    ?? entitlementGatePresentation(projection.entitlementStage, projection.connectivity);
   const redactedCode = safeRedactedSupportCode(projection.supportCode);
 
   // Deterministic focus placement on meaningful transitions (never per poll).

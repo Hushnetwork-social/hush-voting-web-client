@@ -531,6 +531,11 @@ describe('FEAT-018 captured election App Twin', () => {
       expect(adapter.snapshot().electionAccess?.reason).toBe('ENTITLEMENT_AUTHORITY_UNAVAILABLE');
       expect(server.submitCalls).toBe(signedSubmissions);
       server.electionStatus = 200;
+      // T018-5-01: the existing Retry control refreshes election scope rather
+      // than constructing a licence or treating renewal as captured-access repair.
+      expect(bridge.handleIntent({ type: 'INTENT.ENTITLEMENT_RETRY' })).toBe(true);
+      expect(await bridge.refreshElectionAccess(electionId)).toBe(true);
+      expect(server.submitCalls).toBe(signedSubmissions);
       let releaseQuery!: () => void;
       server.electionPause = new Promise<void>(resolve => { releaseQuery = resolve; });
       const disconnectedQuery = bridge.refreshElectionAccess(electionId);
