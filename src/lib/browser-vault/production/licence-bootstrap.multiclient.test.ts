@@ -569,10 +569,11 @@ describe('FEAT-018 captured election App Twin', () => {
       expect(bridge.isRunning).toBe(true);
       expect(await bridge.refreshElectionAccess(electionId)).toBe(true);
       for (const reason of ['ENTITLEMENT_CAPTURE_UNAVAILABLE', 'ENTITLEMENT_SEMANTICS_UNSUPPORTED',
-        'ENTITLEMENT_ROSTER_REPLACEMENT_AFTER_LINK']) {
+        'ROSTER_REPLACEMENT_AFTER_LINK']) {
         const queriesBefore = server.queryCalls;
         server.electionScope = { ElectionId: electionId, SchemaVersion: 1, AllowedOperations: [], EntitlementReason: reason };
         expect(await bridge.refreshElectionAccess(electionId)).toBe(false);
+        expect(adapter.snapshot().electionAccess?.reason).toBe(reason);
         expect(adapter.snapshot().entitlementReady).toBe(currentLicenceReady);
         expect(server.queryCalls).toBe(queriesBefore);
       }
