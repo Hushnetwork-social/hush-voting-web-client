@@ -28,6 +28,7 @@ import type { SuiteCryptoOperations } from '../../vault-core/contracts/ports';
 import type { RuntimeConfigId, BrowserWorkerEvent } from '../contracts/protocol';
 import { LICENCE_QUERY_SIGNATURE_HEADER, LICENCE_QUERY_SIGNED_AT_HEADER, LICENCE_QUERY_SIGNATORY_HEADER, type LicenceTransportStatus } from '../../licensing/contracts';
 import { parseLicenceBffReply } from '../../licensing/licence-bff-http';
+import { createElectionAccessQuery } from '../../elections/query';
 import type { LicenceProgressPayload, LicenceBootstrapStepResult, LicenceConnectivityInput } from '../../licensing/session-contract';
 
 /** Same-origin BFF licence-entitlement query path (server-only route). */
@@ -665,6 +666,11 @@ export function createProductionWorkerEnvironment(params: {
         case 'inspectStartup': {
           const outcome = await engine.inspectStartup();
           return toAuthorityResult(outcomeFromSealed(outcome));
+        }
+        case 'electionAccessQuery': {
+          const electionId = typeof payload.electionId === 'string' ? payload.electionId : '';
+          const result = await engine.electionAccessQuery(electionId, createElectionAccessQuery(params.fetchImpl));
+          return toAuthorityResult({ outcome: 'OK', payload: { kind: 'election-scoped-access', ...result } });
         }
         case 'licenceBootstrapStart': {
           const networkBinding = typeof payload.networkBinding === 'string' ? payload.networkBinding : '';

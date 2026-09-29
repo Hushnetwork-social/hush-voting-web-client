@@ -22071,7 +22071,8 @@ var OPERATION_PAYLOAD_SCHEMAS = {
   // FEAT-017 additive: confirmed-upgrade activation carries only the bounded
   // server plan handle; acknowledge carries no payload.
   licenceUpgradeConfirm: ["targetPlanId"],
-  licenceUpgradeAcknowledge: []
+  licenceUpgradeAcknowledge: [],
+  electionAccessQuery: ["electionId"]
 };
 var FORBIDDEN_PAYLOAD_MARKERS = ["password", "mnemonic", "secret", "key", "salt", "nonce", "decrypted", "bundle", "private", "fileBytes", "bytes"];
 function hasSecretShapedField(value) {
@@ -22218,7 +22219,8 @@ var OPERATION_KINDS = /* @__PURE__ */ new Set([
   "licenceBootstrapEligibility",
   // FEAT-017 additive: closed confirmed-upgrade op kinds.
   "licenceUpgradeConfirm",
-  "licenceUpgradeAcknowledge"
+  "licenceUpgradeAcknowledge",
+  "electionAccessQuery"
 ]);
 function validateSecretTransfer(record) {
   if (!hasNoUnknownFields(record, ["kind", "operationId", "clientChannel", "authorityEpoch", "purpose", "value"])) {
@@ -22359,7 +22361,9 @@ var FRESH_CAPABILITY_REQUIRED_BY_OPERATION = {
   // FEAT-017 additive: confirmed-upgrade ops require no fresh password
   // capability (authenticated session only; same rule as bootstrap ops).
   licenceUpgradeConfirm: null,
-  licenceUpgradeAcknowledge: null
+  licenceUpgradeAcknowledge: null,
+  electionAccessQuery: null
+  // authenticated read using the same worker signer
 };
 
 // src/lib/browser-vault/authority/authority.ts
@@ -26691,6 +26695,120 @@ function licenceFreshTimestampUtc(nowMs) {
   return new Date(nowMs).toISOString();
 }
 
+// src/lib/elections/entitlement.ts
+var ELECTION_ENTITLEMENT_REASONS = [
+  "ENTITLEMENT_NOT_ACTIVE",
+  "ENTITLEMENT_LIMIT_EXCEEDED",
+  "ENTITLEMENT_PROFILE_NOT_ALLOWED",
+  "ENTITLEMENT_AUTHORITY_UNAVAILABLE",
+  "ENTITLEMENT_CAPTURE_UNAVAILABLE",
+  "ENTITLEMENT_SEMANTICS_UNSUPPORTED",
+  "ROSTER_REPLACEMENT_AFTER_LINK"
+];
+var ELECTION_CAPTURED_OPERATIONS = [
+  "vote",
+  "close",
+  "approve",
+  "finalize",
+  "submitFinalizationShare",
+  "continuity",
+  "void",
+  "audit",
+  "report",
+  "results"
+];
+function electionEntitlementReason(value) {
+  if (value === "" || value === void 0 || value === null) return null;
+  return ELECTION_ENTITLEMENT_REASONS.includes(value) ? value : "ENTITLEMENT_SEMANTICS_UNSUPPORTED";
+}
+function isElectionId(value) {
+  return typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(value) && value !== "00000000-0000-0000-0000-000000000000";
+}
+function parseElectionScopedAccess(value, expectedElectionId) {
+  const blocked = (reason2) => ({ electionId: expectedElectionId, allowedOperations: [], reason: reason2 });
+  if (!isElectionId(expectedElectionId) || value === null || typeof value !== "object" || Array.isArray(value))
+    return blocked("ENTITLEMENT_SEMANTICS_UNSUPPORTED");
+  const wire = value;
+  if (wire.SchemaVersion !== 1 || wire.ElectionId !== expectedElectionId || typeof wire.EntitlementReason !== "string")
+    return blocked("ENTITLEMENT_SEMANTICS_UNSUPPORTED");
+  const reason = electionEntitlementReason(wire.EntitlementReason);
+  if (reason !== null) return blocked(reason);
+  if (!Array.isArray(wire.AllowedOperations) || wire.AllowedOperations.length > ELECTION_CAPTURED_OPERATIONS.length || wire.AllowedOperations.some((op) => !ELECTION_CAPTURED_OPERATIONS.includes(op)) || new Set(wire.AllowedOperations).size !== wire.AllowedOperations.length)
+    return blocked("ENTITLEMENT_SEMANTICS_UNSUPPORTED");
+  return { electionId: expectedElectionId, allowedOperations: [...wire.AllowedOperations], reason: null };
+}
+
+// src/lib/elections/query.ts
+var ELECTION_QUERY_HEADERS = ["x-hush-election-query-signatory", "x-hush-election-query-signed-at", "x-hush-election-query-signature"];
+function electionQuerySignedJson(actorAddress, electionId, signedAt) {
+  return JSON.stringify({ actorAddress, method: "GetElection", request: { ElectionId: electionId }, signedAt });
+}
+async function readElectionJson(body, maxBytes) {
+  if (body === null) throw new Error("Missing election response");
+  const reader = body.getReader();
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    void reader.cancel().catch(() => {
+    });
+  }, 1e4);
+  try {
+    const chunks = [];
+    let size = 0;
+    for (; ; ) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > maxBytes) throw new Error("Election response bound exceeded");
+      chunks.push(value);
+    }
+    if (timedOut) throw new Error("Election response deadline exceeded");
+    const bytes = new Uint8Array(size);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+  } finally {
+    clearTimeout(timer);
+    try {
+      await reader.cancel();
+    } finally {
+      reader.releaseLock();
+    }
+  }
+}
+function createElectionAccessQuery(fetchImpl = fetch) {
+  return async (electionId, signed) => {
+    if (!isElectionId(electionId)) return { ok: false, reason: "ENTITLEMENT_SEMANTICS_UNSUPPORTED" };
+    const abort = new AbortController();
+    const timer = setTimeout(() => abort.abort(), 1e4);
+    try {
+      const response = await fetchImpl("/api/election-access", {
+        method: "POST",
+        cache: "no-store",
+        signal: abort.signal,
+        headers: {
+          "content-type": "application/json",
+          [ELECTION_QUERY_HEADERS[0]]: signed.signatory,
+          [ELECTION_QUERY_HEADERS[1]]: signed.signedAt,
+          [ELECTION_QUERY_HEADERS[2]]: signed.signature
+        },
+        body: JSON.stringify({ electionId })
+      });
+      if (!response.ok) return { ok: false, reason: "ENTITLEMENT_AUTHORITY_UNAVAILABLE" };
+      const value = await readElectionJson(response.body, 8192);
+      const scope = value !== null && typeof value === "object" ? value.scope : null;
+      return { ok: true, access: parseElectionScopedAccess(scope, electionId) };
+    } catch {
+      return { ok: false, reason: "ENTITLEMENT_AUTHORITY_UNAVAILABLE" };
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+}
+
 // src/lib/licensing/pending-transaction.ts
 var LICENCE_PENDING_PURPOSE = "pending_licence_transaction";
 var LICENCE_PENDING_AAD_LABEL = "hushvoting-licence-pending-v1";
@@ -28108,6 +28226,23 @@ var SealedVaultEngine = class {
     }
     return { signingAddress: this.session.record.keyBinding.signingAddress };
   }
+  /** Same authenticated signer, read-only election query. No durable grant or new key store. */
+  async electionAccessQuery(electionId, submit) {
+    const session = this.session;
+    const unavailable = { ok: false, reason: "ENTITLEMENT_AUTHORITY_UNAVAILABLE" };
+    if (session === null || this.phase !== "authenticated" || !isElectionId(electionId)) return unavailable;
+    const actorSigningAddress = session.record.keyBinding.signingAddress;
+    try {
+      const signedAt = licenceFreshTimestampUtc(this.nowMs());
+      const signature = signMessage(electionQuerySignedJson(actorSigningAddress, electionId, signedAt), session.signingPrivateKey);
+      if (!signature.ok) return unavailable;
+      const result = await submit(electionId, { signatory: actorSigningAddress, signedAt, signature: signature.value.compactBase64 });
+      if (this.session !== session || this.phase !== "authenticated") return unavailable;
+      return { ...result, actorSigningAddress };
+    } catch {
+      return unavailable;
+    }
+  }
   /**
    * One fresh signed `GetMyEntitlement` query. The authority mints a new UTC
    * `signedAt`, signs the frozen canonical envelope bytes with the user's
@@ -28900,6 +29035,8 @@ var LicenceEntitlementCoordinator = class _LicenceEntitlementCoordinator {
     this.upgradeTerminal = null;
     /** FEAT-017: consume-after-submit flag for the authoritative-rejection requery. */
     this.upgradeRejectedRequery = false;
+    /** An election rejection requests observation, never licence issuance/resubmission. */
+    this.rejectionRefreshOnly = false;
   }
   static {
     /** Conservative retry after a due expiry query still returns active (FEAT-016 annual expiry). */
@@ -29011,6 +29148,7 @@ var LicenceEntitlementCoordinator = class _LicenceEntitlementCoordinator {
   }
   /** Manual/UI Retry after recoverable error states (fresh query first). */
   async recoverFromError() {
+    this.rejectionRefreshOnly = false;
     if (this.pendingRecord !== null && this.pendingTransactionId !== null) {
       await this.retryExact();
       return this.snapshot();
@@ -29023,6 +29161,7 @@ var LicenceEntitlementCoordinator = class _LicenceEntitlementCoordinator {
    * account entry, authoritative rejection): gate first, then fresh query.
    */
   async revalidate(trigger) {
+    if (trigger === "authoritative-rejection") this.rejectionRefreshOnly = true;
     this.phase = "resolving";
     this.projection = null;
     this.lastOutcomeCode = `revalidate:${trigger}`;
@@ -29196,6 +29335,7 @@ var LicenceEntitlementCoordinator = class _LicenceEntitlementCoordinator {
         if (outcome.outcome !== "ready") return;
         await this.attachBoundPendingRecordForReconciliation();
         const reconciledUpgrade = this.reconcilePendingAgainstActive(outcome.projection.licenceReference);
+        this.rejectionRefreshOnly = false;
         this.projection = outcome.projection;
         this.phase = "entitlementReady";
         if (!reconciledUpgrade) {
@@ -29242,6 +29382,12 @@ var LicenceEntitlementCoordinator = class _LicenceEntitlementCoordinator {
     void reason;
   }
   async handleNoActive(template, reason) {
+    if (this.rejectionRefreshOnly) {
+      this.phase = "entitlementUnavailable";
+      this.projection = null;
+      this.lastOutcomeCode = "authoritative-rejection-query-only";
+      return;
+    }
     const bound = await this.findBoundPending();
     if (bound !== null) {
       this.pendingRecord = bound;
@@ -30577,6 +30723,11 @@ function createProductionWorkerEnvironment(params) {
       case "inspectStartup": {
         const outcome = await engine.inspectStartup();
         return toAuthorityResult(outcomeFromSealed(outcome));
+      }
+      case "electionAccessQuery": {
+        const electionId = typeof payload.electionId === "string" ? payload.electionId : "";
+        const result = await engine.electionAccessQuery(electionId, createElectionAccessQuery(params.fetchImpl));
+        return toAuthorityResult({ outcome: "OK", payload: { kind: "election-scoped-access", ...result } });
       }
       case "licenceBootstrapStart": {
         const networkBinding = typeof payload.networkBinding === "string" ? payload.networkBinding : "";

@@ -111,6 +111,7 @@ export const FRESH_CAPABILITY_REQUIRED_BY_OPERATION: Readonly<Record<BrowserOper
   // capability (authenticated session only; same rule as bootstrap ops).
   licenceUpgradeConfirm: null,
   licenceUpgradeAcknowledge: null,
+  electionAccessQuery: null, // authenticated read using the same worker signer
 } as const;
 
 /** Safe session projection vocabulary for clients (never secrets). */

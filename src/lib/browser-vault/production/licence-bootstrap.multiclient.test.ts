@@ -33,6 +33,17 @@ import { LICENCE_CATALOGUE_VERSION_V1, LICENCE_PLAN_DIRECT_FREE } from '../../li
 import type { BrowserWorkerEvent } from '../contracts/protocol';
 import { BROWSER_PROTOCOL_VERSION } from '../contracts/protocol';
 
+import { AuthAdapter, canAccessCapturedElection } from '../../auth/react/adapter';
+import { EntitlementBridge } from '../../auth/web/entitlement-bridge';
+import type { BrowserVaultClient } from './client';
+import type { AuthActors } from '../../auth/ports';
+import { completeAllPendingOperations, createLocalUserAuthorityTestActor, createSecretAuthorityTestActor,
+  createIdentityVerificationTestActor, createOnboardingTestActor, createRemovalTestActor,
+  createBrowserCoordinationTestActor, createNavigationTestActor } from '../../auth/testing/actors';
+import { electionQuerySignedJson, ELECTION_QUERY_HEADERS } from '../../elections/query';
+import { verifyMessage } from '../../identity-compatibility/signature';
+import { base64ToHex } from '../../licensing/sealing';
+
 const PASSWORD = 'Tr0ub4dor&3-correct-horse';
 const NETWORK_BINDING = ISOLATED_DEVNET_MANIFEST.canonicalNetworkId;
 
@@ -94,6 +105,11 @@ class MemoryVaultStorage implements VaultStorageSession {
 }
 
 interface FakeServer {
+  electionScope?: unknown;
+  electionStatus?: number;
+  electionCalls?: number;
+  electionSignaturesValid?: boolean;
+  electionPause?: Promise<void>;
   signingAddress: string;
   encryptionAddress: string;
   queryCalls: number;
@@ -108,8 +124,19 @@ function noActive(): LicenceQueryTransportResult {
 }
 
 function fakeFetch(server: FakeServer): typeof fetch {
-  return (async (input: RequestInfo | URL) => {
+  return (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
+    if (url.includes('/api/election-access')) {
+      server.electionCalls = (server.electionCalls ?? 0) + 1;
+      const request = JSON.parse(String(init?.body)) as { electionId: string };
+      const headers = new Headers(init?.headers);
+      const at = headers.get(ELECTION_QUERY_HEADERS[1]) ?? '';
+      const signature = base64ToHex(headers.get(ELECTION_QUERY_HEADERS[2]) ?? '');
+      const check = signature !== null && verifyMessage(electionQuerySignedJson(server.signingAddress, request.electionId, at), signature, server.signingAddress, 'compact');
+      server.electionSignaturesValid = headers.get(ELECTION_QUERY_HEADERS[0]) === server.signingAddress && check;
+      await server.electionPause;
+      return new Response(JSON.stringify({ scope: server.electionScope }), { status: server.electionStatus ?? 200 });
+    }
     if (url.includes('/api/identity')) {
       return new Response(
         JSON.stringify({ reply: { successfull: true, profileName: 'Alice', publicSigningAddress: server.signingAddress, publicEncryptAddress: server.encryptionAddress, isPublic: false } }),
@@ -429,4 +456,150 @@ describe('FEAT-016 multi-client worker authority (Task 6.4)', () => {
     for (const event of progressEvents(tab1)) assertSecretFree(JSON.stringify(event));
     for (const event of progressEvents(tab2)) assertSecretFree(JSON.stringify(event));
   });
+});
+
+// EPIC-002 AT-LIC-014 -> AC-018-007/008/009 -> P018-4-01/02 -> T018-4-01/02.
+// Real root machine/adapter + bridge + production worker/crypto; only server transport and storage are isolated.
+describe('FEAT-018 captured election App Twin', () => {
+  it.each([false, true])('binds fresh signed access without disturbing current licence readiness (%s), and clears on Close/offline/lock', async (currentLicenceReady) => {
+    const electionId = '11111111-2222-4333-8444-555555555555';
+    const server: FakeServer = { signingAddress: '', encryptionAddress: '', queryCalls: 0, submitCalls: 0,
+      querySequence: [currentLicenceReady ? { ok: true, state: 'active', active: {
+        LicenceReference: '5f2d9e11-3c44-4a80-b8e7-6b2f1a0c9d3e', PlanId: LICENCE_PLAN_DIRECT_FREE,
+        PlanFamily: 'direct', DisplayName: 'HushVoting! Direct Free', SafeDescription: 'Free community licence',
+        EffectiveFromUtc: '2026-09-06T00:00:00.000Z', AssignedCatalogueVersion: LICENCE_CATALOGUE_VERSION_V1,
+        AllowedGovernanceOptionIds: [], HigherOptions: [],
+      } } : noActive()], submitStatus: 'PENDING',
+      electionScope: { ElectionId: electionId, SchemaVersion: 1, AllowedOperations: ['vote', 'results'], EntitlementReason: '' } };
+    const { authority, ports } = createAuthority(new MemoryVaultStorage(), server);
+    const tab = ports[0];
+    const identity = await authenticate(tab, authority, server);
+    const actors: AuthActors = {
+      localUserAuthority: createLocalUserAuthorityTestActor([{ code: 'INIT_NO_LOCAL_USER' }]),
+      secretAuthority: createSecretAuthorityTestActor([{ code: 'UNLOCK_SUCCESS' }]),
+      identityVerification: createIdentityVerificationTestActor([{ code: 'VERIFY_SUCCESS', identity: {
+        alias: 'Alice', publicSigningKey: identity.signingAddress, publicEncryptionKey: identity.encryptionAddress } }]),
+      onboarding: { createUser: createOnboardingTestActor([{ code: 'ONBOARDING_COMPLETED', localUserRef: 'test-local-user' }]),
+        restoreCredentialFile: null, restoreRecoveryWords: null },
+      removal: createRemovalTestActor([{ code: 'REMOVAL_COMPLETE' }]),
+      browserCoordination: createBrowserCoordinationTestActor([{ code: 'COORDINATION_SAFE' }]),
+      navigation: createNavigationTestActor(), telemetry: null,
+    };
+    const adapter = new AuthAdapter({ actors, registeredCapabilities: new Set(), safeCoordination: true, entitlementRequired: true });
+    const settleRoot = async () => { for (let n = 0; n < 12; n++) { completeAllPendingOperations(); await new Promise(resolve => setTimeout(resolve, 0)); } };
+    await settleRoot(); adapter.send({ type: 'INTENT.CREATE_USER' }); await settleRoot();
+    adapter.sendEvent({ type: 'CONNECTIVITY.CHANGE', state: 'online' });
+    const listeners = new Set<(value: unknown) => void>();
+    const deliver = tab.deliver;
+    tab.deliver = event => { deliver(event); if (event.kind === 'licence-progress') for (const listener of listeners) listener(event); };
+    const client = { dispatch: async (operation: string, payload?: Record<string, unknown>) => dispatchOp(tab, authority, operation, payload),
+      onLicenceProgress: (listener: (value: unknown) => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; } };
+    const bridge = new EntitlementBridge({ adapter, client: client as unknown as BrowserVaultClient, networkBinding: NETWORK_BINDING,
+      lockSession: async () => { await dispatchOp(tab, authority, 'lockAll'); adapter.send({ type: 'INTENT.LOCK' }); return true; } });
+    const awaitBootstrap = async () => {
+      const deadline = Date.now() + 5_000;
+      while (Date.now() < deadline) {
+        bridge.observe(adapter.snapshot());
+        if (bridge.isRunning && adapter.snapshot().entitlementStage === (currentLicenceReady ? 'entitlementReady' : 'awaitingIndex')
+          && authority.snapshot().activeOperationId === null) return;
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+      throw new Error('Bootstrap did not release the worker at awaitingIndex');
+    };
+    try {
+      bridge.start(); bridge.observe(adapter.snapshot());
+      await awaitBootstrap();
+      const first = bridge.refreshElectionAccess(electionId);
+      const repeated = bridge.refreshElectionAccess(electionId);
+      expect(first).toBe(repeated);
+      expect(await first).toBe(true);
+      expect(server.electionCalls).toBe(1);
+      expect(server.electionSignaturesValid).toBe(true);
+      expect(adapter.snapshot().entitlementReady).toBe(currentLicenceReady);
+      expect(adapter.snapshot().protectedAccess).toBe(currentLicenceReady);
+      expect(canAccessCapturedElection(adapter.snapshot(), electionId, 'vote')).toBe(true);
+      expect(canAccessCapturedElection(adapter.snapshot(), '22222222-2222-4333-8444-555555555555', 'vote')).toBe(false);
+      expect(canAccessCapturedElection(adapter.snapshot(), electionId, 'close')).toBe(false);
+      const signedSubmissions = server.submitCalls;
+      server.electionScope = { ElectionId: electionId, SchemaVersion: 1, AllowedOperations: ['results'], EntitlementReason: '' };
+      await bridge.refreshElectionAccess(electionId);
+      expect(canAccessCapturedElection(adapter.snapshot(), electionId, 'vote')).toBe(false);
+      expect(canAccessCapturedElection(adapter.snapshot(), electionId, 'results')).toBe(true);
+      adapter.sendEvent({ type: 'CONNECTIVITY.CHANGE', state: 'offline' });
+      expect(adapter.snapshot().electionAccess).toBeNull();
+      adapter.sendEvent({ type: 'CONNECTIVITY.CHANGE', state: 'online' });
+      expect(canAccessCapturedElection(adapter.snapshot(), electionId, 'results')).toBe(false);
+      await bridge.refreshElectionAccess(electionId);
+      const prior = adapter.snapshot().electionAccess!;
+      const licenceQueriesBeforeFailure = server.queryCalls;
+      server.electionStatus = 503;
+      expect(await bridge.refreshElectionAccess(electionId)).toBe(false);
+      expect(adapter.snapshot().electionAccess?.reason).toBe('ENTITLEMENT_AUTHORITY_UNAVAILABLE');
+      expect(server.submitCalls).toBe(signedSubmissions);
+      expect(adapter.snapshot().entitlementReady).toBe(currentLicenceReady);
+      expect(adapter.snapshot().protectedAccess).toBe(currentLicenceReady);
+      expect(server.queryCalls).toBe(licenceQueriesBeforeFailure);
+      server.electionStatus = 200;
+      // T018-5-01: the existing Retry control refreshes election scope rather
+      // than constructing a licence or treating renewal as captured-access repair.
+      expect(bridge.handleIntent({ type: 'INTENT.ENTITLEMENT_RETRY' })).toBe(true);
+      expect(await bridge.refreshElectionAccess(electionId)).toBe(true);
+      expect(server.submitCalls).toBe(signedSubmissions);
+      let releaseQuery!: () => void;
+      server.electionPause = new Promise<void>(resolve => { releaseQuery = resolve; });
+      const disconnectedQuery = bridge.refreshElectionAccess(electionId);
+      adapter.sendEvent({ type: 'CONNECTIVITY.CHANGE', state: 'offline' });
+      adapter.sendEvent({ type: 'CONNECTIVITY.CHANGE', state: 'online' });
+      releaseQuery();
+      expect(await disconnectedQuery).toBe(false);
+      expect(adapter.snapshot().electionAccess).toBeNull();
+      server.electionPause = undefined;
+      expect(await bridge.refreshElectionAccess(electionId)).toBe(true);
+      server.electionPause = new Promise<void>(resolve => { releaseQuery = resolve; });
+      const stoppedQuery = bridge.refreshElectionAccess(electionId);
+      bridge.stop(); adapter.sendEvent({ type: 'ENTITLEMENT.RESET' });
+      bridge.start(); bridge.observe(adapter.snapshot());
+      releaseQuery();
+      expect(await stoppedQuery).toBe(false);
+      expect(adapter.snapshot().electionAccess).toBeNull();
+      server.electionPause = undefined;
+      // The worker serializes operations: bootstrap can be busy behind the old
+      // query. The next root observation retries after that operation has ended.
+      await awaitBootstrap();
+      expect(bridge.isRunning).toBe(true);
+      expect(await bridge.refreshElectionAccess(electionId)).toBe(true);
+      for (const reason of ['ENTITLEMENT_CAPTURE_UNAVAILABLE', 'ENTITLEMENT_SEMANTICS_UNSUPPORTED',
+        'ROSTER_REPLACEMENT_AFTER_LINK']) {
+        const queriesBefore = server.queryCalls;
+        server.electionScope = { ElectionId: electionId, SchemaVersion: 1, AllowedOperations: [], EntitlementReason: reason };
+        expect(await bridge.refreshElectionAccess(electionId)).toBe(false);
+        expect(adapter.snapshot().electionAccess?.reason).toBe(reason);
+        expect(adapter.snapshot().entitlementReady).toBe(currentLicenceReady);
+        expect(server.queryCalls).toBe(queriesBefore);
+      }
+      if (currentLicenceReady) {
+        for (const reason of ['ENTITLEMENT_NOT_ACTIVE', 'ENTITLEMENT_LIMIT_EXCEEDED', 'ENTITLEMENT_PROFILE_NOT_ALLOWED']) {
+          const queriesBefore = server.queryCalls;
+          server.electionScope = { ElectionId: electionId, SchemaVersion: 1, AllowedOperations: [], EntitlementReason: reason };
+          expect(await bridge.refreshElectionAccess(electionId)).toBe(false);
+          await awaitBootstrap();
+          expect(server.queryCalls).toBe(queriesBefore + 1);
+          expect(server.submitCalls).toBe(signedSubmissions);
+        }
+      }
+      server.electionScope = { ElectionId: electionId, SchemaVersion: 1, AllowedOperations: ['results'], EntitlementReason: '' };
+      // Lock while the real signed query is still pending; neither worker nor root
+      // may turn its late reply into a grant for the next session.
+      server.electionPause = new Promise<void>(resolve => { releaseQuery = resolve; });
+      const lockedQuery = bridge.refreshElectionAccess(electionId);
+      await dispatchOp(tab, authority, 'lockAll'); adapter.send({ type: 'INTENT.LOCK' });
+      releaseQuery();
+      expect(await lockedQuery).toBe(false);
+      expect(adapter.snapshot().electionAccess).toBeNull();
+      adapter.sendEvent({ type: 'ELECTION.ACCESS.RESULT', electionId, epoch: prior.epoch, actorSigningAddress: prior.actorSigningAddress,
+        requestId: 1, access: prior });
+      expect(canAccessCapturedElection(adapter.snapshot(), electionId, 'results')).toBe(false);
+      assertSecretFree(JSON.stringify(adapter.snapshot()));
+    } finally { bridge.stop(); adapter.stop(); await dispatchOp(tab, authority, 'lockAll'); }
+  }, 30_000); // Real crypto plus several serialized worker round trips; not a latency assertion.
 });

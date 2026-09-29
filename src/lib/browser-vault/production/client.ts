@@ -72,7 +72,8 @@ export type ClientOperationKind =
   | 'licenceBootstrapEligibility'
   // FEAT-017 additive: one closed confirmed-upgrade operation per authority.
   | 'licenceUpgradeConfirm'
-  | 'licenceUpgradeAcknowledge';
+  | 'licenceUpgradeAcknowledge'
+  | 'electionAccessQuery';
 
 /** Secret purposes accepted by the sink. */
 export type SecretPurpose = 'devicePassword' | 'mnemonic' | 'filePassword' | 'fileBytes';

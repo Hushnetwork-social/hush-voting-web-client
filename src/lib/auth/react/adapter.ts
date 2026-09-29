@@ -16,6 +16,8 @@
  */
 
 import { useMemo, useSyncExternalStore } from 'react';
+import type { ElectionCapturedOperation } from '../../elections/entitlement';
+import type { ScopedElectionSessionAccess } from '../state/machine';
 import { createActor, type Actor, type SnapshotFrom } from 'xstate';
 import { authMachine, type AuthMachineEvent, type AuthMachineInput } from '../state/machine';
 import type {
@@ -41,6 +43,7 @@ const ENTITLEMENT_STAGES: ReadonlyArray<string> = [
 
 /** Render-safe projection of the authority snapshot. */
 export interface AuthRenderProjection {
+  readonly electionAccess?: ScopedElectionSessionAccess | null;
   readonly authState: AuthStateCode;
   readonly connectivity: ConnectivityStateCode;
   /** True only when protected content may mount (authenticated + capability). */
@@ -114,6 +117,7 @@ function projectSnapshot(snapshot: AuthSnapshot): AuthRenderProjection {
     completedRestorationKind?: 'restoreCredentialFile' | 'restoreRecoveryWords' | null;
     entitlementRequired?: boolean;
     sessionEpoch?: number;
+    electionAccess?: ScopedElectionSessionAccess | null;
   };
   const entitlementReady =
     entitlementStage === 'entitlementReady' && context.authenticatedIdentity !== null;
@@ -125,6 +129,10 @@ function projectSnapshot(snapshot: AuthSnapshot): AuthRenderProjection {
   return {
     authState,
     connectivity,
+    electionAccess: authState === 'authenticated' && connectivity === 'online'
+      && context.electionAccess?.epoch === context.sessionEpoch
+      && context.electionAccess?.actorSigningAddress === context.authenticatedIdentity?.publicSigningKey
+      ? context.electionAccess : null,
     // Synchronous FEAT-016 boundary: protected rendering requires the nested
     // entitlement-ready stage with a live authenticated identity (or the
     // explicitly auth-only harness). React effects alone never decide it.
@@ -141,6 +149,15 @@ function projectSnapshot(snapshot: AuthSnapshot): AuthRenderProjection {
     completedRestorationEpoch: context.completedRestorationEpoch ?? null,
     completedRestorationKind: context.completedRestorationKind ?? null,
   };
+}
+
+/** A scoped route must name both election and operation; never substitutes global readiness. */
+export function canAccessCapturedElection(projection: AuthRenderProjection, electionId: string, operation: ElectionCapturedOperation): boolean {
+  const scoped = projection.electionAccess;
+  return projection.authState === 'authenticated' && projection.connectivity === 'online'
+    && scoped !== null && scoped !== undefined && scoped.reason === null
+    && scoped.epoch === projection.sessionEpoch && scoped.actorSigningAddress === projection.authenticatedIdentity?.publicSigningKey
+    && scoped.electionId === electionId && scoped.allowedOperations.includes(operation);
 }
 
 /** Create the authority adapter and start it (convenience wrapper). */

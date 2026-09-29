@@ -127,6 +127,39 @@ function stageEvent(stage: EntitlementStageCode, epoch: SessionEpoch): AuthMachi
   return { type: 'ENTITLEMENT.STAGE', stage, epoch };
 }
 
+// AC-018-007/008 -> P018-4-02 -> T018-4-02. Root authorization alternatives,
+// complementary to the App Twin that exercises the real worker/bridge path.
+describe('captured election session binding', () => {
+  it('rejects another actor and stale epoch and starts a replacement root without inherited scope', async () => {
+    const machine = createDriver(makeActors());
+    const replacement = createDriver(makeActors());
+    try {
+      await reachAuthenticated(machine);
+      machine.send({ type: 'CONNECTIVITY.CHANGE', state: 'online' });
+      const electionId = '11111111-2222-4333-8444-555555555555';
+      const request = { electionId, actorSigningAddress: VERIFIED_IDENTITY.publicSigningKey, epoch: INITIAL_EPOCH, requestId: 1 };
+      const access = { electionId, allowedOperations: ['vote'] as const, reason: null };
+      machine.send({ type: 'ELECTION.ACCESS.REQUEST', ...request });
+      machine.send({ type: 'ELECTION.ACCESS.RESULT', ...request, actorSigningAddress: 'another-identity', access });
+      expect(machine.getSnapshot().context.electionAccess).toBeNull();
+      machine.send({ type: 'ELECTION.ACCESS.RESULT', ...request, epoch: nextEpoch(INITIAL_EPOCH), access });
+      expect(machine.getSnapshot().context.electionAccess).toBeNull();
+      machine.send({ type: 'ELECTION.ACCESS.RESULT', ...request, access });
+      expect(machine.getSnapshot().context.electionAccess?.allowedOperations).toEqual(['vote']);
+      machine.stop();
+      await reachAuthenticated(replacement);
+      replacement.send({ type: 'CONNECTIVITY.CHANGE', state: 'online' });
+      // Even a matching epoch in a new process/root has no pending authenticated query.
+      replacement.send({ type: 'ELECTION.ACCESS.RESULT', ...request, access });
+      expect(replacement.getSnapshot().context.electionAccess).toBeNull();
+      replacement.send({ type: 'ELECTION.ACCESS.REQUEST', ...request });
+      replacement.send({ type: 'ELECTION.ACCESS.RESULT', ...request, access });
+      expect(replacement.getSnapshot().context.electionAccess?.allowedOperations).toEqual(['vote']);
+      expect(entitlementChild(replacement.getSnapshot())).toBe('entitlementResolving');
+    } finally { machine.stop(); replacement.stop(); }
+  });
+});
+
 describe('compound authenticated entitlement substages', () => {
   it('enters entitlementResolving and keeps auth authenticated (no protected access yet)', async () => {
     const machine = createDriver(makeActors());
