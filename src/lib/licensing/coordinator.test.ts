@@ -388,6 +388,21 @@ describe('authoritative election rejection refresh', () => {
     expect(h.journal.size).toBe(0);
   });
 
+  it('restores normal no-active recovery after fresh active truth resolves a rejection', async () => {
+    const h = makeHarness();
+    h.queryQueue.push(activeResult(), noActiveResult(), activeResult(), noActiveResult());
+    h.admissionQueue.push('accepted');
+    await h.coordinator.start();
+    await h.coordinator.revalidate('authoritative-rejection');
+    expect(h.submitCalls).toHaveLength(0);
+    await h.coordinator.revalidate('authoritative-rejection');
+    expect(h.coordinator.snapshot().phase).toBe('entitlementReady');
+    await h.coordinator.revalidate('account-entry');
+    expect(h.identityCounter).toBe(1);
+    expect(h.submitCalls).toHaveLength(1);
+    expect(h.coordinator.snapshot().phase).toBe('awaitingIndex');
+  });
+
   it('keeps unavailable distinct and accepts only fresh active truth', async () => {
     const h = makeHarness();
     h.queryQueue.push(activeResult(), { ok: false, status: 'UNAVAILABLE' }, activeResult());

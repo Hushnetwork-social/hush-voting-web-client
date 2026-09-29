@@ -566,6 +566,9 @@ export class LicenceEntitlementCoordinator {
         // (FEAT-016 baseline semantics unchanged).
         await this.attachBoundPendingRecordForReconciliation();
         const reconciledUpgrade = this.reconcilePendingAgainstActive(outcome.projection.licenceReference);
+        // Fresh active authority resolves the rejection. Later ordinary expiry or
+        // account-entry queries must retain the accepted baseline recovery policy.
+        this.rejectionRefreshOnly = false;
         this.projection = outcome.projection;
         this.phase = 'entitlementReady';
         if (!reconciledUpgrade) {

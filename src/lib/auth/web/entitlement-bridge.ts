@@ -258,7 +258,12 @@ export class EntitlementBridge {
     const accepted = this.deps.adapter.snapshot().electionAccess;
     if (accepted === null || accepted === undefined || accepted.electionId !== request.electionId
       || accepted.epoch !== request.epoch || accepted.actorSigningAddress !== request.actorSigningAddress) return false;
-    if (accepted.reason !== null) this.handleLicenceWorkspaceIntent({ type: 'LICENCE.AUTHORITATIVE_REJECTION_REFRESH' });
+    // E03: only current-licence policy denials invalidate workspace authority.
+    // Availability, capture, compatibility and roster failures stay election-scoped.
+    if (accepted.reason === 'ENTITLEMENT_NOT_ACTIVE' || accepted.reason === 'ENTITLEMENT_LIMIT_EXCEEDED'
+      || accepted.reason === 'ENTITLEMENT_PROFILE_NOT_ALLOWED') {
+      this.handleLicenceWorkspaceIntent({ type: 'LICENCE.AUTHORITATIVE_REJECTION_REFRESH' });
+    }
     return accepted.reason === null && accepted.allowedOperations.length > 0;
   }
 

@@ -461,10 +461,15 @@ describe('FEAT-016 multi-client worker authority (Task 6.4)', () => {
 // EPIC-002 AT-LIC-014 -> AC-018-007/008/009 -> P018-4-01/02 -> T018-4-01/02.
 // Real root machine/adapter + bridge + production worker/crypto; only server transport and storage are isolated.
 describe('FEAT-018 captured election App Twin', () => {
-  it('binds fresh signed access across root/worker, survives absent current rights, and clears on Close/offline/lock', async () => {
+  it.each([false, true])('binds fresh signed access without disturbing current licence readiness (%s), and clears on Close/offline/lock', async (currentLicenceReady) => {
     const electionId = '11111111-2222-4333-8444-555555555555';
     const server: FakeServer = { signingAddress: '', encryptionAddress: '', queryCalls: 0, submitCalls: 0,
-      querySequence: [noActive()], submitStatus: 'PENDING',
+      querySequence: [currentLicenceReady ? { ok: true, state: 'active', active: {
+        LicenceReference: '5f2d9e11-3c44-4a80-b8e7-6b2f1a0c9d3e', PlanId: LICENCE_PLAN_DIRECT_FREE,
+        PlanFamily: 'direct', DisplayName: 'HushVoting! Direct Free', SafeDescription: 'Free community licence',
+        EffectiveFromUtc: '2026-09-06T00:00:00.000Z', AssignedCatalogueVersion: LICENCE_CATALOGUE_VERSION_V1,
+        AllowedGovernanceOptionIds: [], HigherOptions: [],
+      } } : noActive()], submitStatus: 'PENDING',
       electionScope: { ElectionId: electionId, SchemaVersion: 1, AllowedOperations: ['vote', 'results'], EntitlementReason: '' } };
     const { authority, ports } = createAuthority(new MemoryVaultStorage(), server);
     const tab = ports[0];
@@ -495,7 +500,7 @@ describe('FEAT-018 captured election App Twin', () => {
       const deadline = Date.now() + 5_000;
       while (Date.now() < deadline) {
         bridge.observe(adapter.snapshot());
-        if (bridge.isRunning && adapter.snapshot().entitlementStage === 'awaitingIndex'
+        if (bridge.isRunning && adapter.snapshot().entitlementStage === (currentLicenceReady ? 'entitlementReady' : 'awaitingIndex')
           && authority.snapshot().activeOperationId === null) return;
         await new Promise(resolve => setTimeout(resolve, 10));
       }
@@ -510,8 +515,8 @@ describe('FEAT-018 captured election App Twin', () => {
       expect(await first).toBe(true);
       expect(server.electionCalls).toBe(1);
       expect(server.electionSignaturesValid).toBe(true);
-      expect(adapter.snapshot().entitlementReady).toBe(false);
-      expect(adapter.snapshot().protectedAccess).toBe(false);
+      expect(adapter.snapshot().entitlementReady).toBe(currentLicenceReady);
+      expect(adapter.snapshot().protectedAccess).toBe(currentLicenceReady);
       expect(canAccessCapturedElection(adapter.snapshot(), electionId, 'vote')).toBe(true);
       expect(canAccessCapturedElection(adapter.snapshot(), '22222222-2222-4333-8444-555555555555', 'vote')).toBe(false);
       expect(canAccessCapturedElection(adapter.snapshot(), electionId, 'close')).toBe(false);
@@ -526,10 +531,14 @@ describe('FEAT-018 captured election App Twin', () => {
       expect(canAccessCapturedElection(adapter.snapshot(), electionId, 'results')).toBe(false);
       await bridge.refreshElectionAccess(electionId);
       const prior = adapter.snapshot().electionAccess!;
+      const licenceQueriesBeforeFailure = server.queryCalls;
       server.electionStatus = 503;
       expect(await bridge.refreshElectionAccess(electionId)).toBe(false);
       expect(adapter.snapshot().electionAccess?.reason).toBe('ENTITLEMENT_AUTHORITY_UNAVAILABLE');
       expect(server.submitCalls).toBe(signedSubmissions);
+      expect(adapter.snapshot().entitlementReady).toBe(currentLicenceReady);
+      expect(adapter.snapshot().protectedAccess).toBe(currentLicenceReady);
+      expect(server.queryCalls).toBe(licenceQueriesBeforeFailure);
       server.electionStatus = 200;
       // T018-5-01: the existing Retry control refreshes election scope rather
       // than constructing a licence or treating renewal as captured-access repair.
@@ -559,6 +568,25 @@ describe('FEAT-018 captured election App Twin', () => {
       await awaitBootstrap();
       expect(bridge.isRunning).toBe(true);
       expect(await bridge.refreshElectionAccess(electionId)).toBe(true);
+      for (const reason of ['ENTITLEMENT_CAPTURE_UNAVAILABLE', 'ENTITLEMENT_SEMANTICS_UNSUPPORTED',
+        'ENTITLEMENT_ROSTER_REPLACEMENT_AFTER_LINK']) {
+        const queriesBefore = server.queryCalls;
+        server.electionScope = { ElectionId: electionId, SchemaVersion: 1, AllowedOperations: [], EntitlementReason: reason };
+        expect(await bridge.refreshElectionAccess(electionId)).toBe(false);
+        expect(adapter.snapshot().entitlementReady).toBe(currentLicenceReady);
+        expect(server.queryCalls).toBe(queriesBefore);
+      }
+      if (currentLicenceReady) {
+        for (const reason of ['ENTITLEMENT_NOT_ACTIVE', 'ENTITLEMENT_LIMIT_EXCEEDED', 'ENTITLEMENT_PROFILE_NOT_ALLOWED']) {
+          const queriesBefore = server.queryCalls;
+          server.electionScope = { ElectionId: electionId, SchemaVersion: 1, AllowedOperations: [], EntitlementReason: reason };
+          expect(await bridge.refreshElectionAccess(electionId)).toBe(false);
+          await awaitBootstrap();
+          expect(server.queryCalls).toBe(queriesBefore + 1);
+          expect(server.submitCalls).toBe(signedSubmissions);
+        }
+      }
+      server.electionScope = { ElectionId: electionId, SchemaVersion: 1, AllowedOperations: ['results'], EntitlementReason: '' };
       // Lock while the real signed query is still pending; neither worker nor root
       // may turn its late reply into a grant for the next session.
       server.electionPause = new Promise<void>(resolve => { releaseQuery = resolve; });
@@ -572,5 +600,5 @@ describe('FEAT-018 captured election App Twin', () => {
       expect(canAccessCapturedElection(adapter.snapshot(), electionId, 'results')).toBe(false);
       assertSecretFree(JSON.stringify(adapter.snapshot()));
     } finally { bridge.stop(); adapter.stop(); await dispatchOp(tab, authority, 'lockAll'); }
-  });
+  }, 30_000); // Real crypto plus several serialized worker round trips; not a latency assertion.
 });
