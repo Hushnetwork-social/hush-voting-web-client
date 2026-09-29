@@ -29335,6 +29335,7 @@ var LicenceEntitlementCoordinator = class _LicenceEntitlementCoordinator {
         if (outcome.outcome !== "ready") return;
         await this.attachBoundPendingRecordForReconciliation();
         const reconciledUpgrade = this.reconcilePendingAgainstActive(outcome.projection.licenceReference);
+        this.rejectionRefreshOnly = false;
         this.projection = outcome.projection;
         this.phase = "entitlementReady";
         if (!reconciledUpgrade) {
